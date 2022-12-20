@@ -1,0 +1,1270 @@
+<p>Portable Systems Group</p>
+<p>NT OS/2 File System Support Routines Specification</p>
+<p><strong>Author:</strong> Gary D. Kimura</p>
+<p>Revision 1.0, August 10, 1990</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Miscellaneous Support Macros 2</p>
+<p>2.1 FsRtlCompleteRequest 2</p>
+<p>3. Byte Range File Lock Routines 3</p>
+<p>3.1 FsRtlInitializeFileLock 3</p>
+<p>3.2 FsRtlUninitializeFileLock 4</p>
+<p>3.3 FsRtlAreThereCurrentFileLocks 4</p>
+<p>3.4 FsRtlProcessFileLock 5</p>
+<p>3.5 FsRtlCheckLockForReadAccess 5</p>
+<p>3.6 FsRtlCheckLockForWriteAccess 6</p>
+<p>3.7 FsRtlGetNextFileLock 6</p>
+<p>4. Name Support Routines 8</p>
+<p>4.1 FsRtlFirstDbcsCharacter 8</p>
+<p>4.2 FsRtlDissectDbcs 10</p>
+<p>4.3 FsRtlUpcaseDbcs 11</p>
+<p>4.4 FsRtlDbcsContainsWildCards 12</p>
+<p>4.5 FsRtlCompareDbcs 12</p>
+<p>4.6 FsRtlIsDbcsInExpression 13</p>
+<p>4.7 FsRtlIsNameValid 14</p>
+<p>4.8 FsRtlIsPathValid 14</p>
+<p>4.9 FsRtlIsLegalDbcsCharacter 15</p>
+<p>4.10 FsRtlToUpperDbcsCharacter 16</p>
+<p>5. Mapped Control Block Routines 17</p>
+<p>5.1 FsRtlInitializeMcb 18</p>
+<p>5.2 FsRtlUninitializeMcb 18</p>
+<p>5.3 FsRtlAddMcbEntry 18</p>
+<p>5.4 FsRtlRemoveMcbEntry 19</p>
+<p>5.5 FsRtlLookupMcbEntry 20</p>
+<p>5.6 FsRtlLookupLastMcbEntry 21</p>
+<p>5.7 FsRtlNumberOfRunsInMcb 21</p>
+<p>5.8 FsRtlGetNextMcbEntry 22</p>
+<p>6. Volume Mapped Control Block Routines 24</p>
+<p>6.1 FsRtlInitializeVmcb 25</p>
+<p>6.2 FsRtlUninitializeVmcb 25</p>
+<p>6.3 FsRtlSetMaximumLbnVmcb 26</p>
+<p>6.4 FsRtlAddVmcbMapping 26</p>
+<p>6.5 FsRtlRemoveVmcbMapping 27</p>
+<p>6.6 FsRtlVmcbVbnToLbn 27</p>
+<p>6.7 FsRtlVmcbLbnToVbn 28</p>
+<p>6.8 FsRtlSetDirtyVmcb 28</p>
+<p>6.9 FsRtlSetCleanVmcb 29</p>
+<p>6.10 FsRtlGetDirtySectorsVmcb 29</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes a library of file system support
+routines for use by the different file systems within <strong>NT
+OS/2</strong>. They are executive level routines that are too file
+system specific to belong in the Ex or public Rtl component, and are
+also inappropriate for the I/O component.</p>
+<p>The name of this component is <strong>FsRtl</strong>. Each set of
+routines within <strong>FsRtl</strong> is tailored for supporting a
+specific file system function. Most components within
+<strong>FsRtl</strong> define an abstract data type and routines for
+manipulating the data. In addition, the header file for
+<strong>FsRtl</strong> defines some global data types common to multiple
+file systems.</p>
+<p>The global data types defined within <strong>FsRtl</strong> are:</p>
+<p>o Logical Block Number (<strong>LBN</strong>). <strong>LBN</strong>
+is the moniker used to identify physical blocks on the disk. The
+numbering sequence is from zero to <em>N</em>-1 where <em>N</em> is the
+number of sectors on the disk.</p>
+<p>o Virtual Block Number (<strong>VBN</strong>). The
+<strong>VBN</strong> identifies the sectors of a file relative to the
+start of the file. A value of 0 corresponds to the first sector of data
+for a file, a value of 1 corresponds to the second sector, and so
+forth.</p>
+<p>The individual categories of support provided by
+<strong>FsRtl</strong> are:</p>
+<p>o Byte Range File Locks (<strong>FILE_LOCK</strong>). This package
+implements a set of routines for handling byte range file locking. The
+routines provide a consistent method of all file system to maintain and
+implement byte range file locks.</p>
+<p>o Name Support. This package provides string manipulation routines
+and macros that are tailored for file system usage.</p>
+<p>o Mapped Control Block (<strong>MCB</strong>). This package provides
+for in-memory retrieval mapping support. Retrieval mapping is the
+correspondence between LBN's and VBN's for a given file.</p>
+<p>o Volume Mapped Control Block (<strong>VMCB</strong>). The Pinball
+and Fat file systems treat the ancillary structures of the on-disk file
+system as one large file, called the Volume File. This allows the file
+systems to utilize memory management for maintaining a cache of these
+sectors stored in memory. This package provides necessary support for
+constructing and maintaining an artificial mapping between LBNs and VBNs
+in the volume file.</p>
+<p>o Notify Change Directory Routines. \\ still needs to be added \\</p>
+<p>To use the FsRtl component a file system must explicitly include the
+file &lt;fsrtl.h&gt; (i.e., the file is not automatically included with
+&lt;ntos.h&gt;).</p>
+<p>The remainder of this document describes, in detail, each of the
+preceding components, and also miscellaneous macros.</p>
+<h1 id="miscellaneous-support-macros"><br />
+2. Miscellaneous Support Macros</h1>
+<blockquote>
+<p>This module defines all of the general File System Rtl routines</p>
+</blockquote>
+<h2 id="fsrtlcompleterequest">2.1 FsRtlCompleteRequest</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlCompleteRequest(</strong></p>
+<p><strong>IN PIRP</strong> <em>Irp</em><strong>,</strong></p>
+<p><strong>IN NTSTATUS</strong> <em>Status</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine is used to complete an IRP with the indicated status. It
+does the necessary raise and lower of IRQL.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Irp</em> - Supplies a pointer to the Irp to complete</p>
+<p><em>Status</em> - Supplies the completion status for the Irp</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h1 id="byte-range-file-lock-routines"><br />
+3. Byte Range File Lock Routines</h1>
+<blockquote>
+<p>The file lock package provides a set of routines that allow the
+caller to handle byte range file lock requests. A variable of type
+FILE_LOCK is needed for every file with byte range locking. The package
+provides routines to set and clear locks, and to test for read or write
+access to a file with byte range locks.</p>
+<p>The main idea of the package is to have the file system initialize a
+FILE_LOCK variable for every data file as its opened, and then to simply
+call a file lock processing routine to handle all IRP's with a major
+function code of LOCK_CONTROL. The package is responsible for keeping
+track of locks and for completing the LOCK_CONTROL IRPS. When processing
+a read or write request the file system can then call two query routines
+to check for access.</p>
+<p>Most of the code for processing IRPS and checking for access use
+paged pool and can encounter a page fault, therefore the check routines
+cannot be called at DPC level. To help servers that do call the file
+system to do read/write operations at DPC level there is a additional
+routine that simply checks for the existence of a lock on a file and can
+be run at DPC level.</p>
+<p>Concurrent access to the FILE_LOCK variable must be control by the
+caller.</p>
+<p>The functions provided in this package are as follows:</p>
+<p>o FsRtlInitializeFileLock - Initialize a new FILE_LOCK structure.</p>
+<p>o FsRtlUninitializeFileLock - Uninitialize an existing FILE_LOCK
+structure.</p>
+<p>o FsRtlProcessFileLock - Process an IRP whose major function code is
+LOCK_CONTROL.</p>
+<p>o FsRtlCheckLockForReadAccess - Check for read access to a range of
+bytes in a file.</p>
+<p>o FsRtlCheckLockForWriteAccess - Check for write access to a range of
+bytes in a file.</p>
+<p>o FsRtlAreThereCurrentFileLocks - Check if there are any locks
+currently assigned to a file.</p>
+<p>o FsRtlGetNextFileLock - This procedure enumerates the current locks
+of a file lock variable.</p>
+</blockquote>
+<h2 id="fsrtlinitializefilelock">3.1 FsRtlInitializeFileLock</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlInitializeFileLock(</strong></p>
+<p><strong>IN PFILE_LOCK</strong>
+<em>OpaqueFileLock</em><strong>,</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em><strong>,</strong></p>
+<p><strong>IN PCOMPLETE_LOCK_IRP_ROUTINE</strong>
+<em>CompleteLockIrpRoutine</em> <strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine initializes a new FILE_LOCK structure. The caller must
+supply the memory for the structure. This call must precede all other
+calls that utilize the FILE_LOCK variable.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueFileLock</em> - Supplies a pointer to the FILE_LOCK
+structure to initialize.</p>
+<p><em>PoolType</em> - Supplies the pool type to use when allocating
+additional internal storage. If nonpaged pool is selected then all of
+the routines in this package can be called a DPC level. However, using
+nonpaged pool for storing file lock information is not a wise use of
+nonpaged pool.</p>
+<p><em>CompleteLockIrpRoutine</em> - Optionally supplies an alternate
+routine to call for completing IRPs. FsRtlProcessFileLock by default
+will call IoCompleteRequest to finish up an IRP; however if the caller
+want to process the completion itself then it needs to specify a
+completion routine here. This routine will then be called in place of
+IoCompleteRequest.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtluninitializefilelock">3.2 FsRtlUninitializeFileLock</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlUninitializeFileLock(</strong></p>
+<p><strong>IN PFILE_LOCK</strong> <em>OpaqueFileLock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine uninitializes a FILE_LOCK structure. After calling this
+routine the File lock must be reinitialized before being used again.</p>
+<p>This routine will free all files locks and completes any outstanding
+lock requests as a result of cleaning itself up.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueFileLock</em> - Supplies a pointer to the FILE_LOCK
+struture being decommissioned.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtlaretherecurrentfilelocks">3.3
+FsRtlAreThereCurrentFileLocks</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlAreThereCurrentFileLocks(</strong></p>
+<p><strong>IN PFILE_LOCK</strong> <em>OpaqueFileLock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine tells its if caller there are any current file locks for
+the file. It does this test by simply checking the file lock variable
+and not by accessing other pieces of memory. Therefore if the FileLock
+variable is in nonpaged pool then this test can be done at DPC.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>FileLock</em> - Supplies the File lock being queried</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if there are current locks on the file and FALSE
+otherwise</p>
+</blockquote>
+<h2 id="fsrtlprocessfilelock">3.4 FsRtlProcessFileLock</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>FsRtlProcessFileLock(</strong></p>
+<p><strong>IN PFILE_LOCK</strong>
+<em>OpaqueFileLock</em><strong>,</strong></p>
+<p><strong>IN PIRP</strong> <em>Irp</em><strong>,</strong></p>
+<p><strong>IN PVOID</strong> <em>Context</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine processes a file lock IRP it does either a lock request,
+or an unlock request. It also completes the IRP. Once called the user
+(i.e., File System) has relinquished control of the input IRP.</p>
+<p>If pool is not available to store the information this routine will
+raise a status value indicating insufficient resources.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueFileLock</em> - Supplies the File lock being
+modified/queried.</p>
+<p><em>Irp</em> - Supplies the Irp being processed.</p>
+<p><em>Context</em> - Optionally supplies a context to use when calling
+the user alternate IRP completion routine.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>NTSTATUS - The return status for the operation.</p>
+</blockquote>
+<h2 id="fsrtlchecklockforreadaccess">3.5
+FsRtlCheckLockForReadAccess</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlCheckLockForReadAccess(</strong></p>
+<p><strong>IN PFILE_LOCK</strong>
+<em>OpaqueFileLock</em><strong>,</strong></p>
+<p><strong>IN PIRP</strong> <em>Irp</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine checks to see if the caller has read access to the range
+indicated in the IRP due to file locks. This call does not complete the
+Irp it only uses it to get the lock information and read information.
+The IRP must be for a read operation.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueFileLock</em> - Supplies the File Lock to check.</p>
+<p><em>Irp</em> - Supplies the Irp being processed.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the indicated user/request has read access to the
+entire specified byte range, and FALSE otherwise</p>
+</blockquote>
+<h2 id="fsrtlchecklockforwriteaccess">3.6
+FsRtlCheckLockForWriteAccess</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlCheckLockForWriteAccess(</strong></p>
+<p><strong>IN PFILE_LOCK</strong>
+<em>OpaqueFileLock</em><strong>,</strong></p>
+<p><strong>IN PIRP</strong> <em>Irp</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine checks to see if the caller has write access to the
+indicated range due to file locks. This call does not complete the Irp
+it only uses it to get the lock information and write information. The
+IRP must be for a write operation.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueFileLock</em> - Supplies the File Lock to check.</p>
+<p><em>Irp</em> - Supplies the Irp being processed.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the indicated user/request has write access to the
+entire specified byte range, and FALSE otherwise</p>
+</blockquote>
+<h2 id="fsrtlgetnextfilelock">3.7 FsRtlGetNextFileLock</h2>
+<p><strong>PFILE_LOCK_INFO</strong></p>
+<p><strong>FsRtlGetNextFileLock(</strong></p>
+<p><strong>IN PFILE_LOCK</strong>
+<em>OpaqueFileLock</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>Restart</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine enumerate the file lock current denoted by the input
+file lock variable. It returns a pointer to the file lock information
+stored for each lock. The caller is responsible for synchronizing call
+to this procedure and for not altering any of the data returned by this
+procedure.</p>
+<p>The way a programing will use this procedure to enumerate all of the
+locks is as follows:</p>
+<p>for (p = FsRtlGetNextFileLock( FileLock, TRUE );</p>
+<p>p != NULL;</p>
+<p>p = FsRtlGetNextFileLock( FileLock, FALSE )) {</p>
+<p>// Process the lock information referenced by p</p>
+<p>}</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueFileLock</em> - Supplies the File Lock to enumerate. The
+current enumeration state is stored in the file lock variable so if
+multiple threads are enumerating the lock at the same time the results
+will be unpredictable.</p>
+<p><em>Restart</em> - Indicates if the enumeration is to start at the
+beginning of the file lock list or if we are continuing from a previous
+call.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>PFILE_LOCK_INFO - Either it returns a pointer to the next file lock
+record for the input file lock or it returns NULL if there are not more
+locks.</p>
+</blockquote>
+<h1 id="name-support-routines"><br />
+4. Name Support Routines</h1>
+<blockquote>
+<p>The name support package is for manipulating DBCS strings (later this
+will be extended to also handle UNICODE strings). The routines allow the
+caller to dissect and compare strings.</p>
+<p>There are two exported typedef's defined by this package. The first
+is a structure called CODEPAGE. Every Dbcs routines takes as input a
+code page record. This record contains the double byte character and
+upcase information. If a code page not supplied the routines currently
+use the default US code page.</p>
+<p>We need to work out the routines for a file system to contruct a code
+page.</p>
+<p>The second typedef is an enumerated type called COMPARISON_RESULTS
+that is used when comparing two strings. It indicates if one string is
+less than, equal to, or greater than the other. The comparison routines
+also know how to handle wild cards.</p>
+<p>The following routines are provided by this package:</p>
+<p>o FsRtlDissectDbcs - This routine takes a path name string and breaks
+into two parts. The first name in the string and the remainder. It also
+checks that the first name is valid for an OS/2 file.</p>
+<p>o FsRtlUpcaseDbcs - This routines takes a string and computes its
+upcased equivalent.</p>
+<p>o FsRtlDbcsContainsWildCards - This routines tells the caller if a
+string contains any wildcard characters (i.e., * or ?).</p>
+<p>o FsRtlCompareDbcs - This routine compares two strings.</p>
+<p>o FsRtlIsDbcsInExpression - This routine is used to compare a string
+against a template (possibly containing wildcards) to sees if the string
+is in the language denoted by the template.</p>
+<p>o FsRtlIsNameValid - This routine checks to see if a string contains
+valid characters.</p>
+<p>o FsRtlIsPathValid - This routine checks to see if a string contains
+valid names separated by backslashes.</p>
+<p>o FsRtlFirstDbcsCharacter - This routine is used to extract the first
+character from a DBCS string.</p>
+<p>o FsRtlIslegalDbcsCharacter - This routine is used to decide if a
+DBCS character value is legal.</p>
+<p>o FsRtlToUpperDbcsCharacter - This routine is used to upcase a single
+DBCS character.</p>
+</blockquote>
+<h2 id="fsrtlfirstdbcscharacter">4.1 FsRtlFirstDbcsCharacter</h2>
+<p><strong>USHORT</strong></p>
+<p><strong>FsRtlFirstDbcsCharacter(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN STRING</strong> <em>Name</em><strong>,</strong></p>
+<p><strong>OUT PSTRING</strong> <em>RemainingName</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine takes an input Dbcs string and returns as its function
+value the first character in the string and as an output parameter the
+remaining name after the first character. If the name is empty then a
+value of zero is returned. If the first character in the input name is
+invalid then an invalid character is returned and the remaining name is
+advanced by one byte through the input name.</p>
+<p>Example of its results are:</p>
+<p>Name Function Result RemainingName</p>
+<p>empty 0 empty</p>
+<p>A A empty</p>
+<p>~A ~ A (~ denotes an illegal char)</p>
+<p>AB A B</p>
+<p>Note that given a Dbcs string denoted by a STRING variable Str the
+1st, 2nd, and subsequent Dbcs characters can be extracted using the
+following programming construct</p>
+<p>while (Str.Length != 0) {</p>
+<p>Dbcs = FsRtlFirstDbcsCharacter( NULL, Str, &amp;Str );</p>
+<p>// Dbcs now contains the next character in the string.</p>
+<p>}</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when examining the input string;
+otherwise a generic code page is used.</p>
+<p><em>Name</em> - Supplies the input string being examined</p>
+<p><em>RemainingName</em> - Receives the remaining part of the input
+string after the first character.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>USHORT - Receives the first character found in the input string.</p>
+</blockquote>
+<h2 id="fsrtldissectdbcs">4.2 FsRtlDissectDbcs</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlDissectDbcs(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN STRING</strong> <em>InputName</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>Is8dot3</em><strong>,</strong></p>
+<p><strong>OUT PSTRING</strong> <em>FirstPart</em><strong>,</strong></p>
+<p><strong>OUT PSTRING</strong> <em>RemainingPart</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine takes an input Dbcs string and dissects it into two
+substrings. The first output string contains the name that appears at
+the beginning of the input string, the second output string contains the
+remainder of the input string.</p>
+<p>In the input string backslashes are used to separate names. The input
+string must not start with a backslash. Both output strings will not
+begin with a backslash.</p>
+<p>If the input string does not contain any names then both output
+strings are empty. If the input string contains only one name then the
+first output string contains the name and the second string is
+empty.</p>
+<p>Note that both output strings use the same string buffer memory of
+the input string.</p>
+<p>This routine returns a function result of TRUE if the input string is
+well formed (including empty) and contains only valid characters
+(including wildcards). It returns FALSE if the input string is
+illformed, contains invalid characters.</p>
+<p>Example of its results are:</p>
+<p>InputString FirstPart RemainingPart Function Result</p>
+<p>empty empty empty TRUE</p>
+<p>A A empty TRUE</p>
+<p>A\B\C\D\E A B\C\D\E TRUE</p>
+<p>*A? *A? empty TRUE</p>
+<p>\A empty empty FALSE</p>
+<p>A[,] empty empty FALSE</p>
+<p>A\\B+;\C A \B+;\C TRUE</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when dissecting the input string;
+otherwise a generic code page is used.</p>
+<p><em>InputName</em> - Supplies the input string being dissected</p>
+<p><em>Is</em>8dot3 - Indicates if the first part of the input name must
+be 8.3 or can be long file name.</p>
+<p><em>FirstPart</em> - Receives the first name in the input string</p>
+<p><em>RemainingPart</em> - Receives the remaining part of the input
+string</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the input string is well formed and its first part
+does not contain any illegal characters, and FALSE otherwise.</p>
+</blockquote>
+<h2 id="fsrtlupcasedbcs">4.3 FsRtlUpcaseDbcs</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlUpcaseDbcs(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN STRING</strong> <em>InputName</em><strong>,</strong></p>
+<p><strong>OUT PSTRING</strong> <em>OutputName</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine copies and upcases a Dbcs input string into a caller
+supplied output string according to the following upcase mapping
+rules.</p>
+<p>For character values between 0 and 127, upcase normally.</p>
+<p>For character values between 128 and 255 and not DBCS, use the upcase
+table in the code page to upcase a single character.</p>
+<p>For character values between 128 and 255 and DBCS, do not alter.</p>
+<p>The first two points above are handled transparently via the Code
+Page</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when upcasing the input string; otherwise
+a generic code page is used.</p>
+<p><em>InputName</em> - Supplies the input string to upcase</p>
+<p><em>OutputName</em> - Receives the output string, the output buffer
+must already be supplied by the caller</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtldbcscontainswildcards">4.4 FsRtlDbcsContainsWildCards</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlDbcsContainsWildCards(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN STRING</strong> <em>Name</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine checks if the input Dbcs name contains any wild card
+characters (i.e., * or ?).</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when examining the input string;
+otherwise a generic code page is used.</p>
+<p><em>Name</em> - Supplies the name to examine</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the input name contains any wildcard characters and
+FALSE otherwise.</p>
+</blockquote>
+<h2 id="fsrtlcomparedbcs">4.5 FsRtlCompareDbcs</h2>
+<p><strong>COMPARISON_RESULTS</strong></p>
+<p><strong>FsRtlCompareDbcs(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN STRING</strong> <em>Expression</em><strong>,</strong></p>
+<p><strong>IN STRING</strong> <em>Name</em><strong>,</strong></p>
+<p><strong>IN COMPARISON_RESULTS</strong>
+<em>WildIs</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>CaseInsensitive</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine compares a Dbcs expression with a Dbcs name
+lexigraphically for LessThan, EqualTo, or GreaterThan. If the expression
+does not contain any wildcards, this procedure does a complete
+comparison. If the expression does contain wild cards, then the
+comparison is only done up to the first wildcard character. The Name
+parameter must not contain wild cards. The wildcard character compares
+as less then all other characters. So the wildcard name "*.*" will
+always compare less than all other strings.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when examining the input string;
+otherwise a generic code page is used.</p>
+<p><em>Expression</em> - Supplies the first name (expression) to
+compare, optionally with wild cards. (Upcased already if CaseInsensitive
+is supplied as TRUE.)</p>
+<p><em>Name</em> - Supplies the second name to compare - no wild cards
+allowed.</p>
+<p><em>WildIs</em> - Determines what Result is returned if a wild card
+is encountered in the Expression String.</p>
+<p><em>CaseInsensitive</em> - TRUE if Name should be Upcased before
+comparing.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>COMPARISON_RESULTS -</p>
+<p>LessThan if Expression &lt; Name</p>
+<p>EqualTo if Expression == Name</p>
+<p>GreaterThan if Expression &gt; Name</p>
+</blockquote>
+<h2 id="fsrtlisdbcsinexpression">4.6 FsRtlIsDbcsInExpression</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlIsDbcsInExpression(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN STRING</strong> <em>Expression</em><strong>,</strong></p>
+<p><strong>IN STRING</strong> <em>Name</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>CaseInsensitive</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine compares a Dbcs name and an expression and tells the
+caller if the name is equal to or not equal to the expression. The input
+name cannot contain wildcards, while the expression may contain
+wildcards.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when examining the input string;
+otherwise a generic code page is used.</p>
+<p><em>Expression</em> - Supplies the input expression to check against
+(Caller must already upcase if passing CaseInsensitive TRUE.)</p>
+<p><em>Name</em> - Supplies the input name to check for.</p>
+<p><em>CaseInsensitive</em> - TRUE if Name should be Upcased before
+comparing.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if Name is an element in the set of strings denoted by
+the input Expression and FALSE otherwise.</p>
+</blockquote>
+<h2 id="fsrtlisnamevalid">4.7 FsRtlIsNameValid</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlIsNameValid(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN STRING</strong> <em>Name</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>Is8dot3</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong>
+<em>CanContainWildCards</em><strong>,</strong></p>
+<p><strong>OUT PSTRING</strong> <em>LongestValidPrefix</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine scans the input Dbcs name and verifies that if only
+contains valid characters.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when examining the input string;
+otherwise a generic code page is used.</p>
+<p><em>Name</em> - Supplies the input name to check.</p>
+<p><em>Is</em>8dot3 - Specifies if the Name must be 8.3 or can be a long
+file name.</p>
+<p><em>CanContainWildCards</em> - Indicates if the name can contain wild
+cards (i.e., * and ?).</p>
+<p><em>LongestValidPrefix</em> - This optional output parameter receives
+a string denoting the largest valid prefix found for the input string.
+If the input string is completely valid then the longest valid prefix is
+equal to the input string.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the input name is valid and FALSE otherwise.</p>
+</blockquote>
+<h2 id="fsrtlispathvalid">4.8 FsRtlIsPathValid</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlIsPathValid(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN STRING</strong> <em>Name</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>Is8dot3</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong>
+<em>MustHaveLeadingBackslash</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong>
+<em>CanContainWildCards</em><strong>,</strong></p>
+<p><strong>OUT PSTRING</strong> <em>LongestValidPrefix</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine scans the input Dbcs string and verifies that it is only
+composed of valid names separated by backslashes.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when examining the input string;
+otherwise a generic code page is used.</p>
+<p><em>Name</em> - Supplies the input name to check.</p>
+<p><em>Is</em>8dot3 - Specifies if the Name must be 8.3 or can be a long
+file name.</p>
+<p><em>MustHaveLeadingBackslash</em> - Specifies if the name must start
+with a leading backslash.</p>
+<p><em>CanContainWildCards</em> - Indicates if the name can contain wild
+cards (i.e., * and ?).</p>
+<p><em>LongestValidPrefix</em> - This optional output parameter receives
+a string denoting the largest valid prefix found for the input string.
+If the input string is completely valid then the longest valid prefix is
+equal to the input string.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the input name is valid and FALSE otherwise.</p>
+</blockquote>
+<h2 id="fsrtlislegaldbcscharacter">4.9 FsRtlIsLegalDbcsCharacter</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlIsLegalDbcsCharacter(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN USHORT</strong> <em>DbcsCharacter</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine takes an input character (either double byte or single
+byte) and indicates to the caller if the character is legal. The input
+to this procedure should be the return value of having called
+FsRtlFirstDbcsCharacter.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when examining the input character;
+otherwise a generic code page is used.</p>
+<p><em>DbcsCharacter</em> - Supplies the input character being
+examined</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the input character is legal and FALSE
+otherwise</p>
+</blockquote>
+<h2 id="fsrtltoupperdbcscharacter">4.10 FsRtlToUpperDbcsCharacter</h2>
+<p><strong>USHORT</strong></p>
+<p><strong>FsRtlToUpperDbcsCharacter(</strong></p>
+<p><strong>IN PCODEPAGE</strong> <em>CodePage</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN USHORT</strong> <em>DbcsCharacter</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine takes an input character (either double byte or single
+byte) and returns its upcased equivalent character. The input to this
+procedure should be the return value of having called
+FsRtlFirstDbcsCharacter.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>CodePage</em> - Is an optional input parameter. If supplied it
+specifies the code page to use when examining the input character;
+otherwise a generic code page is used.</p>
+<p><em>DbcsCharacter</em> - Supplies the input character being
+upcased</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>USHORT - Recieves the upcased character</p>
+</blockquote>
+<h1 id="mapped-control-block-routines"><br />
+5. Mapped Control Block Routines</h1>
+<blockquote>
+<p>The MCB routines provide support for maintaining an in-memory copy of
+the retrieval mapping information for a file. The general idea is to
+have the file system lookup the retrieval mapping for a VBN once from
+the disk, add the mapping to the MCB structure, and then utilize the MCB
+to retrieve the mapping for subsequent accesses to the file. A variable
+of type MCB is used to store the mapping information.</p>
+<p>The routines provided here allow the user to incrementally store some
+or all of the retrieval mapping for a file and to do so in any order.
+That is, the mapping can be inserted to the MCB structure all at once
+starting from the beginning and working to the end of the file, or it
+can be randomly scattered throughout the file.</p>
+<p>The package identifies each contiguous run of sectors mapping VBNs
+and LBNs indenpendent of the order they are added to the MCB structure.
+For example a user can define a mapping between VBN sector 0 and LBN
+sector 107, and between VBN sector 2 and LBN sector 109. The mapping now
+contains two runs each one sector in length. Now if the user adds an
+additional mapping between VBN sector 1 and LBN sector 106 the MCB
+structure will contain only one run 3 sectors in length.</p>
+<p>Concurrent access to the MCB structure is control by this
+package.</p>
+<p>The following routines are provided by this package:</p>
+<p>o FsRtlInitializeMcb - Initialize a new MCB structure. There should
+be one MCB for every opened file. Each MCB structure must be initialized
+before it can be used by the system.</p>
+<p>o FsRtlUninitializeMcb - Uninitialize an MCB structure. This call is
+used to cleanup any anciallary structures allocated and maintained by
+the MCB. After being uninitialized the MCB must again be initialized
+before it can be used by the system.</p>
+<p>o FsRtlAddMcbEntry - This routine adds a new range of mappings
+between LBNs and VBNs to the MCB structure.</p>
+<p>o FsRtlRemoveMcbEntry - This routines removes an existing range of
+mappings between LBNs and VBNs from the MCB structure.</p>
+<p>o FsRtlLookupMcbEntry - This routine returns the LBN mapped to by a
+VBN, and indicates, in sectors, the length of the run.</p>
+<p>o FsRtlLookupLastMcbEntry - This routine returns the mapping for the
+largest VBN stored in the structure.</p>
+<p>o FsRtlNumberOfRunsInMcb - This routine tells the caller total number
+of discontiguous sectors runs stored in the MCB structure.</p>
+<p>o FsRtlGetNextMcbEntry - This routine returns the the caller the
+starting VBN and LBN of a given run stored in the MCB structure.</p>
+</blockquote>
+<h2 id="fsrtlinitializemcb">5.1 FsRtlInitializeMcb</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlInitializeMcb(</strong></p>
+<p><strong>IN PMCB</strong> <em>OpaqueMcb</em><strong>,</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine initializes a new Mcb structure. The caller must supply
+the memory for the Mcb structure. This call must precede all other calls
+that set/query the Mcb structure.</p>
+<p>If pool is not available this routine will raise a status value
+indicating insufficient resources.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueMcb</em> - Supplies a pointer to the Mcb structure to
+initialize.</p>
+<p><em>PoolType</em> - Supplies the pool type to use when allocating
+additional internal Mcb memory.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtluninitializemcb">5.2 FsRtlUninitializeMcb</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlUninitializeMcb(</strong></p>
+<p><strong>IN PMCB</strong> <em>OpaqueMcb</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine uninitializes an Mcb structure. After calling this
+routine the input Mcb structure must be re-initialized before being used
+again.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueMcb</em> - Supplies a pointer to the Mcb structure to
+uninitialize.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtladdmcbentry">5.3 FsRtlAddMcbEntry</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlAddMcbEntry(</strong></p>
+<p><strong>IN PMCB</strong> <em>OpaqueMcb</em><strong>,</strong></p>
+<p><strong>IN VBN</strong> <em>Vbn</em><strong>,</strong></p>
+<p><strong>IN LBN</strong> <em>Lbn</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>SectorCount</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine is used to add a new mapping of VBNs to LBNs to an
+existing Mcb. The information added will map</p>
+<p>Vbn to Lbn,</p>
+<p>Vbn+1 to Lbn+1,...</p>
+<p>Vbn+(SectorCount-1) to Lbn+(SectorCount-1).</p>
+<p>The mapping for the VBNs must not already exist in the Mcb. If the
+mapping continues a previous run, then this routine will actually
+coalesce them into 1 run.</p>
+<p>If pool is not available to store the information this routine will
+raise a status value indicating insufficient resources.</p>
+<p>An input Lbn value of zero is illegal (i.e., the Mcb structure will
+never map a Vbn to a zero Lbn value).</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueMcb</em> - Supplies the Mcb in which to add the new
+mapping.</p>
+<p><em>Vbn</em> - Supplies the starting Vbn of the new mapping run to
+add to the Mcb.</p>
+<p><em>Lbn</em> - Supplies the starting Lbn of the new mapping run to
+add to the Mcb.</p>
+<p><em>SectorCount</em> - Supplies the size of the new mapping run (in
+sectors).</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the mapping was added successfully (i.e., the new
+Vbns did not collide with existing Vbns), and FALSE otherwise. If FALSE
+is returned then the Mcb is not changed.</p>
+</blockquote>
+<h2 id="fsrtlremovemcbentry">5.4 FsRtlRemoveMcbEntry</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlRemoveMcbEntry(</strong></p>
+<p><strong>IN PMCB</strong> <em>OpaqueMcb</em><strong>,</strong></p>
+<p><strong>IN VBN</strong> <em>Vbn</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>SectorCount</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine removes a mapping of VBNs to LBNs from an Mcb. The
+mappings removed are for</p>
+<p>Vbn,</p>
+<p>Vbn+1, to</p>
+<p>Vbn+(SectorCount-1).</p>
+<p>The operation works even if the mapping for a Vbn in the specified
+range does not already exist in the Mcb. If the specified range of Vbn
+includes the last mapped Vbn in the Mcb then the Mcb mapping shrinks
+accordingly.</p>
+<p>If pool is not available to store the information this routine will
+raise a status value indicating insufficient resources.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueMcb</em> - Supplies the Mcb from which to remove the
+mapping.</p>
+<p><em>Vbn</em> - Supplies the starting Vbn of the mappings to
+remove.</p>
+<p><em>SectorCount</em> - Supplies the size of the mappings to remove
+(in sectors).</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtllookupmcbentry">5.5 FsRtlLookupMcbEntry</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlLookupMcbEntry(</strong></p>
+<p><strong>IN PMCB</strong> <em>OpaqueMcb</em><strong>,</strong></p>
+<p><strong>IN VBN</strong> <em>Vbn</em><strong>,</strong></p>
+<p><strong>OUT PLBN</strong> <em>Lbn</em><strong>,</strong></p>
+<p><strong>OUT PULONG</strong> <em>SectorCount</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine retrieves the mapping of a Vbn to an Lbn from an Mcb. It
+indicates if the mapping exists and the size of the run.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueMcb</em> - Supplies the Mcb being examined.</p>
+<p><em>Vbn</em> - Supplies the Vbn to lookup.</p>
+<p><em>Lbn</em> - Receives the Lbn corresponding to the Vbn. A value of
+zero is returned if the Vbn does not have a corresponding Lbn.</p>
+<p><em>SectorCount</em> - Receives the number of sectors that map from
+the Vbn to contiguous Lbn values beginning with the input Vbn.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the Vbn is within the range of VBNs mapped by the
+MCB (even if it corresponds to a hole in the mapping), and FALSE if the
+Vbn is beyond the range of the MCB's mapping.</p>
+<p>For example, if an MCB has a mapping for VBNs 5 and 7 but not for 6,
+then a lookup on Vbn 5 or 7 will yield a non zero Lbn and a sector count
+of 1. A lookup for Vbn 6 will return TRUE with an Lbn value of 0, and
+lookup for Vbn 8 or above will return FALSE.</p>
+</blockquote>
+<h2 id="fsrtllookuplastmcbentry">5.6 FsRtlLookupLastMcbEntry</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlLookupLastMcbEntry(</strong></p>
+<p><strong>IN PMCB</strong> <em>OpaqueMcb</em><strong>,</strong></p>
+<p><strong>OUT PVBN</strong> <em>Vbn</em><strong>,</strong></p>
+<p><strong>OUT PLBN</strong> <em>Lbn</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine retrieves the last Vbn to Lbn mapping stored in the Mcb.
+It returns the mapping for the last sector or the last run in the Mcb.
+The results of this function is useful when extending an existing file
+and needing to a hint on where to try and allocate sectors on the
+disk.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueMcb</em> - Supplies the Mcb being examined.</p>
+<p><em>Vbn</em> - Receives the last Vbn value mapped.</p>
+<p><em>Lbn</em> - Receives the Lbn corresponding to the Vbn.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if there is a mapping within the Mcb and FALSE
+otherwise (i.e., the Mcb does not contain any mapping).</p>
+</blockquote>
+<h2 id="fsrtlnumberofrunsinmcb">5.7 FsRtlNumberOfRunsInMcb</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>FsRtlNumberOfRunsInMcb(</strong></p>
+<p><strong>IN PMCB</strong> <em>OpaqueMcb</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine returns to the its caller the number of distinct runs
+mapped by an Mcb. Holes (i.e., Vbns that map to Lbn=0) are counted as
+runs. For example, an Mcb containing a mapping for only Vbns 0 and 3
+will have 3 runs, one for the first mapped sector, a second for the hole
+covering Vbns 1 and 2, and a third for Vbn 3.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueMcb</em> - Supplies the Mcb being examined.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - Returns the number of distinct runs mapped by the input
+Mcb.</p>
+</blockquote>
+<h2 id="fsrtlgetnextmcbentry">5.8 FsRtlGetNextMcbEntry</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlGetNextMcbEntry(</strong></p>
+<p><strong>IN PMCB</strong> <em>OpaqueMcb</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>RunIndex</em><strong>,</strong></p>
+<p><strong>OUT PVBN</strong> <em>Vbn</em><strong>,</strong></p>
+<p><strong>OUT PLBN</strong> <em>Lbn</em><strong>,</strong></p>
+<p><strong>OUT PULONG</strong> <em>SectorCount</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine returns to its caller the Vbn, Lbn, and SectorCount for
+distinct runs mapped by an Mcb. Holes are counted as runs. For example,
+to construct to print out all of the runs in a a file is:</p>
+<p>for (i = 0; FsRtlGetNextMcbEntry(Mcb,i,&amp;Vbn,&amp;Lbn,&amp;Count);
+i++){</p>
+<p>// print out vbn, lbn, and count</p>
+<p>}</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueMcb</em> - Supplies the Mcb being examined.</p>
+<p><em>RunIndex</em> - Supplies the index of the run (zero based) to
+return to the caller.</p>
+<p><em>Vbn</em> - Receives the starting Vbn of the returned run, or zero
+if the run does not exist.</p>
+<p><em>Lbn</em> - Recieves the starting Lbn of the returned run, or zero
+if the run does not exist.</p>
+<p><em>SectorCount</em> - Receives the number of sectors within the
+returned run, or zero if the run does not exist.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the specified run (i.e., RunIndex) exists in the
+Mcb, and FALSE otherwise. If FALSE is returned then the Vbn, Lbn, and
+SectorCount parameters receive zero.</p>
+</blockquote>
+<h1 id="volume-mapped-control-block-routines"><br />
+6. Volume Mapped Control Block Routines</h1>
+<blockquote>
+<p>The VMCB routines provide support for maintaining a mapping between
+LBNs and VBNs for a virtual volume file. The volume file is all of the
+sectors that make up the on-disk structures. A file system uses this
+package to map LBNs for on-disk structure to VBNs in a volume file. This
+when used in conjunction with Memory Management and the Cache Manager
+will treat the volume file as a simple mapped file. A variable of type
+VMCB is used to store the mapping information and one is needed for
+every mounted volume.</p>
+<p>The main idea behind this package is to allow the user to dynamically
+read in new disk structure sectors (e.g., FNODEs). The user assigns the
+new sector a VBN in the Volume file and has memory management fault the
+page containing the sector into memory. To do this Memory management
+will call back into the file system to read the page from the volume
+file passing in the appropriate VBN. Now the file system takes the VBN
+and maps it back to its LBN and does the read.</p>
+<p>The granularity of mapping is one a per page basis. That is if a
+mapping for LBN 8 is added to the VMCB structure and the page size is 8
+sectors then the VMCB routines will actually assign a mapping for LBNS 8
+through 15, and they will be assigned to a page aligned set of VBNS.
+This function is needed to allow us to work efficiently with memory
+management. This means that some sectors in some pages might actually
+contain regular file data and not volume information, and so when
+writing the page out we must only write the sectors that are really in
+use by the volume file. To help with this we provide a set of routines
+to keep track of dirty volume file sectors. That way, when the file
+system is called to write a page to the volume file, it will only write
+the sectors that are dirty.</p>
+<p>Concurrent access the VMCB structure is control by this package.</p>
+<p>The functions provided in this package are as follows:</p>
+<p>o FsRtlInitializeVmcb - Initialize a new VMCB structure.</p>
+<p>o FsRtlUninitializeVmcb - Uninitialize an existing VMCB
+structure.</p>
+<p>o FsRtlSetMaximumLbnVmcb - Sets/Resets the maximum allowed LBN for
+the specified VMCB structure.</p>
+<p>o FsRtlAddVmcbMapping - This routine takes an LBN and assigns to it a
+VBN. If the LBN already was assigned to an VBN it simply returns the old
+VBN and does not do a new assignemnt.</p>
+<p>o FsRtlRemoveVmcbMapping - This routine takes an LBN and removes its
+mapping from the VMCB structure.</p>
+<p>o FsRtlVmcbVbnToLbn - This routine takes a VBN and returns the LBN it
+maps to.</p>
+<p>o FsRtlVmcbLbnToVbn - This routine takes an LBN and returns the VBN
+its maps to.</p>
+<p>o FsRtlSetDirtyVmcb - This routine is used to mark sectors dirty in
+the volume file.</p>
+<p>o FsRtlSetCleanVmcb - This routine is used to mark sectors clean in
+the volume file.</p>
+<p>o FsRtlGetDirtySectorsVmcb - This routine is used to retrieve the
+dirty sectors for a page in the volume file.</p>
+</blockquote>
+<h2 id="fsrtlinitializevmcb">6.1 FsRtlInitializeVmcb</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlInitializeVmcb(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>MaximumLbn</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine initializes a new Vmcb Structure. The caller must supply
+the memory for the structure. This must precede all other calls that
+set/query the volume file mapping.</p>
+<p>If pool is not available this routine will raise a status value
+indicating insufficient resources.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies a pointer to the volume file structure
+to initialize.</p>
+<p><em>PoolType</em> - Supplies the pool type to use when allocating
+additional internal structures.</p>
+<p><em>MaximumLbn</em> - Supplies the maximum Lbn value that is valid
+for this volume.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None</p>
+</blockquote>
+<h2 id="fsrtluninitializevmcb">6.2 FsRtlUninitializeVmcb</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlUninitializeVmcb(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine uninitializes an existing VMCB structure. After calling
+this routine the input VMCB structure must be re-initialized before
+being used again.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies a pointer to the VMCB structure to
+uninitialize.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtlsetmaximumlbnvmcb">6.3 FsRtlSetMaximumLbnVmcb</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlSetMaximumLbnVmcb(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>MaximumLbn</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine sets/resets the maximum allowed LBN for the specified
+Vmcb structure. The Vmcb structure must already have been initialized by
+calling FsRtlInitializeVmcb.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies a pointer to the volume file structure
+to initialize.</p>
+<p><em>MaximumLbn</em> - Supplies the maximum Lbn value that is valid
+for this volume.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None</p>
+</blockquote>
+<h2 id="fsrtladdvmcbmapping">6.4 FsRtlAddVmcbMapping</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlAddVmcbMapping(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN LBN</strong> <em>Lbn</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>SectorCount</em><strong>,</strong></p>
+<p><strong>OUT PVBN</strong> <em>Vbn</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine adds a new LBN to VBN mapping to the VMCB structure.
+When a new LBN is added to the structure it does it only on page aligned
+boundaries.</p>
+<p>If pool is not available to store the information this routine will
+raise a status value indicating insufficient resources.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies the VMCB being updated.</p>
+<p><em>Lbn</em> - Supplies the starting LBN to add to VMCB.</p>
+<p><em>SectorCount</em> - Supplies the number of Sectors in the run</p>
+<p><em>Vbn</em> - Receives the assigned VBN</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if this is a new mapping and FALSE if the mapping for
+the LBN already exists. If it already exists then the sector count for
+this new addition must already be in the VMCB structure</p>
+</blockquote>
+<h2 id="fsrtlremovevmcbmapping">6.5 FsRtlRemoveVmcbMapping</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlRemoveVmcbMapping(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN VBN</strong> <em>Vbn</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>SectorCount</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine removes a Vmcb mapping.</p>
+<p>If pool is not available to store the information this routine will
+raise a status value indicating insufficient resources.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies the Vmcb being updated.</p>
+<p><em>Vbn</em> - Supplies the VBN to remove</p>
+<p><em>SectorCount</em> - Supplies the number of sectors to remove.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtlvmcbvbntolbn">6.6 FsRtlVmcbVbnToLbn</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlVmcbVbnToLbn(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN VBN</strong> <em>Vbn</em><strong>,</strong></p>
+<p><strong>IN PLBN</strong> <em>Lbn</em><strong>,</strong></p>
+<p><strong>OUT PULONG</strong> <em>SectorCount</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine translates a VBN to an LBN.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies the VMCB structure being queried.</p>
+<p><em>Vbn</em> - Supplies the VBN to translate from.</p>
+<p><em>Lbn</em> - Receives the LBN mapped by the input Vbn. This value
+is only valid if the function result is TRUE.</p>
+<p><em>SectorCount</em> - Optionally receives the number of sectors
+corresponding to the run.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if he Vbn has a valid mapping and FALSE otherwise.</p>
+</blockquote>
+<h2 id="fsrtlvmcblbntovbn">6.7 FsRtlVmcbLbnToVbn</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>FsRtlVmcbLbnToVbn(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN LBN</strong> <em>Lbn</em><strong>,</strong></p>
+<p><strong>OUT PVBN</strong> <em>Vbn</em><strong>,</strong></p>
+<p><strong>OUT PULONG</strong> <em>SectorCount</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine translates an LBN to a VBN.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies the VMCB structure being queried.</p>
+<p><em>Lbn</em> - Supplies the LBN to translate from.</p>
+<p><em>Vbn</em> - Recieves the VBN mapped by the input LBN. This value
+is only valid if the function result is TRUE.</p>
+<p><em>SectorCount</em> - Optionally receives the number of sectors
+corresponding to the run.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>BOOLEAN - TRUE if the mapping is valid and FALSE otherwise.</p>
+</blockquote>
+<h2 id="fsrtlsetdirtyvmcb">6.8 FsRtlSetDirtyVmcb</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlSetDirtyVmcb(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong>
+<em>LbnPageNumber</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Mask</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine sets the sectors within a page as dirty based on the
+input mask.</p>
+<p>If pool is not available to store the information this routine will
+raise a status value indicating insufficient resources.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies the Vmcb being manipulated.</p>
+<p><em>LbnPageNumber</em> - Supplies the Page Number (LBN based) of the
+page being modified. For example, with a page size of 8 a page number of
+0 corresponds to LBN values 0 through 7, a page number of 1 corresponds
+to 8 through 15, and so on.</p>
+<p><em>Mask</em> - Supplies the mask of dirty sectors to set for the
+Page (a 1 bit means to set it dirty). For example to set LBN 9 dirty on
+a system with a page size of 8 the LbnPageNumber will be 1, and the mask
+will be 0x00000002.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtlsetcleanvmcb">6.9 FsRtlSetCleanVmcb</h2>
+<p><strong>VOID</strong></p>
+<p><strong>FsRtlSetCleanVmcb(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>LbnPageNumber</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine sets all of the sectors within a page as clean. All of
+the sectors in a page whether they are dirty or not are set clean by
+this procedure.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies the Vmcb being manipulated.</p>
+<p><em>LbnPageNumber</em> - Supplies the Page Number (Lbn based) of page
+being modified. For example, with a page size of 8 a page number of 0
+corresponds to LBN values 0 through 7, a page number of 1 corresponds to
+8 through 15, and so on.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="fsrtlgetdirtysectorsvmcb">6.10 FsRtlGetDirtySectorsVmcb</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>FsRtlGetDirtySectorsVmcb(</strong></p>
+<p><strong>IN PVMCB</strong> <em>OpaqueVmcb</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>LbnPageNumber</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine returns to its caller a mask of dirty sectors within a
+page.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>OpaqueVmcb</em> - Supplies the Vmcb being manipulated</p>
+<p><em>LbnPageNumber</em> - Supplies the Page Number (Lbn based) of page
+being modified. For example, with a page size of 8 a page number of 0
+corresponds to LBN values 0 through 7, a page number of 1 corresponds to
+8 through 15, and so on.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - Receives a mask of dirty sectors within the specified page.
+(a 1 bit indicates that the sector is dirty).</p>
+</blockquote>

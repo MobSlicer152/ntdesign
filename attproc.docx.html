@@ -1,0 +1,424 @@
+<p><strong>Portable Systems Group</strong></p>
+<p><strong>Windows NT Attach Process Design Note</strong></p>
+<p><strong>Author</strong>: <em>David N. Cutler</em></p>
+<p><em>Original Draft 1.0, February 8, 1989</em></p>
+<p><em>Revision 1.2, March 30, 1989</em></p>
+<p>This design note discusses a proposal that would allow a thread to
+attach to the address space of another process, execute code in the
+attached process's address space, and then detach and resume execution
+in the original process address space. It is envisioned that this
+capability will be required to implement the newly proposed system
+structure.</p>
+<p>This capability would not be exported to user mode at all. It is
+intended for internal use by the executive layer of the system.</p>
+<p>The new system structure (i.e. system service servers) requires the
+ability to perform certain operations on behalf of another process.
+Typical of these operations is creating and deleting virtual memory. In
+order to implement these operations, we either have to build the data
+structures and algorithms such that they can be done outside the
+recipient process or architect a way to actually execute code within the
+address space of another process.</p>
+<p>A good example of a difficult service to build outside of a process
+is the deletion of virtual memory. <strong>Mach</strong> stands on its
+head to implement this capability and, while it is doing such an
+operation, a global virtual memory lock must be held.</p>
+<p>Graham Hamilton (of exDECwest fame) suggested that a way to do this
+was to have some number of anonymous system threads which could do such
+an operation. A requesting thread would build a request packet that
+contained the arguments of the operation to be performed, the function
+that was to be executed, a pointer to the address map that the thread
+was to execute in, and an event to synchronize the completion of the
+operation. The request packet would then be queued to the worker thread,
+a semaphore signaled, and the requesting thread would wait on the event.
+A worker thread would be awakened by the signal of the semaphore and
+would remove an entry from the request queue. The thread would attach to
+the new address space, perform the operation, set the event, detach from
+the address space, and then look for more work to do. The requesting
+thread would then resume execution.</p>
+<p>In analyzing Graham's proposal it is clear that there are two extra
+context switches, a copy of the argument data, two extra translation
+buffer and data cache flushes, and the need to attach to an address
+space. So why not just let the requesting thread directly attach to the
+target process address space and avoid the worker threads, the argument
+copy, and the two extra context switches?</p>
+<p>When a thread wanted to execute in another process' address space it
+would execute the following logic:</p>
+<p>verify that source process has the rights necessary to</p>
+<p>perform the desired operation on the destination</p>
+<p>process</p>
+<p>obtain pointers to objects in the source process as</p>
+<p>necessary</p>
+<p><strong>KeAttachProcess</strong>(<em>pPcb</em>)</p>
+<p>perform desired operation in address space of target</p>
+<p>process</p>
+<p><strong>KeDetachProcess</strong>()</p>
+<p>resume execution is source process</p>
+<p>There are several questions and complications that arise from doing
+this kind of operation. These include:</p>
+<blockquote>
+<p>1. How is the kernel stack of the source thread addressed in the
+target process?</p>
+<p>2. What happens if the source process gets removed from the balance
+set while an attach operation is in progress and causes the process'
+thread's kernel stacks to be made pageable?</p>
+<p>3. What happens if the target process is not in the balance set?</p>
+<p>4. What happens if the source or target processes are terminated?</p>
+<p>5. What happens if the source thread is terminated?</p>
+<p>6. What happens if a thread tries to do a second attach after having
+attached to a target process' address space?</p>
+<p>7. What object table is visible when a thread is attached to the
+address space of another process?</p>
+<p>8. What working set is manipulated while a thread is attached to the
+address space of another process?</p>
+<p>9. What process gets charged for the time that is consumed while the
+thread is attached to another process' address space?</p>
+<p>10. How is mutex ownership handled between the source and target
+processes?</p>
+<p>11. What happens if user and/or kernel mode are alerted while a
+process is attached?</p>
+<p>12. What happens to <strong>APC</strong>'s that are queued to the
+thread after it has entered the target process' address space?</p>
+<p>13. Can the attached thread receive <strong>APC</strong>'s?</p>
+<p>14. What happens if a suspend or resume is performed on the specified
+thread?</p>
+</blockquote>
+<p>Before attempting to answer these questions it is useful to review
+the kernel data structures that correspond to process and thread
+objects. These data structures are described in more detail at the end
+of this note.</p>
+<p>There is a Process Control Block (<strong>PCB</strong>) and a Thread
+Control Block (<strong>TCB</strong>).</p>
+<p>A <strong>PCB</strong> contains a pointer to a process address map
+(actually the physical address of the Page Directory for the process), a
+list of all the <strong>TCB</strong>'s that are members of the
+<strong>PCB</strong>, a count of all the kernel mutexes owned by member
+<strong>TCB</strong>'s, and a state which is either "included" or
+"excluded" (corresponds to whether the process is, or is not, in the
+balance set).</p>
+<p>A <strong>TCB</strong> contains a pointer to the <strong>PCB</strong>
+of which it is a member, an <strong>APC</strong> queue for each of the
+modes kernel and user, a kernel <strong>APC</strong> in progress flag, a
+kernel <strong>APC</strong> pending flag, a user <strong>APC</strong>
+pending flag, a user alert <strong>APC</strong> Control Block
+(<strong>ACB</strong>), an alerted flag for each of the modes kernel and
+user, an alertable wait flag, an owned mutex count, and link pointers
+for linking the thread into the <strong>PCB</strong>'s
+<strong>TCB</strong> list.</p>
+<p>Actually there are several other fields in the <strong>TCB</strong>
+and <strong>PCB</strong>, but they are not really pertinent to this
+discussion.</p>
+<p>The kernel data structures that describe the <strong>TCB</strong> and
+<strong>PCB</strong> are contained within the executive data structures
+that describe the process and thread objects. The executive must use the
+linkage structures provided by the kernel and cannot keep a separate set
+of linkage pointers that tie the data structures together.</p>
+<p>The below discussion addresses the questioins raised above and gives
+an explanation of how <strong>KeAttachProcess</strong> and
+<strong>KeDetachProcess</strong> work.</p>
+<p><strong>How is the kernel stack of the source thread addressed in the
+target process?</strong></p>
+<p>We would like to make kernel stacks addressible in the process part
+of the address space. However, in order to attach to another process'
+address space we will need to map kernel stacks in the system part of
+the address space so we can avoid an argument copy and allocation of a
+temporary kernel stack. If we do not do this, then we will have to
+allocate a temporary kernel stack in the system part of the address
+space, copy necessary argument information to the temporary stack,
+switch to the temporary stack, attach the target process' address space,
+execute the necessary logic, switch back to the source address space,
+switch back to the original stack, and then deallocate the temporary
+stack.</p>
+<p>When a process is in the balance set the kernel stacks of all its
+threads must be locked in memory (there are several ways we can do this
+- the reference count on the pages being the most likely candidate).
+When a process is not in the balance set, the kernel stacks of all its
+threads are pageable. The locking and unlocking of these pages is
+performed by the balance set manager when it brings a process into or
+out of the balance set.</p>
+<p><strong>What happens if the source process gets removed from the
+balance set while an attach operation is in progress and causes the
+process' thread's kernel stacks to be made pageable?</strong></p>
+<p>If the source process is allowed to leave the balance set while a
+thread is attached to another process, then the kernel stack on which
+the thread is running would become pageable. This cannot be allowed to
+happen since it would cause the system to crash if a page fault occurred
+on the kernel stack itself. In order to prevent this situation from
+happening, the <strong>Pcb.MutexCount</strong> in the source
+<strong>PCB</strong> is incremented by one on attach to ensure that the
+process is not allowed to leave the balance set. When the corresponding
+detach is executed the count if decremented by one.</p>
+<p>Even though the process is not allowed to leave the balance set any
+threads that do not own mutexes are prevented from further execution if
+the process is excluded from the balance set. Threads that do own
+mutexes are allowed to continue execution until they release all the
+mutexes they own. Therefore <strong>Tcb.MutexCount</strong> in the
+<strong>TCB</strong> is incremented by one on attach to ensure that the
+thread continues to execute. When the corresponding detach is executed
+the count is decremented by one.</p>
+<p><strong>What happens if the target process is not in the balance
+set?</strong></p>
+<p>If the target process is not in the balance set, then the subject
+<strong>TCB</strong> is inserted in the target <strong>PCB</strong>'s
+ready queue. When the corresponding process is brought into the balance
+set, the thread's <strong>TCB</strong> will be inserted in the
+appropriate dispatcher ready queue. We must ensure that once the target
+process is brought into the balance set, it is not allowed to leave the
+balance set until the detach operation is performed. This is required
+since we have incremented <strong>Tcb.MutexCount</strong> which allows
+the thread to continue running in the target process' address space even
+though the process might be removed from the balance set. Therefore
+<strong>Pcb.MutexCount</strong> is also incremented in the target
+process' <strong>PCB</strong> during the attach operation. When the
+detach operation occurs all the mutex counts will be corrected to enable
+the respective processes to leave the balance set.</p>
+<p><strong>What happens if the source or target processes are
+terminated?</strong></p>
+<p><strong>What happens if the source thread is terminated?</strong></p>
+<p>The kernel does not allocate or deallocate any data structures that
+control the execution of threads within the system. It depends on the
+executive to keep appropriate reference counts, and only when the
+reference count is zero, can the executive delete data structures.
+Therefore the executive must ensure that the reference count of the
+source process, the target process, and the subject thread are such that
+they cannot be deleted during the execution of a attach/detach
+sequence.</p>
+<p><strong>What happens if a thread tries to do a second attach after
+having attached to a target process' address space?</strong></p>
+<p>The <strong>TCB</strong> of a thread contains the storage necessary
+to save information for a single execution of an attach/detach sequence.
+Therefore the rule is that only one level of attach is allowed. If an
+attempt is made to attach to another address space while an address
+space is already attached, then a bug check will occur.</p>
+<p><strong>What object table is visible when a thread is attached to the
+address space of another process?</strong></p>
+<p>The object table of the attached process is visible to a thread when
+it is attached to another process' address space. It is doubtful that it
+will ever be necessary to create an object in another process' object
+table, but this operation can be performed if necessary.</p>
+<p><strong>What working set is manipulated while a thread is attached to
+the address space of another process?</strong></p>
+<p>While a thread is attached to another process' address space it takes
+page faults and manipulates the working set of that process as if it
+were really a thread in that process.</p>
+<p><strong>What process gets charged for the time that is consumed while
+the thread is attached to another process' address space?</strong></p>
+<p>While a thread is attached to a target process' address space, the
+target process is charged for the execution time accumulated by the
+thread. When the detach operation occurs, execution time is again
+charged to the source process.</p>
+<p><strong>How is mutex ownership handled between the source and target
+processes?</strong></p>
+<p>There is simple rule for mutex ownership. When a thread does and
+attach or detach process it cannot own any mutexes. If an attempt is
+made to attach/detach while a thread owns a mutex, then a bug check will
+occur.</p>
+<p><strong>What happens if user and/or kernel mode are alerted while a
+process is attached?</strong></p>
+<p>There is no interaction between alert and attach process. Kernel
+alert applies to whatever context the thread is currently in. The thread
+can either respond or ignor kernel alert as appropriate. User alert only
+applies to the source context since user mode cannot be entered when a
+process is attached.</p>
+<p>A user mode alert cannot occur while a thread has a process attached
+since the thread will never do a wait alertable for user mode. An alert
+<strong>ACB</strong> may have been queued just prior to attaching the
+process in which case it will occur when the thread detachs and returns
+to user mode.</p>
+<p><strong>What happens to APC's that are queued to the thread after it
+has entered the target process' address space?</strong></p>
+<p><strong>Can the attached thread receive APC's?</strong></p>
+<p>An <strong>ACB</strong> is initialized and directed to a thread
+running in a specific address space. Therefore <strong>APC</strong>'s
+directed to a source process context cannot be allowed to occur while
+the subject thread is attached to the address space of another process.
+This means that there must be a way to direct an <strong>APC</strong> to
+the right context and make sure it does not occur at the wrong time.</p>
+<p>To accomplish this, each <strong>TCB</strong> will contain an
+<strong>APC</strong> state index (<strong>Tcb.ApcStateIndex</strong>)
+which can have a value of zero or one (only one level of attach is
+allowed). When an <strong>ACB</strong> is initialized the address of the
+associated <strong>TCB</strong> must be specified. This allows
+<strong>Tcb.ApcStateIndex</strong> and
+<strong>Tcb.CurrentApcState.Pcb</strong> to be captured and stored in
+the <strong>ACB</strong> in addition to the address of the
+<strong>TCB</strong> itself.</p>
+<p>Two sets of <strong>APC</strong> context are stored in the
+<strong>TCB</strong>; the current <strong>APC</strong> context
+(<strong>Tcb.CurrentApcState</strong>) and the saved
+<strong>APC</strong> context (<strong>Tcb.SavedApcState</strong>). Each
+set of context contains the <strong>APC</strong> state information
+described for the kernel <strong>TCB</strong> data structure.</p>
+<p>An array of pointers is used to address the two sets of
+<strong>APC</strong> context. When an <strong>ACB</strong> is queued,
+the appropriate set of <strong>APC</strong> context is selected by using
+<strong>Acb.ApcStateIndex</strong> to obtain the appropriate array
+member which contains the address of the corresponding set of
+<strong>APC</strong> context. A comparison is then made between the
+<strong>PCB</strong> address stored in the <strong>ACB</strong> and the
+<strong>PCB</strong> address stored in the selected <strong>APC</strong>
+context. If a mismatch occurs, then a bug check is executed (i.e. an
+attach was performed, an <strong>ACB</strong> was initialized (e.g.
+associated with a timer), a detach was performed, and then the
+<strong>ACB</strong> was queued). Otherwise the <strong>ACB</strong> is
+inserted in the selected <strong>APC</strong> queue and appropriate
+<strong>APC</strong> state bits are updated. If
+<strong>Tcb.ApcStateIndex</strong> is equal to
+<strong>Acb.ApcStateIndex</strong>, then the <strong>APC</strong>
+effects the current context of the subject thread and checks are made to
+determine if an <strong>APC</strong> should be delivered
+immediately.</p>
+<p>When <strong>Tcb.ApcStateIndex</strong> is zero, the first pointer of
+the array points to <strong>Tcb.CurrentApcState</strong> and the second
+pointer points to <strong>Tcb.SavedApcState</strong>. To ensure a
+<strong>PCB</strong> address mismatch occurs if an attempt is made to
+queue an <strong>ACB</strong> with an <strong>Acb.ApcStateIndex</strong>
+value of one, a value of <strong>NIL</strong> is stored in
+<strong>Tcb.SavedApcState.Pcb</strong>.</p>
+<p>When <strong>Tcb.ApcStateIndex</strong> is one, the first pointer of
+the array points to <strong>Tcb.SavedApcState</strong> and the second
+pointer of the array points to <strong>Tcb.CurrentApcState</strong>.
+Both sets of context have a valid <strong>PCB</strong> pointer.</p>
+<p>When an attach process is executed,
+<strong>Tcb.ApcStateIndex</strong> is examined. If the value is one,
+then a bug check occurs (i.e. an attempt is being made to attach another
+process while one is already attached). Otherwise
+<strong>Tcb.ApcStateIndex</strong> is incremented and the current
+<strong>APC</strong> context is copied to the saved <strong>APC</strong>
+context. The two pointers in the array that address the
+<strong>APC</strong> context blocks are switched and the current
+<strong>APC</strong> state is initialized.</p>
+<p>While a thread is executing in another process' address space, the
+thread can initialize and receive <strong>APC</strong>'s targeted to
+that address space.</p>
+<p>When a detach process is executed, <strong>Tcb.ApcStateIndex</strong>
+is examined. If the value is zero, then a bug check occurs (i.e. an
+attempt is being made to detach an address space when one is not
+attached). The current <strong>APC</strong> context is also examined to
+determine if the thread has a "clean" <strong>APC</strong> context. If a
+kernel <strong>APC</strong> is in progress, the kernel
+<strong>APC</strong> queue contains an entry, or the user
+<strong>APC</strong> queue contains as entry, then a bug check occurs.
+Otherwise <strong>Tcb.ApcStateIndex</strong> is decremented, the saved
+<strong>APC</strong> context is moved to the current
+<strong>APC</strong> context, the saved <strong>APC</strong> context
+<strong>PCB</strong> address is set to <strong>NIL</strong>, and the two
+entries in the pointer array are switched.</p>
+<p><strong>What happens if a suspend or resume is performed on the
+specified thread?</strong></p>
+<p>A thread is suspended by queuing the thread's builtin suspend
+<strong>ACB</strong>. This <strong>ACB</strong> is initialized such that
+it's target is the source process' address space and causes a normal
+kernel <strong>APC</strong>. In an attempt is made to suspend a thread
+while it attached to another process, then the suspend
+<strong>ACB</strong> will get queued to the source context and the
+suspend count will get adjusted. Suspension of the thread will not
+actually occur until the thread does a detach and reenters the source
+context. The thread may be suspended and resumed several times while it
+is attached to another process. This works in the same way as the case
+where the suspend <strong>APC</strong> cannot be delivered because the
+thread is either currently in a kernel <strong>APC</strong> or has
+kernel <strong>APC</strong>'s blocked (<strong>IRQL</strong>
+raised).</p>
+<p>The following pseudo code describes the operation of attach to
+address space:</p>
+<p><strong>PROCEDURE</strong> KeAttachProcess (</p>
+<p><strong>IN</strong> Pcb : <strong>POINTER</strong> KtPcb;</p>
+<p>);</p>
+<p><strong>BEGIN</strong></p>
+<p>Acquire dispatcher database lock;</p>
+<p>Get current TCB address;</p>
+<p><strong>IF</strong> Tcb.ApcStateIndex == 1 <strong>OR</strong>
+Tcb.MutexCount &lt;&gt; 0 <strong>THEN</strong></p>
+<p>Call bugcheck with fatal error;</p>
+<p><strong>ELSE</strong></p>
+<p>Tcb.ApcStateIndex += 1;</p>
+<p>Tcb.SavedApcState = Tcb.CurrentApcState;</p>
+<p>Tcb.CurrentApcState.Pcb = Pcb;</p>
+<p>Tcb.CurrentApcState.KernelApcInProgress = FALSE;</p>
+<p>Tcb.CurrentApcState.KernelApcPending = FALSE;</p>
+<p>Tcb.CurrentApcState.UserApcPending = FALSE;</p>
+<p>Initialize APC queue headers for current state;</p>
+<p>Swap APC context pointers in APC pointer array;</p>
+<p>Tcb.MutexCount += 1;</p>
+<p>Pcb.MutexCount += 1;</p>
+<p>Tcb.SavedApcState.Pcb-&gt;Pcb.MutexCount += 1;</p>
+<p><strong>IF</strong> Pcb.Active <strong>OR</strong> Pcb.MutexCount
+&gt; 1 <strong>THEN</strong></p>
+<p>Flush data cache;</p>
+<p>Set new page directory pointer;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>ELSE</strong></p>
+<p>Tcb.PcbReadyQueue = TRUE;</p>
+<p>Insert TCB in PCB's ready queue;</p>
+<p>Select new thread to run;</p>
+<p>Call context switch routine;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>RETURN</strong>;</p>
+<p><strong>END</strong> KeAttachProcess;</p>
+<p>The following pseudo code describes the operation of detach from
+address space:</p>
+<p><strong>PROCEDURE</strong> KeDetachProcess (</p>
+<p>);</p>
+<p><strong>BEGIN</strong></p>
+<p>Acquire dispatcher database lock;</p>
+<p>Get current TCB address;</p>
+<p><strong>IF</strong> Tcb.ApcStateIndex == 0 <strong>OR</strong>
+Tcb.MutexCount &lt;&gt; 1 <strong>OR</strong></p>
+<p>Tcb.CurrentApcState.KernelApcInProgress <strong>OR</strong></p>
+<p>Current kernel APC queue not empty <strong>OR</strong></p>
+<p>Current user APC queue not empty <strong>THEN</strong></p>
+<p>Call bugcheck with fatal error;</p>
+<p><strong>ELSE</strong></p>
+<p>Tcb.ApcStateIndex -= 1;</p>
+<p>Tcb.CurrentApcState.Pcb-&gt;Pcb.MutexCount -= 1;</p>
+<p><strong>IF</strong> Tcb.CurrentApcState.Pcb-&gt;Pcb.MutexCount ==
+0</p>
+<p><strong>AND</strong> <strong>NOT</strong>
+Tcb.CurrentApcState.Pcb-&gt;Pcb.Active</p>
+<p><strong>THEN</strong></p>
+<p>Set Tcb.CurrentApcState.Pcb-&gt;Pcb.Event;</p>
+<p><strong>END IF</strong>;</p>
+<p>Tcb.CurrentApcState = Tcb.SavedApcState;</p>
+<p>Tcb.SavedApcState.Pcb = NIL;</p>
+<p>Swap APC context pointers in APC pointer array;</p>
+<p>Tcb.MutexCount -= 1;</p>
+<p><strong>IF</strong> Kernel APC queue not empty
+<strong>THEN</strong></p>
+<p>Tcb.CurrentApcState.KernelApcPending = TRUE;</p>
+<p>Set software interrupt at <strong>IRQL</strong> 1;</p>
+<p><strong>END IF</strong>;</p>
+<p>Tcb.CurrentApcState.Pcb-&gt;Pcb.MutexCount -= 1;</p>
+<p><strong>IF</strong> Tcb.CurrentApcState.Pcb-&gt;Pcb.MutexCount ==
+0</p>
+<p><strong>AND</strong> <strong>NOT</strong>
+Tcb.CurrentApcState.Pcb-&gt;Pcb.Active</p>
+<p><strong>THEN</strong></p>
+<p>Set Tcb.CurrentApcState.Pcb-&gt;Pcb.Event;</p>
+<p>Tcb.PcbReadyQueue = TRUE;</p>
+<p>Insert TCB in PCB's ready queue;</p>
+<p>Select new thread to run;</p>
+<p>Call context switch routine;</p>
+<p><strong>ELSE</strong></p>
+<p>Flush data cache;</p>
+<p>Set new page directory pointer;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>RETURN</strong>;</p>
+<p><strong>END</strong> KeDetachProcess;</p>
+<p><strong>Revision History</strong>:</p>
+<blockquote>
+<p>Original Draft 1.0, February 8, 1989</p>
+</blockquote>
+<p>Revision 1.1, February 17, 1989</p>
+<blockquote>
+<p>1. Add text to explain what interactions exist between attach/detach
+process and suspend/resume, <strong>APC</strong>'s, alerts, and
+mutexes.</p>
+<p>2. Allow APC's to be queued and processed in either the source or
+target address on attach/detach operations.</p>
+<p>Revision 1.2, March 30, 1989</p>
+<p>1. Minor edits ot conform to standard format.</p>
+</blockquote>
+<p>[end of attproc]</p>

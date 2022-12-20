@@ -1,0 +1,265 @@
+<p>Portable Systems Group</p>
+<p>NT OS Memory Management Guide For I/O</p>
+<p><strong>Author:</strong> Lou Perazzoli</p>
+<p>Original Draft 1.0, December 15, 1990</p>
+<p>Revision 1.1, January 8, 1991</p>
+<p>Revision 1.2, January 28, 1991</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Overview 1</p>
+<p>3. Processes and Working Sets 2</p>
+<p>4. Probe and lock pages 2</p>
+<p>5. Mapping Locked Pages 3</p>
+<p>6. Mapping I/O space 4</p>
+<p>7. Physically Contiguous Memory 4</p>
+<p>8. Non Cached Memory 4</p>
+<p>9. Obtaining physical addresses 5</p>
+<p>10. Paged and NonPaged Pool 5</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes the memory management support routines
+available to I/O drivers, their usage and limitations.</p>
+<h1 id="overview">2. Overview</h1>
+<p>The typical device driver has to deal with a number of memory
+management related issues - allocating buffers, working with MDL's,
+mapping device registers, etc. By properly designing the interaction
+between the driver and the memory management support routines, drivers
+will perform better in throughput, latency and system impact.
+Architectural differences between various architectures should be
+considered such that drivers are written to be as portable as
+possible.</p>
+<p>Memory management supports a 4-gigabyte virtual address space. It is
+important to understand the differences between virtual addresses and
+physical addresses (and on MIPS how physical addresses appear in the
+virtual address space).</p>
+<p>The 4 GB address space is divided into 3 regions:</p>
+<p>o User space - Consists of 2 gigabytes which is unique for each
+address space. The page ownership for this region is user mode.</p>
+<p>o Hyper space - Consists of 8 megabytes with a page ownership of
+kernel mode and is unique for each address space. Page table pages,
+working set lists, PTEs reserved for temporary mappings, and other
+address space unique structures reside in this region.</p>
+<p>o System space - Consists of almost 2 gigabyte which is shared among
+all address spaces and has a page ownership of kernel mode.</p>
+<p>The page ownership (user mode or kernel mode) is used for access
+checks for operations on virtual addresses.</p>
+<p>Layout of Virtual Address Space:</p>
+<p>+--------------------------+ 00000000</p>
+<p>| |</p>
+<p>| |</p>
+<p>| User Space |</p>
+<p>| |</p>
+<p>+--------------------------+ 80000000</p>
+<p>| Kseg0 and Kseg1 on MIPS |</p>
+<p>| |</p>
+<p>+--------------------------+ C0000000</p>
+<p>| Hyper Space |</p>
+<p>+--------------------------+ C0800000</p>
+<p>| |</p>
+<p>| System Space |</p>
+<p>| |</p>
+<p>+--------------------------+ FFFFFFFF</p>
+<p>System space contains a paged and a non-paged area. The paged area
+starts at the low addresses and grows upward, while the nonpaged area
+starts at the high addresses and grows downward.</p>
+<h1 id="processes-and-working-sets">3. Processes and Working Sets</h1>
+<p>Each process has a unique virtual address space which is independent
+from all other processes in both user space and hyper space. However,
+the system space portions have identical page translations and the
+non-paged portion of the system space can be referenced in any process
+at any IRQL. These items are very important for device drivers because
+when an interrupt occurs the processor could be executing in any
+thread's context.</p>
+<p>As a thread executes and accesses non-valid virtual addresses
+(addresses that have no corresponding physical address) the pages are
+made valid (i.e., translated to a physical address), and are placed into
+the process's working set. Each process has a unique working set which
+consists of the set of all pageable addresses which are currently valid
+in the process. This includes both user space and system space
+addresses. This is important to note since a pageable system address
+that is resident in one process may not be valid in another process and
+a reference to that address may cause a page-fault to make the reference
+valid.</p>
+<p>The working set has a minimum and maximum size. As the thread
+executes and faults more pages into the working set, the working set may
+exceed its minimum at which time the page fault routine determines if
+the working set is allowed to grow or if a page is to be removed from
+the working set. Hence, the working set acts as a process-specific
+quota.</p>
+<h1 id="probe-and-lock-pages">4. Probe and lock pages</h1>
+<p>The <strong>MmProbeAndLockPages</strong> function takes as input an
+MDL which has the <em>StartVa, ByteOffset,</em> and <em>ByteCount</em>
+fields initialized. The function checks the specified range for access
+(read or write) and locks the physical memory corresponding the the
+virtual addresses and puts the "page frame numbers" for the physical
+addresses into the MDL. In addition, the <em>Process</em> field of the
+MDL is initialized to the current process.</p>
+<p>The <strong>MmProbeAndLockPages</strong> function keeps track of the
+number of pages in user-space each process has locked in memory and
+refuses to lock pages (it raises the exception STATUS_NO_MEMORY) if the
+total number of locked pages would exceed the working set minimum minus
+some small constant.</p>
+<p>/Darryl should MmBuildMdlForNonPagedPool and MmMapLockedPages fill in
+the system VA field of the MDL if it is NULL?/</p>
+<p>Another important aspect of <strong>MmProbeAndLockPages</strong> is
+that when the virtual address specified in the MDL is in the user's
+portion of the address space, when MmProbeAndLockPages returns the
+completed MDL, the user may change the address space. This means that
+the virtual address in the MDL may no longer correspond to the physical
+pages in the MDL. This causes no problem as long as the device never
+accesses the buffers through both the MDL (either physically or by
+mapping them in the system address space) and by the user's virtual
+address. This is a very important point.</p>
+<p>To unlock the pages that were locked by
+<strong>MmProbeAndLockPages</strong> invoke the
+<strong>MmUnlockPages</strong> function specifying the same MDL that was
+used in the MmProbeAndLockPages call. This will cause the pages to be
+unlocked and the locked count to be decremented in the process.</p>
+<p>If the buffer resides in the non-paged portion of system space and
+I/O completion is not invoked to unlock the buffer, the routine
+<strong>MmBuildMdlForNonPagedPool</strong> can be used to complete the
+MDL. This routine does not increment any reference counts or checks to
+ensure pages are resident, it merely updates the MDL with the
+corresponding page frame numbers.</p>
+<h1 id="mapping-locked-pages">5. Mapping Locked Pages</h1>
+<p>Certain devices, such as the standard AT disk, require the buffer to
+be accessed virtually rather than physically at high IRQL. But the
+pager, which is invoked when a virtual address does not have a
+corresponding physical address, can only be called at an IRQL of
+APC_LEVEL and below and at a mutex level below
+<strong>MUTEX_LEVEL_WORKING_SET</strong>.</p>
+<p>To create virtual addresses that "map" the user's buffer and can be
+accessed at high IRQLs use the combination of
+<strong>MmProbeAndLockPages</strong> and
+<strong>MmMapLockedPages</strong>. The MmProbeAndLockPages function will
+complete the MDL and the MmMapLockedPages function will create a range
+of non-paged virtual addresses which map the physical buffer.</p>
+<p>When invoking MmMapLockedPages the <em>AccessMode</em> argument
+should always be <em>KernelMode</em>. When the argument is specified as
+<em>UserMode</em> the buffer specified by the MDL is mapped into the
+user-mode portion of the current process and hence can only be
+referenced in the context of that process. This feature is used only by
+File System Processes (FSPs).</p>
+<p>The <strong>MmUnmapLockedPages</strong> function deletes the mapping
+to the buffer. It is called with the <em>BaseAddress</em> that was
+returned by MmMapLockedPages and the same MDL that was passed into
+MmMapLockedPages.</p>
+<p>The MmMapLockedPages and MmUnmapLockedPages have a cost which
+increases dramatically on a multi-processor system. When the pages are
+locked, the non-paged portion of system space is searched for an empty
+range to contain the buffer. The time for this search varies based on
+the number of pages in the MDL. Single page requests complete
+immediately, whereas multi-page requests may take slightly longer to
+locate a suitable range. When unmapping the pages, the addresses are
+marked as unused and returned and the <strong>translation buffer is
+invalidated on all processors</strong>. Note that if the request is for
+a single page then only a single address is invalidated if the
+underlying hardware supports single invalidation. Note that the 386 does
+not support single invalidation, but the 486 and the R4000 do.</p>
+<p>The bottom line is that if the device supports DMA operations the
+driver should be designed such that <strong>MmUnmapLockedPages</strong>
+is never invoked.</p>
+<h1 id="mapping-io-space">6. Mapping I/O space</h1>
+<p>Most devices have control registers which reside in the I/O portion
+of the physical address space. In order to access these registers a
+corresponding non-pageable virtual address must be created which refers
+to the physical I/O address. This is accomplished using the
+<strong>MmMapIoSpace</strong> service. The returned address is the
+virtual address which corresponds to the specified physical I/O address.
+This virtual address is created either cached or non-cached depending on
+an argument. Note that only certain processors support non-cached memory
+via the translation hardware (MIPS and 486).</p>
+<p>When the driver is being unloaded <strong>MmMapIoSpace</strong> is
+invoked to return the reserved address space back to the system.</p>
+<h1 id="physically-contiguous-memory">7. Physically Contiguous
+Memory</h1>
+<p>On certain archaic systems, devices require the buffers to be
+physically contiguous in memory. On NT the memory management system has
+no support for memory compaction or other mechanisms to obtain
+physically contiguous pages. Hence a simple solution is required; when
+the system is initialized and non-paged pool created, all physical pages
+used for non-paged pool are contiguous.</p>
+<p>Therefore during system initialization any allocation from non-paged
+pool is most likely physically contiguous. However, as the demand for
+nonpaged pool increases and non-paged pool is automatically expanded,
+the pages added are NOT physically contiguous. This means that after the
+system has been operating for a some period of time there is a
+possibility that no non-paged contiguous memory can be allocated.</p>
+<p>Drivers that require physically contiguous memory should allocate
+their memory at driver initialization using the
+<strong>MmAllocateContiguousMemory</strong> function. The driver should
+then copy the user's buffer into or out of the physically contiguous
+area during its operation. Note depending on how the driver is designed,
+the copy may not require building a MDL for the user's buffer, rather it
+can use a simple RtlMoveMemory inside of a try/except block.</p>
+<p>When the driver is being unloaded or the need for physically
+contiguous memory is no longer present, the memory should be deallocated
+with the <strong>MmDeallocateContiguousMemory</strong> function.</p>
+<h1 id="non-cached-memory">8. Non Cached Memory</h1>
+<p>Certain devices require that buffers be shared between the device and
+the driver. These may be ring buffers which present a list of transfers
+to the device and a protocol is followed to insert and remove from the
+list, or other types of buffers. But the key thing about these buffers
+is that reads from and writes to the buffers must go directly to memory
+and not to the processor's cache where the device cannot see the
+changes.</p>
+<p>The <strong>MmAllocateNonCachedMemory</strong> function allocates a
+range of nonpaged memory within system space and makes that memory
+non-cached. If insufficient memory is available, NULL is returned.</p>
+<p>Currently, full pages are allocated to the request, so a request for
+8 bytes allocates a full page. This is to avoid putting another pool
+type in the system and having the overhead of managing the pool as
+allocating noncached memory should be an infrequent function. It is
+anticipated that certain drivers will obtain some non cached pages at
+initialization and use only those pages for the life of the driver.</p>
+<p>The <strong>MmDeallocatedNonCachedMemory</strong> function returns
+the non-cached memory back to the system pool.</p>
+<h1 id="obtaining-physical-addresses">9. Obtaining Physical
+Addresses</h1>
+<p>The <strong>MmGetPhysicalAddress</strong> function returns the
+physical address for a corresponding virtual address. This function
+should only be used to obtain the physical address of a virtual address
+that is in the non-pageable portion of the system.</p>
+<h1 id="paged-and-nonpaged-pool">10. Paged and NonPaged Pool</h1>
+<p>Paged and NonPaged pool requests have the following
+characterists:</p>
+<p>o requests of PAGE_SIZE or less are always physically contiguous and
+do not cross a page boundary</p>
+<p>o the returned address is aligned on a quadword boundary (low order 3
+bits of virtual address are zero)</p>
+<p>o pool allocations do not share cache lines with any other pool
+allocations.</p>
+<h1 id="determining-non-paged-system-space-addresses">11. Determining
+Non-Paged System Space Addresses</h1>
+<p>The <strong>MmIsNonPagedSystemAddressValid</strong> function allows
+the caller to determine if a given virtual address is within the
+non-paged portion of the system space and is currently mapped (valid).
+This includes such regions as non-paged pool, kernel stacks, and mapped
+locked pages.</p>
+<h1 id="useful-macros">12. Useful Macros</h1>
+<p>The following macros are also provided to aid in dealing with virtual
+addresses and buffer sizes:</p>
+<p><strong>o ROUND_TO_PAGES</strong></p>
+<p>- Given a size, round the size up to the next page multiple.</p>
+<p><strong>o BYTES_TO_PAGES</strong></p>
+<p>- Given a size, compute the number of pages required to contain a
+buffer of that size.</p>
+<p><strong>o BYTE_OFFSET</strong></p>
+<p>- Given a virtual address, return the byte offset for that virtual
+address.</p>
+<p><strong>o PAGE_ALIGN</strong></p>
+<p>- Given a virtual address, return the corresponding page aligned
+virtual address.</p>
+<p><strong>o MM_IS_SYSTEM_VIRTUAL_ADDRESS</strong></p>
+<p>- Given a virtual address, return <em>TRUE</em> if the virtual
+address is within system space.</p>
+<p><strong>Revision History:</strong></p>
+<p>Original Draft 1.0, December 15, 1990.</p>
+<p>Revision 1.1, January 8, 1991</p>
+<p>1. Added MmIsAddressInNonPagedSystemSpace.</p>
+<p>2. Editorial changes.</p>
+<p>3. Added useful macros.</p>
+<p>Revision 1.2, January 28, 1991</p>
+<p>1. Added CacheEnable argument to MmMapIoSpace.</p>
+<p>2. Changed MmIsAddressinNonPagedSystemSpace to
+MmIsNonPagedSystemAddressValid to more reflect the actions.</p>

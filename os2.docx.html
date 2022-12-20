@@ -1,0 +1,356 @@
+<p><strong>Portable Systems Group</strong><br />
+<br />
+<strong>OS/2 Emulation Subsystem Specification</strong><br />
+<br />
+<strong>Author:</strong> <em>Steven R. Wood</em><br />
+<br />
+<em>Revision 1.0, January 19, 1990</em><br />
+<em>Original Draft August 15, 1989</em></p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>1.1 OS/2 DLL State 1</p>
+<p>1.2 OS/2 Server State 1</p>
+<p>1.3 OS/2 Kernel Extension State 2</p>
+<p>1.4 Process Structure 2</p>
+<p>1.5 Name Processing 4</p>
+<p>1.6 File Handle Processing 4</p>
+<p>1.7 32 Bit OS/2 API Summary 5</p>
+<p>1.8 Rationale for Not Implemented OS/2 API Calls 8</p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This specification describes the design and implementation of the
+OS/2 Emulation Subsystem for NT OS/2. The subsystem consists of a
+dynamic link library (DLL) that resides in the OS/2 application's
+address space, a server process that maintains global state across all
+OS/2 applications and an NT OS/2 Kernel Extension that runs in Kernel
+Mode and implements the OS/2 Semaphore primitives.</p>
+<p>The DLL exports as entry points all of the 32 bit Dos32 API's defined
+by OS/2 Version 2.0 (Cruiser). Some of the entry points, that only
+manipulate process private state are implemented entirely in the DLL.
+Others call the OS/2 Subsystem server to access and/or modify the global
+state it maintains. Finally, the 32 bit Dos Semaphore API's call the
+OS/2 Subsystem Kernel Extension.</p>
+<p>For the remainder of this document, these three components will be
+referred to as: the OS/2 Server, the OS/2 DLL and the OS/2 Kernel
+Extension.</p>
+<h2 id="os2-dll-state">1.1 OS/2 DLL State</h2>
+<p>The OS/2 DLL maintains the following information for each OS/2
+process:</p>
+<p>o Current drive</p>
+<p>o Current directory for each drive</p>
+<p>o Environment variables</p>
+<p>o Command line</p>
+<p>o OS/2 File handle table</p>
+<p>o Hard Error and Verify flags</p>
+<p>o Thread Information Block (TIB) for each thread</p>
+<h2 id="os2-server-state">1.2 OS/2 Server State</h2>
+<p>The OS/2 Server maintains the following state:</p>
+<p>o Hierarchy of OS/2 processes</p>
+<p>o List of threads for each process</p>
+<p>o Exit list procedures for each process</p>
+<p>o Shadow of file handle table for each process</p>
+<p>o Queues, Pipes and Shared memory objects</p>
+<p>o Keyboard buffer for Dos32Read calls to Standard Input</p>
+<p>o Listen Thread that listens for connection requests from OS/2
+applications.</p>
+<p>o Keyboard Thread that is waiting on a Presentation Manager message
+queue for keyboard events. This message queue is associated with any
+character mode window. In the current OS/2 1.1 implementation, this
+thread runs in the task manager process.</p>
+<p>o Request Threads. The number of request threads will vary
+dynamically based on the number of outstanding connections to OS/2
+applications. The exact ratio will be determined during performance
+analysis.</p>
+<p>o Exception Port Thread that is waiting for exceptions for OS/2
+application threads that were not handled.</p>
+<p>o Session Manager Thread that is dedicated to servicing requests from
+the NT OS/2 Session Manager</p>
+<h2 id="os2-kernel-extension-state">1.3 OS/2 Kernel Extension State</h2>
+<p>The OS/2 Kernel Extension maintains the following state:</p>
+<p>o OS/2 Event Semaphore objects</p>
+<p>o OS/2 Mutex Semaphore objects</p>
+<p>o OS/2 MuxWait Semaphore objects</p>
+<h2 id="process-structure">1.4 Process Structure</h2>
+<p>The OS/2 Server is responsible for creating all OS/2 processes and
+maintain a process tree structure that describes the relationship
+between OS/2 processes. For each process the following information is
+maintained:</p>
+<p>o OS/2 PID value</p>
+<p>o NT OS/2 Process Handle</p>
+<p>o Parent process</p>
+<p>o Sibling process list</p>
+<p>o Child process list</p>
+<p>o Thread Table</p>
+<p>o File Handle Table</p>
+<p>Process creation is the result of one of several external events:</p>
+<p>o an OS/2 application calls Dos32ExecPgm</p>
+<p>o an OS/2 application calls Dos32StartSession</p>
+<p>o the NT OS/2 Session Manager calls the OS/2 Server to start an OS/2
+application.</p>
+<p>o opens the image file</p>
+<p>o creates a process with that image file mapped</p>
+<p>o extracts the entry address and program type from the image
+header</p>
+<p>o allocates a stack and fills in the TEB with the stack bounds</p>
+<p>o creates a suspended thread with an initial context that points to
+the correct entry address and stack</p>
+<p>o Client Id</p>
+<p>o Process and Thread handles</p>
+<p>o Type of image file</p>
+<p>If the type of the image is not OS/2, then the OS/2 Server will pass
+the information returned by SmCreateImageFileProcess back to the Session
+Manager and allow it to communicate the information to the appropriate
+subsystem (e.g. Posix). When this happens, a node is still created in
+the OS/2 process structure so that the foreign process has a valid
+process Id in the OS/2 world.</p>
+<p>Finally, the OS/2 Server can be called by the Session Manager with an
+OS/2 process that was created by another subsystem calling the
+SmCreateImageFileProcess routine. In this case the OS/2 Server will add
+the process as a top level OS/2 process whose parent process is the
+dummy process at the root of the OS/2 process tree.</p>
+<p>Threads within an OS/2 process are also created and managed by the
+OS/2 Server. The server will maintain a doubly linked list of all the
+threads created by the client calling the Dos32CreateThread API within a
+given OS/2 process. For each thread, the following information will be
+maintained:</p>
+<p>o Thread list pointers</p>
+<p>o Client Id</p>
+<p>o OS/2 TID value</p>
+<p>o NT OS/2 Thread Handle</p>
+<p>o Address of OS/2 TIB in client's address space</p>
+<p>o Address of NT OS/2 TEB in client's address space</p>
+<h2 id="name-processing">1.5 Name Processing</h2>
+<p>All file name parsing occurs in the OS/2 DLL. It maintains the
+following information in the address space of each OS/2 process:</p>
+<p>o Current Drive</p>
+<p>o Current Directory for each drive</p>
+<p>\OS2\Drives\A: =&gt; \Device\Floppy1</p>
+<p>\OS2\Drives\B: =&gt; \Device\Floppy2</p>
+<p>\OS2\Drives\C: =&gt; \Device\SCSI0</p>
+<p>\"LogonDirectory"\OS2\Drives\A: =&gt; \OS2\Drives\A:</p>
+<p>\"LogonDirectory"\OS2\Drives\B: =&gt; \OS2\Drives\B:</p>
+<p>\"LogonDirectory"\OS2\Drives\C: =&gt; \OS2\Drives\C:</p>
+<p>\"LogonDirectory"\OS2\Drives\D: =&gt;
+\"LogonDirectory"\Net\Portasys</p>
+<p>The double level of indirection is to allow separation of network
+connections between logon sessions. In order to map an OS/2 file name,
+into an NT OS/2 file name, the following logic will be performed by the
+OS/2 DLL:</p>
+<p>o If no drive letter, supply current drive from process state.</p>
+<p>o If first character after drive letter, colon is not a path
+separator, then supply current directory for the drive letter from
+process state.</p>
+<p>o Scan the remainder of the file name, removing any relative path
+specifiers (. and ..) by shifting file name characters left and removing
+path separators.</p>
+<p>o At the same time convert any forward slash (/) path separators to
+back slashes (\).</p>
+<p>o Finally, insert the \"LogonDirectory"\OS2\Drives\ string at the
+front of the file name.</p>
+<p>When querying a name from NT OS/2, a reverse of some of the logic
+above needs to be performed. Since the only API calls that return path
+names are the FindFirst and FindNext, the FindFirst code can cache the
+user specified path name so that it and FindNext can use it to format
+the return buffer. This prevents the OS/2 DLL from having to decode the
+reverse symbolic link path that leads from \Device\SCSI0 to C:</p>
+<h2 id="file-handle-processing">1.6 File Handle Processing</h2>
+<p>The OS/2 Server will maintain the OS/2 File Handle table in its
+process state. The file handle table will be indexed by OS/2 File
+Handles, which are small integers, starting from 0 and going to some
+maximum amount. The OS/2 DLL will impose no limit on the number of file
+handles, other than available memory for the file handle table. The OS/2
+DLL will allocate chunks of memory that hold 64 file handles. If more
+than 64 file handles are created, then two chunks will be allocated, one
+to hold the second group of file handles and another to act as a layer
+of indirection that leads to either the first or second chunks of file
+handles.</p>
+<p>For each file handle, the following information is maintained:</p>
+<p>o NT OS/2 File Handle</p>
+<p>o Flags</p>
+<p>o Handler</p>
+<p>The handler associated with each file handle will enable the API
+stubs to dispatch to the appropriate code based on the type of the file
+handle (NT OS/2 File Handle, OS/2 Pipe Handle, etc.).</p>
+<h2 id="bit-os2-api-summary">1.7 32 Bit OS/2 API Summary</h2>
+<p>Below is a complete list of all the 32-Bit OS/2 API calls supported
+by OS/2 2.0 (aka Cruiser). For each call, it is identified whether the
+call is implemented in the OS/2 Server, the OS/2 DLL, the OS/2 Kernel
+Extension or not implemented. In the case of calls implemented in the
+OS/2 Server, there is also work done in the OS/2 DLL to prepare the
+parameters for the server and to process the results from the call to
+the server.</p>
+<p>Dos32QuerySysInfo DLL</p>
+<p>Dos32Error DLL</p>
+<p>Dos32CreateThread Server</p>
+<p>Dos32WaitChild Server</p>
+<p>Dos32WaitThread Server</p>
+<p>Dos32EnterCritSec Server</p>
+<p>Dos32ExitCritSec Server</p>
+<p>Dos32ExecPgm Server</p>
+<p>Dos32Exit Server</p>
+<p>Dos32ExitList Server</p>
+<p>Dos32GetThreadInfo DLL</p>
+<p>Dos32SetPriority DLL</p>
+<p>Dos32KillProcess Server</p>
+<p>Dos32ResumeThread Server</p>
+<p>Dos32SuspendThread Server</p>
+<p>Dos32CreatePipe Server</p>
+<p>Dos32CallNPipe Server</p>
+<p>Dos32ConnectNPipe Server</p>
+<p>Dos32DisConnectNPipe Server</p>
+<p>Dos32CreateNPipe Server</p>
+<p>Dos32PeekNPipe Server</p>
+<p>Dos32QueryNPHState Server</p>
+<p>Dos32QueryNPipeInfo Server</p>
+<p>Dos32QueryNPipeSemState Server</p>
+<p>Dos32RawReadNPipe Server</p>
+<p>Dos32RawWriteNPipe Server</p>
+<p>Dos32SetNPHState Server</p>
+<p>Dos32SetNPipeSem Server</p>
+<p>Dos32TransactNPipe Server</p>
+<p>Dos32WaitNPipe Server</p>
+<p>Dos32CreateQueue Server</p>
+<p>Dos32OpenQueue Server</p>
+<p>Dos32CloseQueue Server</p>
+<p>Dos32PeekQueue Server</p>
+<p>Dos32PurgeQueue Server</p>
+<p>Dos32QueryQueue Server</p>
+<p>Dos32ReadQueue Server</p>
+<p>Dos32WriteQueue Server</p>
+<p>Dos32CreateEventSem Kernel Extension</p>
+<p>Dos32OpenEventSem Kernel Extension</p>
+<p>Dos32CloseEventSem Kernel Extension</p>
+<p>Dos32ResetEventSem Kernel Extension</p>
+<p>Dos32PostEventSem Kernel Extension</p>
+<p>Dos32WaitEventSem Kernel Extension</p>
+<p>Dos32QueryEventSem Kernel Extension</p>
+<p>Dos32CreateMutexSem Kernel Extension</p>
+<p>Dos32OpenMutexSem Kernel Extension</p>
+<p>Dos32CloseMutexSem Kernel Extension</p>
+<p>Dos32RequestMutexSem Kernel Extension</p>
+<p>Dos32ReleaseMutexSem Kernel Extension</p>
+<p>Dos32QueryMutexSem Kernel Extension</p>
+<p>Dos32CreateMuxWaitSem Kernel Extension</p>
+<p>Dos32OpenMuxWaitSem Kernel Extension</p>
+<p>Dos32CloseMuxWaitSem Kernel Extension</p>
+<p>Dos32WaitMuxWaitSem Kernel Extension</p>
+<p>Dos32AddMuxWaitSem Kernel Extension</p>
+<p>Dos32DeleteMuxWaitSem Kernel Extension</p>
+<p>Dos32QueryMuxWaitSem Kernel Extension</p>
+<p>Dos32GetDateTime DLL</p>
+<p>Dos32SetDateTime DLL</p>
+<p>Dos32Sleep DLL</p>
+<p>Dos32AsyncTimer DLL</p>
+<p>Dos32StartTimer DLL</p>
+<p>Dos32StopTimer DLL</p>
+<p>Dos32AliasMem not implemented</p>
+<p>Dos32AllocMem DLL</p>
+<p>Dos32AllocSharedMem Server</p>
+<p>Dos32GetNamedSharedMem Server</p>
+<p>Dos32GetSharedMem Server</p>
+<p>Dos32GiveSharedMem Server</p>
+<p>Dos32FreeMem DLL</p>
+<p>Dos32SetMem DLL</p>
+<p>Dos32QueryMemState not implemented</p>
+<p>Dos32QueryMem DLL</p>
+<p>Dos32SubAlloc DLL</p>
+<p>Dos32SubFree DLL</p>
+<p>Dos32SubSet DLL</p>
+<p>Dos32LoadModule Server</p>
+<p>Dos32FreeModule Server</p>
+<p>Dos32QueryProcAddr Server</p>
+<p>Dos32QueryModuleHandle Server</p>
+<p>Dos32QueryModuleName Server</p>
+<p>Dos32GetResource Server</p>
+<p>Dos32QueryAppType Server</p>
+<p>Dos32Beep DLL</p>
+<p>Dos32DevConfig DLL</p>
+<p>Dos32PhysicalDisk not implemented</p>
+<p>Dos32ScanEnv DLL</p>
+<p>Dos32SearchPath DLL</p>
+<p>Dos32QueryVerify DLL</p>
+<p>Dos32SetVerify DLL</p>
+<p>Dos32SetMaxFH DLL</p>
+<p>Dos32Open Server</p>
+<p>Dos32SetFHState DLL</p>
+<p>Dos32QueryFHState DLL</p>
+<p>Dos32QueryHType DLL</p>
+<p>Dos32QueryFileMode DLL</p>
+<p>Dos32SetFileMode DLL</p>
+<p>Dos32SetFileInfo DLL</p>
+<p>Dos32QueryFileInfo DLL</p>
+<p>Dos32ResetBuffer DLL</p>
+<p>Dos32SetFilePtr DLL</p>
+<p>Dos32Read DLL</p>
+<p>Dos32Write DLL</p>
+<p>Dos32Close Server</p>
+<p>Dos32DevIOCtl not implemented</p>
+<p>Dos32DupHandle Server</p>
+<p>Dos32FileIO DLL</p>
+<p>Dos32SetFileLocks DLL</p>
+<p>Dos32SetFileSize DLL</p>
+<p>Dos32FindFirst DLL</p>
+<p>Dos32FindNext DLL</p>
+<p>Dos32FindClose DLL</p>
+<p>Dos32FindNotifyFirst DLL</p>
+<p>Dos32FindNotifyNext DLL</p>
+<p>Dos32FindNotifyClose DLL</p>
+<p>Dos32SetDefaultDisk DLL</p>
+<p>Dos32QueryCurrentDisk DLL</p>
+<p>Dos32SetCurrentDir DLL</p>
+<p>Dos32QueryCurrentDir DLL</p>
+<p>Dos32Delete DLL</p>
+<p>Dos32EditName DLL</p>
+<p>Dos32QueryPathInfo DLL</p>
+<p>Dos32SetPathInfo DLL</p>
+<p>Dos32SetCurrentDir DLL</p>
+<p>Dos32CreateDir DLL</p>
+<p>Dos32DeleteDir DLL</p>
+<p>Dos32Move DLL</p>
+<p>Dos32Copy DLL</p>
+<p>Dos32FSAttach not implemented</p>
+<p>Dos32FSCtl not implemented</p>
+<p>Dos32QueryFSAttach not implemented</p>
+<p>Dos32SetFSInfo not implemented</p>
+<p>Dos32QueryFSInfo not implemented</p>
+<p>Dos32GetMessage DLL</p>
+<p>Dos32InsertMessage DLL</p>
+<p>Dos32PutMessage DLL</p>
+<p>Dos32SetProcessCp DLL</p>
+<p>Dos32QueryCp DLL</p>
+<p>Dos32QueryCtryInfo DLL</p>
+<p>Dos32QueryDBCSEnv DLL</p>
+<p>Dos32QueryCollate DLL</p>
+<p>Dos32MapCase DLL</p>
+<p>Dos32StartSession Server</p>
+<p>Dos32SetSession Server</p>
+<p>Dos32SelectSession Server</p>
+<p>Dos32StopSession Server</p>
+<p>Dos32SetExceptionHandler DLL</p>
+<p>Dos32UnsetExceptionHandler DLL</p>
+<p>Dos32RaiseException DLL</p>
+<p>Dos32UnwindException DLL</p>
+<p>Dos32SendException eliminated(D658)</p>
+<p>Dos32FlagProcess eliminated(D658)</p>
+<p>Dos32ErrClass DLL</p>
+<h2 id="rationale-for-not-implemented-os2-api-calls">1.8 Rationale for
+Not Implemented OS/2 API Calls</h2>
+<p>Dos32QueryMemState is an internal API added for Component Test and
+performance testing. It is not part of the OS/2 2.0 API, even though it
+appears in BSEDOS.H.</p>
+<p>Dos32AliasMem is an internal API added to support the 32 to 16 bit
+thunk code. It is not part of the OS/2 2.0 API, even though it appears
+in BSEDOS.H.</p>
+<p>The five Installable File System calls: Dos32FSAttach, Dos32FSCtl,
+Dos32QueryFSAttach, Dos32SetFSInfo and Dos32QueryFSInfo are not
+implemented because Portable OS/2 is not compatible with existing IFS
+implementations.</p>
+<p>Dos32DevIOCtl is not implemented because Portable OS/2 is not
+compatible with existing OS/2 device drivers. In addition, the
+Dos32DevIOCtl API in OS/2 V2.0 is only specified to work with 16 bit
+device drivers.</p>
+<p>Dos32PhysicalDisk is not implemented because it provides a means for
+accessing the physical media via Dos32DevIOCtl calls, which is not
+implemented for Portable OS/2. We made need to support the ability of
+the Dos32PhysicalDisk API to return partition information for a drive,
+but for now there is no plan to do so.</p>

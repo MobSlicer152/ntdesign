@@ -1,0 +1,273 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Status Code Specification</p>
+<p><strong>Author:</strong> Darryl E. Havens</p>
+<p>Revision 1.0, June 11, 1989</p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>2. Definition 1</p>
+<p>3. Use of Status Codes 2</p>
+<p>4. Programming Interfaces 3</p>
+<p>4.1 Obtaining Information for Status Codes 3</p>
+<p>4.2 Determining Success or Failure 5</p>
+<p>4.3 Determining Success Severity 5</p>
+<p>4.4 Determining Information Severity 5</p>
+<p>4.5 Determining WARNING Severity 5</p>
+<p>4.6 Determining ERROR Severity 5</p>
+<p>4.7 Obtaining the Facility from a Status Code 6</p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This specification describes the purpose, structure, and use of
+status codes for the <strong>Windows NT</strong> system.</p>
+<p>In its simplest form, a <em>status code</em> is a value that is used
+to indicate whether an operation was successfully completed. If this
+were its only purpose, however, then all functions that returned a
+status indicator might simply return a boolean value of TRUE or FALSE.
+One of the values would indicate that the operation was successful, and
+the other would indicate that something went wrong. Which value was
+assigned which meaning would probably be arbitrary.</p>
+<p>Systems today do not generally take this oversimplified approach when
+dealing with success and failure. Most systems are at least concerned
+with why a function incurred an error. Hence, systems generally have a
+"success" code, indicating that everything worked properly, and multiple
+failure codes, each indicating that an error occurred as well as
+providing some hint or clue as to what went wrong.</p>
+<p><strong>Windows NT</strong> takes this concept one step further and
+adds multiple success codes as well as multiple error codes. This allows
+the system to provide more information about what actually happened,
+rather than simply indicate that the function worked. For example,
+rather than just returning "success" with reason information, an
+<em>information</em> status code may be used. Likewise, rather than just
+returning "error" with reason information associated with it,
+<strong>Windows NT</strong> provides the ability to express a
+<em>warning</em> as well.</p>
+<p>These types of status codes do not adversely affect the efficiency of
+the system; rather, they provide robustness. A programmer can still ask
+the basic question, "Was the function successful or not?"</p>
+<p><strong>Windows NT</strong> provides a common architecture for its
+status codes, which it uses throughout the native part of the system.
+That is, all functions that return status return the same type of status
+code. This common treatment of status values makes them easy to use and
+easy to understand.</p>
+<p>Finally, <strong>Windows NT</strong> provides a mechanism to allow
+status codes to be local to a given <em>facility</em>, such as the
+kernel or the Session Manager. That is, each component has a separate
+<em>facility code</em>. In this way, message codes used by one facility
+will not be confused with codes used by another facility.</p>
+<p>Having different facility codes also provides more useful information
+to the caller when it is important to determine exactly which part of
+the system encountered an error. For example, if the C runtime library
+incurs an error when opening a file, was it the runtime library itself
+that incurred the error, a subsystem that the runtime called, the
+operating system, the file system, or a disk driver? This information is
+sometimes important.</p>
+<p>The previous extra PS is included here to keep the following header
+on the same page as the diagram. If repagination occurs and this happens
+automatically, remove the extra PS.</p>
+<h1 id="definition">2. Definition</h1>
+<p>A status code in <strong>Windows NT</strong> contains four fields.
+The following is the format of a status code:</p>
+<p>3 3 2 2 1 1</p>
+<p>1 0 9 8 6 5 0</p>
+<p>┌───┬─┬───────────────────┬──────────────────────┐</p>
+<p>│ <strong>S</strong> │<strong>C</strong>│ <strong>Facility</strong> │
+<strong>Code</strong> │</p>
+<p>└───┴─┴───────────────────┴──────────────────────┘</p>
+<p>where:</p>
+<p><strong>S</strong> ——<em>Severity</em> field. This field represents
+the severity of the status code. The following values are defined:</p>
+<p><strong>00</strong> ——<em>Success</em>. This value means that the
+function was successful.</p>
+<p><strong>01</strong> ——<em>Information</em>. This value means that the
+function was successful and additional information about what happened
+is supplied.</p>
+<p><strong>10</strong> ——<em>Warning</em>. This value means that the
+function incurred an error that was not necessarily fatal.</p>
+<p><strong>11</strong> ——<em>Error</em>. This value means that the
+function incurred an error.</p>
+<p><strong>C</strong> ——<em>Customer</em> field. This field is reserved
+to customers of Microsoft Corporation to allow them to define their own
+facility codes.</p>
+<p><strong>Facility</strong> ——<em>Facility</em> field. This field
+indicates the facility from which the status code was issued.</p>
+<p><strong>Code</strong> ——<em>Code</em> field. This field describes
+what actually took place.</p>
+<p>All system-defined status codes are defined in the file
+<em>NTSTATUS.H</em>. Each status code has the format
+<strong>STATUS_xxx</strong>, where <strong>xxx</strong> is a short
+identifier that describes the meaning of the code. For example, the
+status code <strong>STATUS_BUFFER_OVERFLOW</strong> indicates, as the
+name suggests, that an overflow occurred while writing a buffer. Names
+are chosen to be as descriptive as possible, making source code easier
+to read.</p>
+<h1 id="use-of-status-codes">3. Use of Status Codes</h1>
+<p>Status codes in <strong>Windows NT</strong> are used throughout the
+system. They are returned by all system services to indicate whether the
+service completed successfully. In some cases, the service returns an
+alternate success code. That is, rather than return
+<em>STATUS_SUCCESS</em>, the normal success status code, another code
+may be used. An example of this is an I/O service that returns
+<em>STATUS_PENDING</em>. This indicates that the request was
+successfully made to the system, but it has not yet completed. While
+this code indicates that the request was successful, it also provides
+pertinent information about exactly what was successful.</p>
+<p>All library routines in <strong>Windows NT</strong> that can return a
+success indicator also use status codes. They return status codes in the
+same format as the rest of the system.</p>
+<p>Status codes may also be used in a call to the
+<strong>NtRaiseException</strong> service, provided the status code
+represents a warning or error. Information and success codes may not be
+raised. It should also be noted that if a warning status is raised, and
+no exception handler handles the exception, the default action is to
+<em>continue</em>. The default action for an unhandled error condition,
+however, is to terminate the thread. For more information, see the
+<em>Windows NT Exception Handling Specification</em>.</p>
+<p>The following is an example utilization of the various types of
+status codes in a common search utility. For example, the following
+status codes might be used to indicate various completion statuses:</p>
+<p>o <em>STATUS_SUCCESS</em> ——This code, a <em>SUCCESS</em> code, might
+be used to indicate that all matches were successfully located and
+displayed.</p>
+<p>o <em><span class="smallcaps">STATUS_NO_MATCHES</span></em> ——This
+code, an <em>INFORMATION</em> code, might be used to indicate that while
+no errors occurred, no strings were located that matched the search
+pattern string.</p>
+<p>o <em>STATUS_BUFFER_OVERFLOW</em> ——This code, a <em>WARNING</em>
+code, might be used to indicate that while a match was found, a buffer
+overflow occurred and the entire matching string could not be displayed.
+Notice that this is certainly a problem from which the utility can
+recover and therefore should not terminate the search.</p>
+<p>o <em>STATUS_FILE_NOT_FOUND</em> ——This code, an <em>ERROR</em> code,
+might be used to indicate that no files were found on which to perform
+the search. This is not a recoverable error condition. The program can
+do nothing but terminate.</p>
+<h1 id="programming-interfaces">4. Programming Interfaces</h1>
+<p><strong>Windows NT</strong> provides the following services and C
+language macros to use with status codes:</p>
+<p><strong>NtQueryStatusCode</strong> ——Return text associated with a
+specified status code.</p>
+<p><strong>SUCCESS</strong> ——Return boolean value based on success or
+failure.</p>
+<p><strong>IS_SUCCESS</strong> ——Return boolean TRUE if status code
+severity is success.</p>
+<p><strong>IS_INFORMATION</strong> ——Return boolean TRUE if status code
+severity is information.</p>
+<p><strong>IS_WARNING</strong> ——Return boolean TRUE if status code
+severity is warning.</p>
+<p><strong>IS_ERROR</strong> ——Return boolean TRUE if status code
+severity is error.</p>
+<p><strong>FACILITY</strong> ——Returns the facility code associated with
+a status value.</p>
+<h2 id="obtaining-information-for-status-codes">4.1 Obtaining
+Information for Status Codes</h2>
+<p>The message text associated with a status code may be obtained using
+the <strong>NtQueryStatusCode</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQueryStatusCode (</strong></p>
+<p><strong>IN NTSTATUS</strong> <em>StatusCode,</em></p>
+<p><strong>OUT PVOID</strong> <em>MessageBuffer,</em></p>
+<p><strong>IN ULONG</strong> <em>MessageLength,</em></p>
+<p><strong>OUT PULONG</strong> <em>MessageReturnLength</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>OUT PSEVERITY</strong> <em>SeverityLevel,</em></p>
+<p><strong>OUT PVOID</strong> <em>FacilityBuffer</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN ULONG</strong> <em>FacilityLength</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>OUT PULONG</strong> <em>FacilityReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>);</strong></p>
+<p><u>Parameters:</u></p>
+<p><em>StatusCode</em> ——Supplies the status code value whose associated
+text should be returned.</p>
+<p><em>MessageBuffer</em> ——Supplies a buffer into which the text for
+the status code is stored.</p>
+<p><em>MessageLength</em> ——Supplies the number of bytes in the
+<em>MessageBuffer</em>.</p>
+<p><em>MessageReturnLength</em> ——Optionally supplies a variable in
+which to return the length of the text that was written into
+<em>MessageBuffer</em>.</p>
+<p><em>SeverityLevel</em> ——Supplies a pointer to a variable that is to
+receive an enumerated type code representing the severity of the status
+code.</p>
+<p>SeverityLevel Values</p>
+<p><em>Success</em> ——Indicates that the severity of <em>StatusCode</em>
+is SUCCESS.</p>
+<p><em>Information</em> ——Indicates that the severity of
+<em>StatusCode</em> is INFORMATION.</p>
+<p><em>Warning</em> ——Indicates that the severity of <em>StatusCode</em>
+is WARNING.</p>
+<p><em>Error</em> ——Indicates that the severity of <em>StatusCode</em>
+is ERROR.</p>
+<p><em>FacilityBuffer</em> ——Optionally supplies a buffer into which the
+facility name associated with the status code is written.</p>
+<p><em>FacilityLength</em> ——Optionally supplies the length of the
+<em>FacilityBuffer</em>. If the <em>FacilityBuffer</em> parameter is
+supplied, then this parameter must also be supplied.</p>
+<p><em>FacilityReturnLength</em> ——Optionally supplies a variable in
+which to return the length of the text that was written into
+<em>FacilityBuffer</em>.</p>
+<p>The <strong>NtQueryStatusCode</strong> service fetches the text
+associated with a specified status code and writes it into the supplied
+buffer. This allows programs to output explicit information about what
+happened during the execution of a function.</p>
+<p>If no message text can be found for the specified status code, then
+the message text buffer will be set to the string, "NO MESSAGE TEXT",
+and an information status code of <em>STATUS_NO_MESSAGE</em> is
+returned. Likewise, if no text for the facility of the specified status
+code can be located, the string, "NOFACILITY", is written to the
+facility buffer, if one was supplied. If the country code of the process
+is non-English, the message text appears in the designated language.</p>
+<p>The message text for all status codes defined for <strong>Windows
+NT</strong> can be obtained using the <strong>NtQueryStatusCode</strong>
+service. Text for user-defined status codes can also be obtained
+provided that the codes and text have been "added" to the system. For
+more information, see the <em>Windows NT Status Code Design
+Note</em>.</p>
+<h2 id="determining-success-or-failure">4.2 Determining Success or
+Failure</h2>
+<p>Whether a status code represents success or failure can be determined
+using the C macro, <strong>SUCCESS</strong>:</p>
+<p><strong>SUCCESS(Status)</strong></p>
+<p>This macro returns a BOOLEAN value of TRUE if the status code
+specified by <em>Status</em> represents a success or information
+severity. Otherwise the macro returns a BOOLEAN value of FALSE.</p>
+<h2 id="determining-success-severity">4.3 Determining Success
+Severity</h2>
+<p>Whether a status code represents success can be determined using the
+C macro, <strong>IS_SUCCESS</strong>:</p>
+<p><strong>IS_SUCCESS(Status)</strong></p>
+<p>This macro returns a BOOLEAN value of TRUE if the severity of the
+status code specified by <em>Status</em> is success. Otherwise the macro
+returns a BOOLEAN value of FALSE.</p>
+<h2 id="determining-information-severity">4.4 Determining Information
+Severity</h2>
+<p>Whether a status code represents information severity can be
+determined using the C macro, <strong>IS_INFORMATION</strong>:</p>
+<p><strong>IS_INFORMATION(Status)</strong></p>
+<p>This macro returns a BOOLEAN value of TRUE if the severity of the
+status code specified by <em>Status</em> is information. Otherwise the
+macro returns a BOOLEAN value of FALSE.</p>
+<h2 id="determining-warning-severity">4.5 Determining WARNING
+Severity</h2>
+<p>Whether a status code represents warning severity can be determined
+using the C macro, <strong>IS_WARNING</strong>:</p>
+<p><strong>IS_WARNING(Status)</strong></p>
+<p>This macro returns a BOOLEAN value of TRUE if the severity of the
+status code specified by <em>Status</em> is warning. Otherwise the macro
+returns a BOOLEAN value of FALSE.</p>
+<h2 id="determining-error-severity">4.6 Determining ERROR Severity</h2>
+<p>Whether a status code represents error severity can be determined
+using the C macro <strong>IS_ERROR</strong>:</p>
+<p><strong>IS_ERROR(Status)</strong></p>
+<p>This macro returns a BOOLEAN value of TRUE if the severity of the
+status code specified by <em>Status</em> is error. Otherwise the macro
+returns a BOOLEAN value of FALSE.</p>
+<h2 id="obtaining-the-facility-from-a-status-code">4.7 Obtaining the
+Facility from a Status Code</h2>
+<p>Obtaining the facility number from a status code may be done using
+the C macro, <strong>FACILITY</strong>:</p>
+<p><strong>FACILITY(Status)</strong></p>
+<p>This macro returns a ULONG value which contains the <em>Facility</em>
+field of the status code specified by <em>Status</em>.</p>
+<p><strong>Revision History:</strong></p>
+<p>Original Draft 1.0, June 11, 1989</p>

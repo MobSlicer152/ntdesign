@@ -1,0 +1,172 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Prefix Table Specification</p>
+<p><strong>Author:</strong> Gary D. Kimura</p>
+<p>Revision 1.2, August 2, 1989</p>
+<p>Do not remove any of the division marks (:::) in this template. They
+control the basic layout of the document, including the way page numbers
+are printed.</p>
+<p>The text below (".Begin Table C.") is hidden text that is necessary
+for the table of contents to work correctly. Don't delete the hidden
+text, or you'll end up with the TOC at the end of your document.</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Initializing a Prefix Table 1</p>
+<p>3. Adding a New Prefix 2</p>
+<p>4. Removing a Prefix 2</p>
+<p>5. Locating a Prefix 2</p>
+<p>6. Enumerating a Prefix Table 3</p>
+<p>.End Table C.</p>
+<p>Create section headers by using the H1-H4 styles. You make a line a
+header by typing Alt-H-n, where n is 1-4, when the cursor is anywhere
+within the line. You don't need to make the header text bold; the style
+does that for you. You can switch a paragraph back to normal by typing
+either Alt-X-P or Alt-P-S.</p>
+<p>The following text shows how to format various textual elements using
+the SPEC style sheet. You should remove these examples.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes the <strong>Windows NT</strong> routines
+that implement a prefix table package. The <strong>Windows NT</strong>
+prefix table package is designed for storing and matching path name
+prefixes.</p>
+<p>The prefix table package exports two opaque types, one is a prefix
+table used to denote a collection of prefixes, and the other is a prefix
+table entry used to denote a prefix. A user of this package first
+initializes a prefix table variable and then either inserts or deletes
+prefixes, or finds the longest matching prefix in the table.</p>
+<p>To utilize this package, the caller needs to define a local structure
+to contain a prefix table entry. When inserting a new prefix, the caller
+then supplies a prefix table, prefix string, and a prefix table
+entry.</p>
+<p>To look up a prefix the caller supplies a prefix table and a full
+path name. If a prefix match is found, the look up procedure returns a
+pointer to the prefix table entry corresponding to the located prefix.
+The programmer can then use the CONTAINING_RECORD macro to associate the
+prefix table entry with the local data structures.</p>
+<p>Only prefixes that match whole logical parts of a path name are
+returned. For example, if a table contains the prefix "\Alpha\Beta" then
+a look up on "\Alpha\", "\Alpha\Bet" and "\Alpha\BetaGamma" will be
+unsuccessful, but a look up on "\Alpha\Beta" and "\Alpha\Beta\Gamma"
+will be successful.</p>
+<p>The <strong>APIs</strong> that implement the prefix table package are
+the following:</p>
+<p><strong>PfxInitialize</strong> - Initialize a prefix table.</p>
+<p><strong>PfxInsertPrefix</strong> - Add a new prefix to a prefix
+table.</p>
+<p><strong>PfxRemovePrefix</strong> - Remove an existing prefix from a
+prefix table.</p>
+<p><strong>PfxFindPrefix</strong> - Search a prefix table for the
+longest matching prefix.</p>
+<p><strong>PfxNextPrefix</strong> - Enumerate all of the prefixes stored
+in a prefix table.</p>
+<h1 id="initializing-a-prefix-table">2. Initializing a Prefix Table</h1>
+<p>A prefix table is initialized with the <strong>PfxInitialize</strong>
+procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>PfxInitialize</strong> (</p>
+<p><strong>IN PPREFIX_TABLE</strong> <em>PrefixTable</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>PrefixTable</em> - A pointer to the prefix table variable being
+initialized</p>
+<p>A prefix variable cannot be used by the other procedures until it has
+been initialized.</p>
+<h1 id="adding-a-new-prefix">3. Adding a New Prefix</h1>
+<p>A user adds a new prefix to a prefix table with the
+<strong>PfxInsertPrefix</strong> procedure. The prefix is only added if
+it is not already in the table.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>PfxInsertPrefix</strong> (</p>
+<p><strong>IN</strong> <strong>PPREFIX_TABLE</strong>
+<em>PrefixTable</em>,</p>
+<p><strong>IN</strong> <strong>PSTRING</strong> <em>Prefix</em>,</p>
+<p><strong>IN</strong> <strong>PPREFIX_TABLE_ENTRY</strong>
+<em>PrefixTableEntry</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>PrefixTable</em> - A pointer to the prefix table being
+modified</p>
+<p><em>Prefix</em> - The string to add to the prefix table</p>
+<p><em>PrefixTableEntry</em> - A pointer to the prefix table entry to
+use to denote the prefix</p>
+<p>This procedure has a return value of TRUE if the prefix was not
+already in the table, and FALSE otherwise.</p>
+<p>The prefix table keeps a reference to the input <em>Prefix</em>
+string, so once a prefix is added the input string must not be changed
+by the user.</p>
+<h1 id="removing-a-prefix">4. Removing a Prefix</h1>
+<p>A user removes an existing prefix from a prefix table with the
+<strong>PfxRemovePrefix</strong> procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>PfxRemovePrefix</strong> (</p>
+<p><strong>IN</strong> <strong>PPREFIX_TABLE</strong>
+<em>PrefixTable</em>,</p>
+<p><strong>IN</strong> <strong>PPREFIX_TABLE_ENTRY</strong>
+<em>PrefixTableEntry</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>PrefixTable</em> - A pointer to the prefix table being
+modified</p>
+<p><em>PrefixTableEntry</em> - A pointer to the prefix table entry to
+remove from the prefix table</p>
+<h1 id="locating-a-prefix">5. Locating a Prefix</h1>
+<p>A user searches a prefix table for the longest matching prefix with
+the <strong>PfxFindPrefix</strong> procedure.</p>
+<p><strong>PPREFIX_TABLE_ENTRY</strong></p>
+<p><strong>PfxFindPrefix</strong> (</p>
+<p><strong>IN</strong> <strong>PPREFIX_TABLE</strong>
+<em>PrefixTable</em>,</p>
+<p><strong>IN</strong> <strong>PSTRING</strong> <em>FullString</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>CaseInsensitive</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>PrefixTable</em> - A pointer to the prefix table being
+queried</p>
+<p><em>FullString</em> - A pointer to the string to use as the key in
+searching the prefix table</p>
+<p><em>CaseInsensitive</em> - Indicates if the prefix look up should be
+preformed in a manner that ignores the case (<em>CaseInsensitive</em> is
+TRUE) or expects an exact, case sensitive, match
+(<em>CaseInsensitive</em> is FALSE)</p>
+<p>This procedure returns a pointer to the prefix table entry
+corresponding to the longest prefix that matches the input string if one
+exists and NULL otherwise.</p>
+<h1 id="enumerating-a-prefix-table">6. Enumerating a Prefix Table</h1>
+<p>A user can enumerate all of the elements of a prefix table with the
+<strong>PfxNextPrefix</strong> procedure.</p>
+<p><strong>PPREFIX_TABLE_ENTRY</strong></p>
+<p><strong>PfxNextPrefix</strong> (</p>
+<p><strong>IN</strong> <strong>PPREFIX_TABLE</strong>
+<em>PrefixTable</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong> <em>Restart</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>PrefixTable</em> - A pointer to the prefix table being
+enumerated</p>
+<p><em>Restart</em> - Indicates if the enumeration should start over</p>
+<p>This procedure returns a pointer to the next prefix stored in the
+prefix table, or NULL if there are no more entries. The following code
+fragment illustrates how a programmer uses this procedure to enumerate
+all of the elements of a prefix table.</p>
+<p>for (PfxTableEntry = PfxNextPrefix( PrefixTable, TRUE );</p>
+<p>PfxTableEntry != NULL;</p>
+<p>PfxTableEntry = PfxNextPrefix( PrefixTable, FALSE )) {</p>
+<p>LocalRecord = CONTAINING_RECORD( PfxTableEntry,</p>
+<p>LOCAL_RECORD,</p>
+<p>PrefixTableEntry);</p>
+<p>...</p>
+<p>}</p>
+<p><strong>Revision</strong> <strong>History:</strong></p>
+<p>Original Draft 1.0, August 1, 1989</p>
+<p>Revision 1.1, August 2, 1989</p>
+<p>1. Added statement concerning how the prefix table keeps a pointer
+back to the input prefix string.</p>
+<p>2. Changed <strong>PfxAddPrefix</strong> to
+<strong>PfxInsertPrefix</strong>.</p>
+<p>3. Dropped <em>PrefixLength</em> from <strong>PfxFindPrefix</strong>,
+and added <em>CaseInsensitive</em> parameter.</p>
+<p>4. Changed <strong>PfxNextPrefix</strong> prototype and added example
+of its use.</p>
+<p>Revision 1.2, August 3, 1989</p>
+<p>1. Changed <strong>PfxFindPrefix</strong> to return a pointer to the
+table entry if one is found instead of an OUT parameter.</p>

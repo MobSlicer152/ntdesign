@@ -1,0 +1,251 @@
+<p>This template contains hidden text that describes various features of
+the template. To see the hidden text, get into Options and set `show
+hidden text' to Yes. After you've read the hidden text, you may want to
+delete it. It does no harm to leave it in. <strong>HOWEVER, you must
+either delete this paragraph or make it hidden (Alt-E)!</strong></p>
+<p>Portable Systems Group</p>
+<p>Windows NT Shared Resource Specification</p>
+<p><strong>Author:</strong> Gary D. Kimura</p>
+<p>Revision 1.5, May 15, 1990</p>
+<p>Do not remove any of the division marks (:::) in this template. They
+control the basic layout of the document, including the way page numbers
+are printed.</p>
+<p>The text below (".Begin Table C.") is hidden text that is necessary
+for the table of contents to work correctly. Don't delete the hidden
+text, or you'll end up with the TOC at the end of your document.</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Initializing a Resource Variable 1</p>
+<p>3. Acquiring a Resource for Shared Access 2</p>
+<p>4. Acquiring a Resource for Exclusive Access 2</p>
+<p>5. Releasing a Resource 2</p>
+<p>6. Changing from Shared Access to Exclusive Access 3</p>
+<p>7. Changing from Shared Access to Exclusive Access 3</p>
+<p>8. Deleting a Resource Variable 4</p>
+<p>.End Table C.</p>
+<p>Create section headers by using the H1-H4 styles. You make a line a
+header by typing Alt-H-n, where n is 1-4, when the cursor is anywhere
+within the line. You don't need to make the header text bold; the style
+does that for you. You can switch a paragraph back to normal by typing
+either Alt-X-P or Alt-P-S.</p>
+<p>The following text shows how to format various textual elements using
+the SPEC style sheet. You should remove these examples.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes the <strong>Windows NT</strong> routines
+that implement multiple-readers, single-writer access to a shared
+resource. Access is controlled via a shared resource variable and a set
+of routines to acquire the resource for shared access (also commonly
+known as read access) or to acquire the resource for exclusive access
+(also called write access).</p>
+<p>A resource is logically in one of three states:</p>
+<p>o Acquired for shared access</p>
+<p>o Acquired for exclusive access</p>
+<p>o Released (i.e., not acquired for shared or exclusive access)</p>
+<p>Initially a resource is in the released state, and can be acquired
+for either shared or exclusive access by a user.</p>
+<p>A resource that is acquired for shared access can be acquired by
+other users for shared access. The resource stays in the acquired for
+shared access state until all users that have acquired it have released
+the resource, and then it becomes released. Each resource, internally,
+maintains a count of the number of users granted shared access.</p>
+<p>A resource that is acquired for exclusive access cannot be acquired
+by other users until the single user that has acquired the resource for
+exclusive access releases the resource. However, a thread can
+recursively acquire exclusive access to the same resource without
+blocking.</p>
+<p>The routines described in this specification do not return to the
+caller until the resource has been acquired. or the user has the option
+of having the procedure return immediately to the caller if the resource
+cannot be acquired with blocking. The procedure's return value then
+indicates if the resource has been acquired.</p>
+<p>To help avoid starvation of a user requesting exclusive access to a
+resource, the procedures do not allow additional users shared access to
+a resource if there is a user waiting for exclusive access to the
+resource.</p>
+<p>Also, when a user releases exclusive access to a resource, priority
+is given to those waiting for exclusive access over those waiting for
+shared access.</p>
+<p>The <strong>APIs</strong> that implement a shared resource are the
+following:</p>
+<p><strong>ExInitializeResource</strong> - Initialize a resource and set
+its state to released</p>
+<p><strong>ExAcquireResourceShared</strong> - Acquire shared access to a
+resource</p>
+<p><strong>ExAcquireResourceExclusive</strong> - Acquire exclusive
+access to a resource</p>
+<p><strong>ExReleaseResource</strong> - Release a resource (shared or
+exclusive)</p>
+<p><strong>ExConvertSharedToExclusive</strong> - Convert from shared to
+exclusive access</p>
+<p><strong>ExConvertExclusiveToShared</strong> - Convert from exclusive
+to shared access</p>
+<p><strong>ExDeleteResource</strong> - Deletes (i.e., uninitializes) a
+resource</p>
+<h1 id="initializing-a-resource-variable">2. Initializing a Resource
+Variable</h1>
+<p>A resource variable can be initialized and its state set to released
+with the <strong>ExInitializeResource</strong> procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ExInitializeResource</strong> (</p>
+<p><strong>IN PERESOURCE</strong> <em>Resource</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Resource</em> — A pointer to the resource variable being
+initialized</p>
+<p>A resource variable cannot be used by the other procedures until it
+has been initialized.</p>
+<h1 id="acquiring-a-resource-for-shared-access">3. Acquiring a Resource
+for Shared Access</h1>
+<p>A user can acquire shared access to a resource with the
+<strong>ExAcquireResourceShared</strong> procedure.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ExAcquireResourceShared</strong> (</p>
+<p><strong>IN</strong> <strong>PERESOURCE</strong>
+<em>Resource</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong> <em>Wait</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Resource</em> - A pointer to the resource variable to be acquired
+for shared access</p>
+<p><em>Wait</em> - Indicates if the call is allowed to block in order to
+acquire the resource. A value of TRUE indicates that the call is allowed
+to wait for the resource and FALSE indicates that control is to return
+immediately even if the resource cannot be acquired.</p>
+<p><u>Return Value:</u></p>
+<p><em>BOOLEAN</em> - Returns TRUE if the access to the resource has
+been acquired and FALSE otherwise. If the Wait input parameter is TRUE
+then this function will always return a value of TRUE. If the Wait input
+parameter is FALSE then this function will return TRUE if the resource
+was acquired without blocking and FALSE if the resource cannot be
+acquired without blocking.</p>
+<p>If the Wait parameter is TRUE, then this procedure does not return to
+the caller until the resource has been acquired for shared access. When
+the user acquires the resource, the count of the number of shared access
+users is incremented by one.</p>
+<p>If the caller's thread has previously acquired exclusive access to
+the resource then the call to <strong>ExAcquireResourceShared</strong>
+will automatically succeed.</p>
+<h1 id="acquiring-a-resource-for-exclusive-access">4. Acquiring a
+Resource for Exclusive Access</h1>
+<p>A user can acquire exclusive access to a resource with the
+<strong>ExAcquireResourceExclusive</strong> procedure.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ExAcquireResourceExclusive</strong> (</p>
+<p><strong>IN</strong> <strong>PERESOURCE</strong>
+<em>Resource</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong> <em>Wait</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Resource</em> - A pointer to the resource variable to be acquired
+for exclusive access</p>
+<p><em>Wait</em> - Indicates if the call is allowed to block in order to
+acquire the resource. A value of TRUE indicates that the call is allowed
+to wait for the resource and FALSE indicates that control is to return
+immediately even if the resource cannot be acquired.</p>
+<p><u>Return Value:</u></p>
+<p><em>BOOLEAN</em> - Returns TRUE if the access to the resource has
+been acquired and FALSE otherwise. If the Wait input parameter is TRUE
+then this function will always return a value of TRUE. If the Wait input
+parameter is FALSE then this function will return TRUE if the resource
+was acquired without blocking and FALSE if the resource cannot be
+acquired without blocking.</p>
+<p>If the Wait parameter is TRUE, then this procedure does not return to
+the caller until the resource has been acquired for exclusive
+access.</p>
+<p>If the caller's thread has previously acquired exclusive access to
+the resource then subsequent calls to
+<strong>ExAcquireResourceExclusive</strong> will automatically
+succeed.</p>
+<h1 id="releasing-a-resource">5. Releasing a Resource</h1>
+<p>A user can release access to a resource with the
+<strong>ExReleaseResource</strong> procedure. This procedure is for
+releasing either exclusive access or shared access to a resource.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ExReleaseResource</strong> (</p>
+<p><strong>IN</strong> <strong>PERESOURCE</strong> <em>Resource</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Resource</em> - A pointer to the resource variable to be
+released</p>
+<p>If the resource is acquired for shared access, the number of users
+with shared access to the resource is decremented by one. If the count
+is now zero, the resource is released and next user waiting for
+exclusive access to the resource acquires it.</p>
+<p>If the resource is acquired for exclusive access then the count of
+the number of times it has been recursively acquired is decremented by
+one. If the count is now zero, the resource is released and the next
+user waiting for access to the resource acquires it.</p>
+<h1 id="changing-from-shared-access-to-exclusive-access">6. Changing
+from Shared Access to Exclusive Access</h1>
+<p>A user that has shared access to a resource can change to exclusive
+access with the <strong>ExConvertSharedToExclusive</strong>
+procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ExConvertSharedToExclusive</strong> (</p>
+<p><strong>IN</strong> <strong>PERESOURCE</strong> <em>Resource</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Resource</em> - A pointer to the resource variable to be acquired
+for exclusive access</p>
+<p>This procedure does not return to the caller until the resource has
+been acquired for exclusive access. This procedure is similar in
+function to releasing a shared resource and then acquiring it for
+exclusive access; however, in the case where only one user has the
+resource acquired with shared access, the conversion to exclusive access
+with <strong>ExConvertSharedToExclusive</strong> is more efficient.</p>
+<p>It is an error to try to covert a resource to exclusive access that
+is not currently acquired for either shared or exclusive access.</p>
+<h1 id="changing-from-shared-access-to-exclusive-access-1">7. Changing
+from Shared Access to Exclusive Access</h1>
+<p>A user that has exclusive access to a resource can change to shared
+access with the <strong>ExConvertExclusiveToShared</strong>
+procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ExConvertExclusiveToShared</strong> (</p>
+<p><strong>IN</strong> <strong>PERESOURCE</strong> <em>Resource</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Resource</em> - A pointer to the resource variable to be
+converted to shared access</p>
+<p>This procedure does not return to the caller until the resource has
+been acquired for shared access. This procedure is similar in function
+to releasing an exclusive resource and then acquiring it for shared
+access; however the user calling
+<strong>ExConvertExclusiveToShared</strong> does not relinquish access
+to the resource as the two step operation does.</p>
+<p>It is an error to try to convert a resource to shared access that is
+not currently acquired for exclusive access, or has been acquired
+recusively.</p>
+<h1 id="deleting-a-resource-variable">8. Deleting a Resource
+Variable</h1>
+<p>A resource variable can be deleted (i.e., uninitialized) with the
+<strong>ExDeleteResource</strong> procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ExDeleteResource</strong> (</p>
+<p><strong>IN PERESOURCE</strong> <em>Resource</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Resource</em> — A pointer to the resource variable being
+deleted</p>
+<p>The programmer is responsible for ensuring that no one is actively
+using the resource. After calling this procedure the resource cannot be
+used again unless it is reinitialized.</p>
+<p><strong>Revision</strong> <strong>History:</strong></p>
+<p>Original Draft 1.0, June 23, 1989</p>
+<p>Revision 1.1, June 26, 1989</p>
+<p>1. Added explanation regarding who gets priority when releasing a
+resource</p>
+<p>2. Changes <strong>PEXRESOURCE</strong> to
+<strong>PERESOURCE</strong></p>
+<p>Revision 1.2, June 27, 1989</p>
+<p>1. Changed <strong>ExChangeSharedToExclusive</strong> to
+<strong>ExConvertSharedToExclusive</strong>.</p>
+<p>2. Added <strong>ExConvertExclusiveToShared</strong>.</p>
+<p>Revision 1.3, July 10, 1989</p>
+<p>1. Added <strong>ExDeleteResource</strong></p>
+<p>Revision 1.4, March 21, 1990</p>
+<p>1. Changed <strong>ExAcquireResourceShared</strong> and
+<strong>ExAcquireResourceExclusive</strong> to take an additional Wait
+input parameter and to return a BOOLEAN function value.</p>
+<p>Revision 1.5, May 15, 1990</p>
+<p>1. Added recusive exclusive resource acquisition.</p>

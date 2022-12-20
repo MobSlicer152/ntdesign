@@ -1,0 +1,2536 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Executive Support Routines Specification</p>
+<p><strong>Author:</strong> David Treadwell, Windows NT team</p>
+<p>Revision 1.0, August 2, 1989</p>
+<p>Revision 1.1, October 11, 1989</p>
+<p>Revision 1.2, January 31, 1989</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Get Information About Pages 3</p>
+<p>2.1 ExCreateBitMap 3</p>
+<p>2.2 DeleteBitMap 3</p>
+<p>2.3 ExInitializeBitMap 4</p>
+<p>2.4 ExClearAllBits 4</p>
+<p>2.5 ExSetAllBits 5</p>
+<p>2.6 ExFindClearBits 5</p>
+<p>2.7 ExFindSetBits 5</p>
+<p>2.8 ExFindClearBitsAndSet 6</p>
+<p>2.9 ExFindSetBitsAndClear 6</p>
+<p>2.10 ExClearBits 7</p>
+<p>2.11 ExSetBits 7</p>
+<p>2.12 ExFindLongestRunClear 8</p>
+<p>2.13 ExFindLongestRunSet 8</p>
+<p>2.14 ExCheckBit 9</p>
+<p>3. Determine Pool Type 10</p>
+<p>3.1 MmDeterminePoolType 10</p>
+<p>4. Allocate and Deallocate Pool 11</p>
+<p>4.1 ExLockPool 11</p>
+<p>4.2 ExUnlockPool 11</p>
+<p>4.3 InitializePool 12</p>
+<p>4.4 ExAllocatePool 12</p>
+<p>4.5 ExAllocatePoolWithQuota 13</p>
+<p>4.6 ExDeallocatePool 14</p>
+<p>5. Initialize and Extend Zone Buffer 15</p>
+<p>5.1 ExInitializeZone 15</p>
+<p>5.2 ExExtendZone 16</p>
+<p>6. Perform Interlocked Allocate and Free from Zone 17</p>
+<p>6.1 ExAllocateFromZone 17</p>
+<p>6.2 ExFreeToZone 17</p>
+<p>6.3 ExIsFullZone 17</p>
+<p>6.4 ExInterlockedAllocateFromZone 18</p>
+<p>6.5 ExInterlockedFreeToZone 18</p>
+<p>7. Zero and Move Memory 20</p>
+<p>7.1 ExZeroMemory 20</p>
+<p>7.2 ExMoveMemory 20</p>
+<p>8. Manage Memory for I/O 22</p>
+<p>8.1 MmProbeAndLockPages 22</p>
+<p>8.2 MmUnlockPages 22</p>
+<p>8.3 MmMapLockedPages 23</p>
+<p>8.4 MmUnmapLockedPages 23</p>
+<p>8.5 MmMapIoSpace 24</p>
+<p>8.6 MmUnmapIoSpace 25</p>
+<p>8.7 MmGetPhysicalAddress 25</p>
+<p>8.8 MmSizeOfMdl 26</p>
+<p>8.9 MmCreateMdl 26</p>
+<p>9. Is Address Valid 28</p>
+<p>9.1 MmIsAddressValid 28</p>
+<p>10. Perform Bit Map Operations 29</p>
+<p>10.1 PAGE_ALIGN 29</p>
+<p>10.2 BYTES_TO_PAGES 29</p>
+<p>10.3 ROUND_TO_PAGES 29</p>
+<p>10.4 BYTE_OFFSET 30</p>
+<p>10.5 ADDRESS_AND_SIZE_TO_SPAN_PAGES 30</p>
+<p>11. Manage Object Handles and Handle Tables 32</p>
+<p>11.1 ExCreateHandleTable 32</p>
+<p>11.2 ExLockHandleTable 33</p>
+<p>11.3 ExUnlockHandleTable 33</p>
+<p>11.4 ExDupHandleTable 34</p>
+<p>11.5 ExDestroyHandleTable 34</p>
+<p>11.6 ExDumpHandleTable 35</p>
+<p>11.7 ExEnumHandleTable 35</p>
+<p>11.8 ExCreateHandle 36</p>
+<p>11.9 ExDestroyHandle 37</p>
+<p>11.10 ExMapHandleToPointer 37</p>
+<p>12. Probe and Validate Arguments 39</p>
+<p>12.1 ProbeForRead 39</p>
+<p>12.2 ProbeForWrite 39</p>
+<p>12.3 ProbeAndReadChar 40</p>
+<p>12.4 ProbeAndReadUchar 40</p>
+<p>12.5 ProbeAndReadShort 40</p>
+<p>12.6 ProbeAndReadLong 40</p>
+<p>12.7 ProbeAndReadUlong 40</p>
+<p>12.8 ProbeAndReadQuad 40</p>
+<p>12.9 ProbeAndReadUquad 40</p>
+<p>12.10 ProbeAndReadHandle 41</p>
+<p>12.11 ProbeAndReadBoolean 41</p>
+<p>12.12 ProbeForWriteChar 41</p>
+<p>12.13 ProbeForWriteUchar 41</p>
+<p>12.14 ProbeForWriteShort 41</p>
+<p>12.15 ProbeForWriteUshort 41</p>
+<p>12.16 ProbeForWriteLong 41</p>
+<p>12.17 ProbeForWriteUlong 41</p>
+<p>12.18 ProbeForWriteQuad 41</p>
+<p>12.19 ProbeForWriteUquad 42</p>
+<p>12.20 ProbeForWriteHandle 42</p>
+<p>12.21 ProbeForWriteBoolean 42</p>
+<p>12.22 ProbeAndWriteChar 42</p>
+<p>12.23 ProbeAndWriteUchar 42</p>
+<p>12.24 ProbeAndWriteShort 42</p>
+<p>12.25 ProbeAndWriteUshort 42</p>
+<p>12.26 ProbeAndWriteLong 42</p>
+<p>12.27 ProbeAndWriteUlong 43</p>
+<p>12.28 ProbeAndWriteQuad 43</p>
+<p>12.29 ProbeAndWriteUquad 43</p>
+<p>12.30 ProbeAndWriteHandle 43</p>
+<p>12.31 ProbeAndWriteBoolean 43</p>
+<p>13. Perform Restricted Interlock Operations 44</p>
+<p>13.1 ExInterlockedAddLong 44</p>
+<p>13.2 ExInterlockedAddShort 44</p>
+<p>13.3 ExInterlockedInsertHeadList 45</p>
+<p>13.4 ExInterlockedInsertTailList 45</p>
+<p>13.5 ExInterlockedRemoveHeadList 46</p>
+<p>13.6 ExInterlockedPopEntryList 46</p>
+<p>13.7 ExInterlockedPushEntryList 47</p>
+<p>14. Allocate and Free Spin Locks 48</p>
+<p>14.1 ExAllocateSpinLock 48</p>
+<p>14.2 ExFreeSpinLock 48</p>
+<p>15. Perform General Interlocked Operations 49</p>
+<p>15.1 RtlInterlockedAddLong 49</p>
+<p>15.2 RtlInterlockedAddShort 49</p>
+<p>15.3 RtlInterlockedInsertHeadList 50</p>
+<p>15.4 RtlInterlockedInsertTailList 50</p>
+<p>15.5 RtlInterlockedRemoveHeadList 51</p>
+<p>15.6 RtlInterlockedRemoveHeadList 51</p>
+<p>15.7 RtlInterlockedPopEntryList 52</p>
+<p>15.8 RtlInterlockedPushEntryList 52</p>
+<p>16. Perform Operations on Counted Strings 54</p>
+<p>16.1 RtlInitString 54</p>
+<p>16.2 RtlCopyString 54</p>
+<p>16.3 RtlCompareString 55</p>
+<p>16.4 RtlEqualString 55</p>
+<p>17. Debugging Support Functions 57</p>
+<p>17.1 DbgBreakPoint 57</p>
+<p>17.2 DbgCommand 57</p>
+<p>17.3 DbgQueryInstructionCounter 57</p>
+<p>17.4 DbgPrint 58</p>
+<p>17.5 DbgPrompt 58</p>
+<p>17.6 DbgLoadImageFileSymbols 59</p>
+<p>17.7 DbgSetDirBaseForImage 59</p>
+<p>17.8 DbgKillDirBase 60</p>
+<p>17.9 DbgCheckpointSimulator 60</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This chapter describes executive support routines that are not
+documented elsewhere in the <em><strong>Windows NT</strong> Design
+Workbook</em>. The routines are callable from kernel mode within the
+<strong>Windows NT</strong> executive. The following routines are
+presented in subsequent sections:</p>
+<p>Get Information About Pages ——Routines to calculate values related to
+the memory pagesize</p>
+<p>Determine Pool Type ——A memory management routine that determines
+whether a virtual address resides in paged or nonpaged memory pool</p>
+<p>Allocate and Deallocate Pool ——Routines used to allocate and
+deallocate memory pool using a binary buddy algorithm</p>
+<p>Initialize and Extend Zone Buffer ——Routines that initialize or
+extend a zone buffer (used primarily by local process communication)</p>
+<p>Perform Interlocked Allocate and Free from Zone ——Routines to
+allocate and free memory from a zone in a multiprocessor-safe manner</p>
+<p>Zero and Move Memory ——Routines to zero and move memory</p>
+<p>Manage Memory for I/O ——Routines that provide memory management
+support for the I/O system</p>
+<p>Is Address Valid ——A routine that determines if a given virtual
+address will cause a page fault if read</p>
+<p>Perform Bit Map Operations ——Routines to create, initialize, and
+manipulate bit maps</p>
+<p>Manage Object Handles and Handle Tables ——Routines that support
+object handles and handle tables</p>
+<p>Probe and Validate Arguments ——Routines that provide argument
+validation for system service calls</p>
+<p>Perform Restricted Interlocked Operations ——Restricted routines (no
+page faults allowed) implementing operations that must be synchronized
+across processors in a multiprocessing system</p>
+<p>Allocate and Free Spin Locks ——Routines to allocate and free spin
+locks (specialized mutual exclusion semaphores)</p>
+<p>Perform General Interlocked Operations ——Unrestricted routines (page
+faults allowed) implementing operations that must be synchronized across
+processors in a multiprocessing system</p>
+<p>Perform Operations on Counted Strings ——Routines that manipulate
+counted strings (strings that maintain a length field)</p>
+<p>Debugging Support Functions ——Routines for interfacing kernel-mode
+commands to the kernel-mode debugger.</p>
+<h1 id="get-information-about-pages"><br />
+2. Get Information About Pages</h1>
+<blockquote>
+<p>Implementation of the bit map routines for the Windows NT
+executive.</p>
+<p>Bit numbers within the bit map are zero based. The first is numbered
+zero.</p>
+<p>A bit map is allocated and initialized using the ExCreateBitMap
+routine. Once a bit map has been created, it must be set to a known
+state using either the ExSetAllBits or the ExClearAllBits routine.</p>
+<p>The ExInitializeBitMap routine is provided to initialize preallocated
+bit maps.</p>
+<p>The bit map routines keep track of the number of bits clear or set by
+subtracting or adding the number of bits operated on as bit ranges are
+cleared or set; individual bit states are not tested. This means that if
+a range of bits is set, it is assumed that the total range is currently
+clear.</p>
+</blockquote>
+<h2 id="excreatebitmap">2.1 ExCreateBitMap</h2>
+<p><strong>PEX_BITMAP</strong></p>
+<p><strong>ExCreateBitMap(</strong></p>
+<p><strong>IN ULONG</strong> <em>SizeOfBitMap</em><strong>,</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure allocates a bit map from the specified pool and
+returns a pointer to the bit map.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SizeOfBitMap</em> - Supplies the number of bits required in the
+bitmap.</p>
+<p><em>PoolType</em> - Supplies the type of pool from which to allocate
+the bit map.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>PEX_BITMAP - Returns a pointer to the allocated bit map. The bit map
+is not initialized.</p>
+</blockquote>
+<h2 id="deletebitmap">2.2 DeleteBitMap</h2>
+<p><strong>VOID</strong></p>
+<p><strong>DeleteBitMap(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure deallocates a bit map from the specified pool.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exinitializebitmap">2.3 ExInitializeBitMap</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExInitializeBitMap(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>SizeOfBitMap</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure initializes a bit map which has already been
+allocated.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><em>SizeOfBitMap</em> - Supplies the number of bits required in the
+bit map.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exclearallbits">2.4 ExClearAllBits</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExClearAllBits(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure clears all bits in the specified bit map.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exsetallbits">2.5 ExSetAllBits</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExSetAllBits(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure sets all bits in the specified bit map.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exfindclearbits">2.6 ExFindClearBits</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ExFindClearBits(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberToFind</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure searches the specified bit map for the specified
+contiguous region of clear bits.</p>
+<p>Uses methods from Pinball scan for bit block algorithm.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><em>NumberToFind</em> - Supplies the size of the contiguous region to
+find.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - Starting value (zero based) of the contiguous region
+found.</p>
+</blockquote>
+<h2 id="exfindsetbits">2.7 ExFindSetBits</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ExFindSetBits(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberToFind</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure searches the specified bit map for the specified
+contiguous region of set bits.</p>
+<p>Uses methods from Pinball scan for bit block algorithm.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><em>NumberToFind</em> - Supplies the size of the contiguous region to
+find.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - Starting value (zero based) of the contiguous region
+found.</p>
+</blockquote>
+<h2 id="exfindclearbitsandset">2.8 ExFindClearBitsAndSet</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ExFindClearBitsAndSet(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberToFind</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure searches the specified bit map for the specified
+contiguous region of clear bits, sets the bits and returns the starting
+bit number which was clear then set.</p>
+<p>Uses methods from Pinball scan for bit block algorithm.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><em>NumberToFind</em> - Supplies the size of the contiguous region to
+find.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - Starting value (zero based) of the contiguous region
+found.</p>
+</blockquote>
+<h2 id="exfindsetbitsandclear">2.9 ExFindSetBitsAndClear</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ExFindSetBitsAndClear(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberToFind</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure searches the specified bit map for the specified
+contiguous region of set bits, clears the bits and returns the starting
+bit number which was set then clear.</p>
+<p>Uses methods from Pinball scan for bit block algorithm.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><em>NumberToFind</em> - Supplies the size of the contiguous region to
+find.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - Starting value (zero based) of the contiguous region
+found.</p>
+</blockquote>
+<h2 id="exclearbits">2.10 ExClearBits</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExClearBits(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong>
+<em>StartingLocation</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberToClear</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure clears the specified range of bits within the
+specified bit map.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><em>StartingLocation</em> - Supplies the number of the first bit to
+clear.</p>
+<p><em>NumberToClear</em> - Supplies the number of bits to clear.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exsetbits">2.11 ExSetBits</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExSetBits(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong>
+<em>StartingLocation</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberToSet</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure sets the specified range of bits within the specified
+bit map.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><em>StartingLocation</em> - Supplies the number of the first bit to
+set.</p>
+<p><em>NumberToClear</em> - Supplies the number of bits to set.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exfindlongestrunclear">2.12 ExFindLongestRunClear</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ExFindLongestRunClear(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure finds the largest contiguous range of clear bits
+within the specified bit map.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - Largest contiguous range of clear bits.</p>
+</blockquote>
+<h2 id="exfindlongestrunset">2.13 ExFindLongestRunSet</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ExFindLongestRunSet(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure finds the largest contiguous range of set bits within
+the specified bit map.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - Largest contiguous range of set bits.</p>
+</blockquote>
+<h2 id="excheckbit">2.14 ExCheckBit</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ExCheckBit(</strong></p>
+<p><strong>IN PEX_BITMAP</strong> <em>BitMap</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>BitPosition</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure returns the state of the specified bit within the
+specified bit map.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BitMap</em> - Supplies a pointer to the previously allocated bit
+map.</p>
+<p><em>BitPosition</em> - Supplies the bit number of which to return the
+state.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>ULONG - The state of the specified bit.</p>
+</blockquote>
+<h1 id="determine-pool-type"><br />
+3. Determine Pool Type</h1>
+<blockquote>
+<p>This module contains the routines which allocate and deallocate one
+or more pages from paged or nonpaged pool.</p>
+</blockquote>
+<h2 id="mmdeterminepooltype">3.1 MmDeterminePoolType</h2>
+<p><strong>POOL_TYPE</strong></p>
+<p><strong>MmDeterminePoolType(</strong></p>
+<p><strong>IN PVOID</strong> <em>VirtualAddress</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function determines which pool a virtual address resides
+within.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>VirtualAddress</em> - Supplies the virtual address to determine
+which pool it resides within.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the POOL_TYPE (PagedPool or NonPagedPool).</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel Mode Only.</p>
+</blockquote>
+<h1 id="allocate-and-deallocate-pool"><br />
+4. Allocate and Deallocate Pool</h1>
+<blockquote>
+<p>Implementation of the binary buddy pool allocator for the Windows NT
+executive.</p>
+</blockquote>
+<h2 id="exlockpool">4.1 ExLockPool</h2>
+<p><strong>HANDLE</strong></p>
+<p><strong>ExLockPool(</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function locks the pool specified by pool type.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>PoolType</em> - Specifies the pool that should be locked.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Opaque - Returns a lock handle that must be returned in a subsequent
+call to ExUnlockPool.</p>
+</blockquote>
+<h2 id="exunlockpool">4.2 ExUnlockPool</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExUnlockPool(</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em><strong>,</strong></p>
+<p><strong>IN HANDLE</strong> <em>LockHandle</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>Wait</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function unlocks the pool specified by pool type. If the value
+of the Wait parameter is true, then the pool's lock is released using
+"wait == true".</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>PoolType</em> - Specifies the pool that should be unlocked.</p>
+<p><em>LockHandle</em> - Specifies the lock handle from a previous call
+to ExLockPool.</p>
+<p><em>Wait</em> - Supplies a boolean value that signifies whether the
+call to ExUnlockPool will be immediately followed by a call to one of
+the kernel Wait functions.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="initializepool">4.3 InitializePool</h2>
+<p><strong>VOID</strong></p>
+<p><strong>InitializePool(</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Threshold</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This procedure initializes a pool descriptor for a binary buddy pool
+type. Once initialized, the pool may be used for allocation and
+deallocation.</p>
+<p>This function should be called once for each pool type during system
+initialization.</p>
+<p>Each pool descriptor contains an array of list heads for free blocks.
+Each list head holds blocks of a particular size. One list head contains
+page-sized blocks. The other list heads contain 1/2- page-sized blocks,
+1/4-page-sized blocks.... A threshold is associated with the page-sized
+list head. The number of free blocks on this list will not grow past the
+specified threshold. When a deallocation occurs that would cause the
+threshold to be exceeded, the page is returned to the page-aliged pool
+allocator.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>PoolType</em> - Supplies the type of pool being initialized (e.g.
+nonpaged pool, paged pool...).</p>
+<p><em>Threshold</em> - Supplies the threshold value for the specified
+pool.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exallocatepool">4.4 ExAllocatePool</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>ExAllocatePool(</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberOfBytes</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function allocates a block of pool of the specified type and
+returns a pointer to the allocated block. This function is used to
+access both the page-aligned pools, and the binary buddy (less than a
+page) pools.</p>
+<p>If the number of bytes specifies a size that is too large to be
+satisfied by the appropriate binary buddy pool, then the page-aligned
+pool allocator is used. The allocated block will be page-aligned and a
+page-sized multiple.</p>
+<p>Otherwise, the appropriate binary buddy pool is used. The allocated
+block will be 64-bit aligned, but will not be page aligned. The binary
+buddy allocator calculates the smallest block size that is a power of
+two and that can be used to satisfy the request. If there are no blocks
+available of this size, then a block of the next larger block size is
+allocated and split in half. One piece is placed back into the pool, and
+the other piece is used to satisfy the request. If the allocator reaches
+the paged-sized block list, and nothing is there, the page-aligned pool
+allocator is called. The page is added to the binary buddy pool...</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>PoolType</em> - Supplies the type of pool to allocate.</p>
+<p><em>NumberOfBytes</em> - Supplies the number of bytes to
+allocate.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Non-NULL - Returns a pointer to the allocated pool.</p>
+</blockquote>
+<h2 id="exallocatepoolwithquota">4.5 ExAllocatePoolWithQuota</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>ExAllocatePoolWithQuota(</strong></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberOfBytes</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function allocates a block of pool of the specified type,
+returns a pointer to the allocated block, and if the binary buddy
+allocator was used to satisfy the request, charges pool quota to the
+current process. This function is used to access both the page-aligned
+pools, and the binary buddy.</p>
+<p>If the number of bytes specifies a size that is too large to be
+satisfied by the appropriate binary buddy pool, then the page-aligned
+pool allocator is used. The allocated block will be page-aligned and a
+page-sized multiple. No quota is charged to the current process if this
+is the case.</p>
+<p>Otherwise, the appropriate binary buddy pool is used. The allocated
+block will be 64-bit aligned, but will not be page aligned. After the
+allocation completes, an attempt will be made to charge pool quota (of
+the appropriate type) to the current process object. If the quota charge
+succeeds, then the pool block's header is adjusted to point to the
+current process. The process object is not dereferenced until the pool
+is deallocated and the appropriate amount of quota is returned to the
+process. Otherwise, the pool is deallocated, a "quota exceeded"
+condition is raised.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>PoolType</em> - Supplies the type of pool to allocate.</p>
+<p><em>NumberOfBytes</em> - Supplies the number of bytes to
+allocate.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Non-NULL - Returns a pointer to the allocated pool.</p>
+<p>Unspecified - If insuffient quota exists to complete the pool
+allocation, the return value is unspecified.</p>
+</blockquote>
+<h2 id="exdeallocatepool">4.6 ExDeallocatePool</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExDeallocatePool(</strong></p>
+<p><strong>IN PVOID</strong> <em>P</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function deallocates a block of pool. This function is used to
+deallocate to both the page aligned pools, and the binary buddy (less
+than a page) pools.</p>
+<p>If the address of the block being deallocated is page-aligned, then
+the page-aliged pool deallocator is used.</p>
+<p>Otherwise, the binary buddy pool deallocator is used. Deallocation
+looks at the allocated block's pool header to determine the pool type
+and block size being deallocated. If the pool was allocated using
+ExAllocatePoolWithQuota, then after the deallocation is complete, the
+appropriate process's pool quota is adjusted to reflect the
+deallocation, and the process object is dereferenced.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>P</em> - Supplies the address of the block of pool being
+deallocated.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h1 id="initialize-and-extend-zone-buffer"><br />
+5. Initialize and Extend Zone Buffer</h1>
+<blockquote>
+<p>This module implements a simple zone buffer manager. The primary
+consumer of this module is local LPC.</p>
+<p>The zone package provides a fast and efficient memory allocator for
+fixed-size 64-bit aligned blocks of storage. The zone package does not
+provide any serialization over access to the zone header and associated
+free list and segment list. It is the responsibility of the caller to
+provide any necessary serialization.</p>
+<p>The zone package views a zone as a set of fixed-size blocks of
+storage. The block size of a zone is specified during zone
+initialization. Storage is assigned to a zone during zone initialization
+and when a zone is extended. In both of these cases, a segment and
+length are specified.</p>
+<p>The zone package uses the first ZONE_SEGMENT_HEADER portion of the
+segment for zone overhead. The remainder of the segment is carved up
+into fixed-size blocks and each block is added to the free list
+maintained in the zone header.</p>
+<p>As long as a block is on the free list, the first SINGLE_LIST_ENTRY
+(32 bit) sized piece of the block is used as zone overhead. The rest of
+the block is not used by the zone package and may be used by
+applications to cache information. When a block is not on the free list,
+its entire contents are available to the application.</p>
+</blockquote>
+<h2 id="exinitializezone">5.1 ExInitializeZone</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ExInitializeZone(</strong></p>
+<p><strong>IN PZONE_HEADER</strong> <em>Zone</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>BlockSize</em><strong>,</strong></p>
+<p><strong>IN PVOID</strong>
+<em>InitialSegment</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>InitialSegmentSize</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function initializes a zone header. Once successfully
+initialized, blocks can be allocated and freed from the zone, and the
+zone can be extended.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Zone</em> - Supplies the address of a zone header to be
+initialized.</p>
+<p><em>BlockSize</em> - Supplies the block size of the allocatable unit
+within the zone. The size must be larger that the size of the initial
+segment, and must be 64-bit aligned.</p>
+<p><em>InitialSegment</em> - Supplies the address of a segment of
+storage. The first ZONE_SEGMENT_HEADER-sized portion of the segment is
+used by the zone allocator. The remainder of the segment is carved up
+into fixed size (BlockSize) blocks and is made available for allocation
+and deallocation from the zone. The address of the segment must be
+aligned on a 64-bit boundary.</p>
+<p><em>InitialSegmentSize</em> - Supplies the size in bytes of the
+InitialSegment.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>STATUS_UNSUCCESSFUL - BlockSize or InitialSegment was not aligned on
+64-bit boundaries, or BlockSize was larger than the initial segment
+size.</p>
+<p>STATUS_SUCCESS - The zone was successfully initialized.</p>
+</blockquote>
+<h2 id="exextendzone">5.2 ExExtendZone</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ExExtendZone(</strong></p>
+<p><strong>IN PZONE_HEADER</strong> <em>Zone</em><strong>,</strong></p>
+<p><strong>IN PVOID</strong> <em>Segment</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>SegmentSize</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function extends a zone by adding another segment's worth of
+blocks to the zone.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Zone</em> - Supplies the address of a zone header to be
+extended.</p>
+<p><em>Segment</em> - Supplies the address of a segment of storage. The
+first ZONE_SEGMENT_HEADER-sized portion of the segment is used by the
+zone allocator. The remainder of the segment is carved up into
+fixed-size (BlockSize) blocks and is added to the zone. The address of
+the segment must be aligned on a 64- bit boundary.</p>
+<p><em>SegmentSize</em> - Supplies the size in bytes of Segment.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>STATUS_UNSUCCESSFUL - BlockSize or Segment was not aligned on 64-bit
+boundaries, or BlockSize was larger than the segment size.</p>
+<p>STATUS_SUCCESS - The zone was successfully extended.</p>
+</blockquote>
+<h1 id="perform-interlocked-allocate-and-free-from-zone"><br />
+6. Perform Interlocked Allocate and Free from Zone</h1>
+<blockquote>
+<p>Public executive data structures and procedure prototypes.</p>
+</blockquote>
+<h2 id="exallocatefromzone">6.1 ExAllocateFromZone</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>ExAllocateFromZone(</strong></p>
+<p><strong>IN PZONE_HEADER</strong> <em>Zone</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine removes an entry from the zone and returns a pointer to
+it.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Zone</em> - Pointer to the zone header controlling the storage
+from which the entry is to be allocated.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The function value is a pointer to the storage allocated from the
+zone.</p>
+</blockquote>
+<h2 id="exfreetozone">6.2 ExFreeToZone</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExFreeToZone(</strong></p>
+<p><strong>IN PZONE_HEADER</strong> <em>Zone</em><strong>,</strong></p>
+<p><strong>IN PVOID</strong> <em>Block</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine places the specified block of storage back onto the free
+list in the specified zone.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Zone</em> - Pointer to the zone header controlling the storage to
+which the entry is to be inserted.</p>
+<p><em>Block</em> - Pointer to the block of storage to be freed back to
+the zone.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exisfullzone">6.3 ExIsFullZone</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ExIsFullZone(</strong></p>
+<p><strong>IN PZONE_HEADER</strong> <em>Zone</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine determines if the specified zone is full or not. A zone
+is considered full if the free list is empty.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Zone</em> - Pointer to the zone header to be tested.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>TRUE if the zone is full and FALSE otherwise.</p>
+</blockquote>
+<h2 id="exinterlockedallocatefromzone">6.4
+ExInterlockedAllocateFromZone</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>ExInterlockedAllocateFromZone(</strong></p>
+<p><strong>IN PZONE_HEADER</strong> <em>Zone</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine removes an entry from the zone and returns a pointer to
+it. The removal is performed with the specified lock owned for the
+sequence to make it MP-safe.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Zone</em> - Pointer to the zone header controlling the storage
+from which the entry is to be allocated.</p>
+<p><em>Lock</em> - Pointer to the spin lock which should be obtained
+before removing the entry from the allocation list. The lock is released
+before returning to the caller.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The function value is a pointer to the storage allocated from the
+zone.</p>
+</blockquote>
+<h2 id="exinterlockedfreetozone">6.5 ExInterlockedFreeToZone</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExInterlockedFreeToZone(</strong></p>
+<p><strong>IN PZONE_HEADER</strong> <em>Zone</em><strong>,</strong></p>
+<p><strong>IN PVOID</strong> <em>Block</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine places the specified block of storage back onto the free
+list in the specified zone. The insertion is performed with the lock
+owned for the sequence to make it MP-safe.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Zone</em> - Pointer to the zone header controlling the storage to
+which the entry is to be inserted.</p>
+<p><em>Block</em> - Pointer to the block of storage to be freed back to
+the zone.</p>
+<p><em>Lock</em> - Pointer to the spin lock which should be obtained
+before inserting the entry onto the free list. The lock is released
+before returning to the caller.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h1 id="zero-and-move-memory"><br />
+7. Zero and Move Memory</h1>
+<blockquote>
+<p>This module implements functions to zero and move memory blocks of
+memory. If the memory is aligned on 8 byte boundaries then these
+functions are very efficient, otherwise they do their work a byte at a
+time.</p>
+</blockquote>
+<h2 id="exzeromemory">7.1 ExZeroMemory</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExZeroMemory(</strong></p>
+<p><strong>IN PVOID</strong> <em>Destination</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Length</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>These functions zero memory. The ExZeroMemory function determines the
+most efficient method to use based on the alignment of the Destination
+pointer and the Length. If the Destination pointer is aligned but the
+Length is not, then it will zero alignment sized units and then zero the
+odd number of bytes to finish up. If the Destination pointer is not
+aligned, then it will zero the entire length by bytes.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Destination</em> (r16) - Supplies a pointer to the memory to
+zero.</p>
+<p><em>Length</em> (r17) - Supplies the Length, in bytes, of the memory
+to be zeroed.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+<p>Performance:</p>
+<p>10 Instructions to setup</p>
+<p>2 Instructions per MEMORY_ALIGNMENT bytes zeroed</p>
+<p>4 Instructions for each trailing odd byte</p>
+<p>4 Instructions to finish</p>
+<p>Zero ObjectTableEntry (16 bytes, quad aligned) is 18 instructions</p>
+</blockquote>
+<h2 id="exmovememory">7.2 ExMoveMemory</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExMoveMemory(</strong></p>
+<p><strong>IN PVOID</strong> <em>Destination</em><strong>,</strong></p>
+<p><strong>IN PVOID</strong> <em>Source</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN ULONG</strong> <em>Length</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function moves memory. The ExMoveMemory function determines the
+most efficient method to use based on the alignment of the Source and
+Destination pointers and the Length.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Destination</em> (r16) - Supplies a pointer to the destination of
+the move.</p>
+<p><em>Source</em> (r17) - Supplies a pointer to the memory to move. If
+NULL then zeros the memory at Destination.</p>
+<p><em>Length</em> (r18) - Supplies the Length, in bytes, of the memory
+to be moved.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h1 id="manage-memory-for-io"><br />
+8. Manage Memory for I/O</h1>
+<blockquote>
+<p>This module contains routines which provide support for the I/O
+system.</p>
+</blockquote>
+<h2 id="mmprobeandlockpages">8.1 MmProbeAndLockPages</h2>
+<p><strong>VOID</strong></p>
+<p><strong>MmProbeAndLockPages(</strong></p>
+<p><strong>IN OUT PMDL</strong>
+<em>MemoryDescriptorList</em><strong>,</strong></p>
+<p><strong>IN KPROCESSOR_MODE</strong>
+<em>AccessMode</em><strong>,</strong></p>
+<p><strong>IN LOCK_OPERATION</strong> <em>Operation</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine probes the specified pages, makes the pages resident and
+locks the physical pages mapped by the virtual pages in memory. The
+Memory descriptor list is updated to describe the physical pages.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>MemoryDescriptorList</em> - Supplies a pointer to a Memory
+Descriptor List (MDL). The supplied MDL must supply a virtual address,
+byte offset and length field. The physical page portion of the MDL is
+updated when the pages are locked in memory.</p>
+<p><em>AccessMode</em> - Supplies the access mode in which to probe the
+arguments. One of KernelMode or UserMode.</p>
+<p><em>Operation</em> - Supplies the operation type. One of
+IoReadAccess, IoWriteAccess or IoModifyAccess.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None - exceptions are raised.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode.</p>
+</blockquote>
+<h2 id="mmunlockpages">8.2 MmUnlockPages</h2>
+<p><strong>VOID</strong></p>
+<p><strong>MmUnlockPages(</strong></p>
+<p><strong>IN OUT PMDL</strong> <em>MemoryDescriptorList</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine unlocks physical pages which are described by a Memory
+Descriptor List.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>MemoryDescriptorList</em> - Supplies a pointer to a memory
+description list (MDL). The supplied MDL must have been supplied to
+MmLockPages to lock the pages down. As the pages are unlocked, the MDL
+is updated.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode.</p>
+</blockquote>
+<h2 id="mmmaplockedpages">8.3 MmMapLockedPages</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>MmMapLockedPages(</strong></p>
+<p><strong>IN PMDL</strong>
+<em>MemoryDescriptorList</em><strong>,</strong></p>
+<p><strong>IN KPROCESSOR_MODE</strong> <em>AccessMode</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function maps physical pages described by a memory description
+list into the system virtual address space.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>MemoryDescriptorList</em> - Supplies a valid Memory Descriptor
+List which has been updated by MmProbeAndLockPages.</p>
+<p><em>AccessMode</em> - Supplies an indicator of where to map the
+pages; KernelMode indicates that the pages should be mapped in the
+system part of the address space, UserMode indicates the pages should be
+mapped in the user part of the address space.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the base address where the pages are mapped. The base address
+has the same offset as the virtual address in the MDL.</p>
+<p>This routine will raise an exception if the processor mode is
+USER_MODE and quota limits or VM limits are exceeded.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode.</p>
+</blockquote>
+<h2 id="mmunmaplockedpages">8.4 MmUnmapLockedPages</h2>
+<p><strong>VOID</strong></p>
+<p><strong>MmUnmapLockedPages(</strong></p>
+<p><strong>IN PVOID</strong> <em>BaseAddress</em><strong>,</strong></p>
+<p><strong>IN PMDL</strong> <em>MemoryDescriptorList</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This routine unmaps locked pages which were previously mapped via a
+MmMapLockedPages function.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BaseAddress</em> - Supplies the base address where the pages were
+previously mapped.</p>
+<p><em>MemoryDescriptorList</em> - Supplies a valid Memory Descriptor
+List which has been updated by MmProbeAndLockPages.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode.</p>
+</blockquote>
+<h2 id="mmmapiospace">8.5 MmMapIoSpace</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>MmMapIoSpace(</strong></p>
+<p><strong>IN PHYSICAL_ADDRESS</strong>
+<em>PhysicalAddress</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberOfBytes</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function maps the specified physical address into the
+non-pageable portion of the system address space.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>PhysicalAddress</em> - Supplies the starting physical address to
+map.</p>
+<p><em>NumberOfBytes</em> - Supplies the number of bytes to map.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the virtual address which maps the specified physical
+addresses.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode. APCs disabled.</p>
+</blockquote>
+<h2 id="mmunmapiospace">8.6 MmUnmapIoSpace</h2>
+<p><strong>VOID</strong></p>
+<p><strong>MmUnmapIoSpace(</strong></p>
+<p><strong>IN PVOID</strong> <em>BaseAddress</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>NumberOfBytes</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function unmaps a range of physical address which were
+previously mapped via an MmMapIoSpace function call.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BaseAddress</em> - Supplies the base virtual address where the
+physical address was previously mapped.</p>
+<p><em>NumberOfBytes</em> - Supplies the number of bytes which were
+mapped.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode.</p>
+</blockquote>
+<h2 id="mmgetphysicaladdress">8.7 MmGetPhysicalAddress</h2>
+<p><strong>PHYSICAL_ADDRESS</strong></p>
+<p><strong>MmGetPhysicalAddress(</strong></p>
+<p><strong>IN PVOID</strong> <em>BaseAddress</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function returns the corresponding physical address for a valid
+virtual address.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>BaseAddress</em> - Supplies the virtual address for which to
+return the physical address.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the corresponding physical address.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode. APCs disabled.</p>
+</blockquote>
+<h2 id="mmsizeofmdl">8.8 MmSizeOfMdl</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>MmSizeOfMdl(</strong></p>
+<p><strong>IN PVOID</strong> <em>Base</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Length</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function returns the number of bytes required for an MDL for a
+given buffer and size.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Base</em> - Supplies the base virtual address for the buffer.</p>
+<p><em>Length</em> - Supplies the size of the buffer in bytes.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the number of bytes required to contain the MDL.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode.</p>
+</blockquote>
+<h2 id="mmcreatemdl">8.9 MmCreateMdl</h2>
+<p><strong>PMDL</strong></p>
+<p><strong>MmCreateMdl(</strong></p>
+<p><strong>IN PMDL</strong> <em>MemoryDescriptorList</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>IN PVOID</strong> <em>Base</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Length</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function optionally allocates and initializes an MDL.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>MemoryDescriptorList</em> - Optionally supplies the address of
+the MDL to initialize. If this address is supplied as NULL an MDL is
+allocated from non-paged pool and initialized.</p>
+<p><em>Base</em> - Supplies the base virtual address for the buffer.</p>
+<p><em>Length</em> - Supplies the size of the buffer in bytes.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the address of the initialized MDL.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode.</p>
+</blockquote>
+<h1 id="is-address-valid"><br />
+9. Is Address Valid</h1>
+<blockquote>
+<p>This module contains the pager for memory management.</p>
+</blockquote>
+<h2 id="mmisaddressvalid">9.1 MmIsAddressValid</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>MmIsAddressValid(</strong></p>
+<p><strong>IN PVOID</strong> <em>VirtualAddress</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>For a given virtual address this function returns TRUE if no page
+fault will occur for a read operation on the address, FALSE
+otherwise.</p>
+<p>Note that after this routine was called, if appropriate locks are not
+held, a non-faulting address could fault.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>VirtualAddress</em> - Supplies the virtual address to check.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>TRUE if a no page fault would be generated reading the virtual
+address, FALSE otherwise.</p>
+</blockquote>
+<p><u>Environment:</u></p>
+<blockquote>
+<p>Kernel mode.</p>
+</blockquote>
+<h1 id="perform-bit-map-operations"><br />
+10. Perform Bit Map Operations</h1>
+<blockquote>
+<p>This module contains the public data structures and procedure
+prototypes for the memory management system.</p>
+</blockquote>
+<h2 id="page_align">10.1 PAGE_ALIGN</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>PAGE_ALIGN(</strong></p>
+<p><strong>IN PVOID</strong> <em>Va</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The PAGE_ALIGN macro takes a virtual address and returns a
+page-aligned virtual address for that page.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Va</em> - Virtual address.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the page aligned virtual address.</p>
+</blockquote>
+<h2 id="bytes_to_pages">10.2 BYTES_TO_PAGES</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>BYTES_TO_PAGES(</strong></p>
+<p><strong>IN ULONG</strong> <em>Size</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The BYTES_TO_PAGES macro takes the size in bytes and calculates the
+number of pages required to contain the bytes.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Size</em> - Size in bytes.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the number of pages required to contain the specified
+size.</p>
+</blockquote>
+<h2 id="round_to_pages">10.3 ROUND_TO_PAGES</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ROUND_TO_PAGES(</strong></p>
+<p><strong>IN ULONG</strong> <em>Size</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The ROUND_TO_PAGES macro takes a size in bytes and rounds it up to a
+multiple of the page size.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Size</em> - Size in bytes to round up to a page multiple.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the size rounded up to a multiple of the page size.</p>
+</blockquote>
+<h2 id="byte_offset">10.4 BYTE_OFFSET</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>BYTE_OFFSET(</strong></p>
+<p><strong>IN PVOID</strong> <em>Va</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The BYTE_OFFSET macro takes a virtual address and returns the byte
+offset of that address within the page.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Va</em> - Virtual address.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the byte offset portion of the virtual address.</p>
+</blockquote>
+<h2 id="address_and_size_to_span_pages">10.5
+ADDRESS_AND_SIZE_TO_SPAN_PAGES</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ADDRESS_AND_SIZE_TO_SPAN_PAGES(</strong></p>
+<p><strong>IN PVOID</strong> <em>Va</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Size</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The ADDRESS_AND_SIZE_TO_SPAN_PAGES macro takes a virtual address and
+size and returns the number of pages spanned by the size.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Va</em> - Virtual address.</p>
+<p><em>Size</em> - Size in bytes.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns the number of pages spanned by the size.</p>
+</blockquote>
+<h1 id="manage-object-handles-and-handle-tables"><br />
+11. Manage Object Handles and Handle Tables</h1>
+<blockquote>
+<p>This module implements a set of functions for supporting handles.
+Handles are opaque pointers that are implemented as indexes into a
+handle table.</p>
+<p>Access to handle tables is serialized with a mutex. The level number
+associated with the mutex is specified at the time the handle table is
+created. Also specified at creation time are the initial size of the
+handle table, the memory pool type to allocate the table from and the
+size of each entry in the handle table.</p>
+<p>The size of each entry in the handle table is specified as a power of
+2. The size specifies how many 32-bit values are to be stored in each
+handle table entry. Thus a size of zero, specifies 1 (==2**0) 32-bit
+value. A size of 2 specifies 4 (=2**2) 32-bit values. The ability to
+support different sizes of handle table entries leads to some
+polymorphic interfaces.</p>
+<p>The polymorphism occurs in two of the interfaces, ExCreateHandle and
+ExMapHandleToPointer. ExCreateHandle takes a handle table and a pointer.
+For handle tables whose entry size is one 32-bit value, the pointer
+parameter will be the value of the created handle. For handle tables
+whose entry size is more than one, the pointer parameter is a pointer to
+the 32-bit handle values which will be copied to the newly created
+handle table entry.</p>
+<p>ExMapHandleToPointer takes a handle table and a handle parameter. For
+handle tables whose entry size is one, it returns the 32-bit value
+stored in the handle table entry. For handle tables whose entry size is
+more than one, it returns a pointer to the handle table entry itself. In
+both cases, ExMapHandleToPointer LEAVES THE HANDLE TABLE LOCKED. The
+caller must then call the ExUnlockHandleTable function to unlock the
+table when they are done referencing the contents of the handle table
+entry.</p>
+<p>Free handle table entries are kept on a free list. The head of the
+free list is in the handle table header. To distinguish free entries
+from busy entries, the low order bit of the first 32-bit word of a free
+handle table entry is set to one. This means that the value associated
+with a handle can't have the low order bit set.</p>
+</blockquote>
+<h2 id="excreatehandletable">11.1 ExCreateHandleTable</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>ExCreateHandleTable(</strong></p>
+<p><strong>IN ULONG</strong>
+<em>InitialCountTableEntries</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong>
+<em>CountTableEntriesToGrowBy</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong>
+<em>LogSizeTableEntry</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong>
+<em>TableMutexLevel</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>SerialNumberMask</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function creates a handle table for storing opaque pointers. A
+handle is an index into a handle table.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>InitialCountTableEntries</em> - Initial size of the handle
+table.</p>
+<p><em>CountTableEntriesToGrowBy</em> - Number of entries to grow the
+handle table by when it becomes full.</p>
+<p><em>LogSizeTableEntry</em> - Log, base 2, of the number of 32-bit
+values in each handle table entry.</p>
+<p><em>TableMutexLevel</em> - The level number to associated with the
+mutex that is used to synchronize access to the handle table.</p>
+<p><em>SerialNumberMask</em> - If non-zero then the last 32-bit value in
+each handle table entry is supposed to contain a serial number and the
+value of this parameter is used to mask off bits that are not part of
+the serial number value.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>An opaque pointer to the handle table. Returns NULL if an error
+occurred. The following errors can occur:</p>
+<p>- Insufficient memory</p>
+</blockquote>
+<h2 id="exlockhandletable">11.2 ExLockHandleTable</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExLockHandleTable(</strong></p>
+<p><strong>IN PVOID</strong> <em>HandleTableHandle</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function acquires the mutex for the specified handle table.
+After acquiring the mutex, it then acquired the spin lock for the
+specified handle table and sets the MutexOwned flag in the handle table
+to TRUE before releasing the spin lock.</p>
+<p>The purpose of the dual level locking is so that ExMapHandleToPointer
+can do it's work by just acquiring the spin lock.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - An opaque pointer to a handle table</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exunlockhandletable">11.3 ExUnlockHandleTable</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExUnlockHandleTable(</strong></p>
+<p><strong>IN PVOID</strong>
+<em>HandleTableHandle</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>ReleaseMutex</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function releases the spin lock associated the specified handle
+table. If the ReleaseMutex parameter is TRUE then the mutex associated
+with the handle table is also released, before releasing the spin
+lock.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - An opaque pointer to a handle table</p>
+<p><em>ReleaseMutex</em> - A flag indicated whether or not to release
+the mutex associated with the specified handle table.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exduphandletable">11.4 ExDupHandleTable</h2>
+<p><strong>PVOID</strong></p>
+<p><strong>ExDupHandleTable(</strong></p>
+<p><strong>IN PVOID</strong>
+<em>HandleTableHandle</em><strong>,</strong></p>
+<p><strong>IN EX_DUPLICATE_HANDLE_ROUTINE</strong>
+<em>DupHandleProcedure</em> <strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function creates a duplicate copy of the specified handle
+table.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - An opaque pointer to a handle table</p>
+<p><em>DupHandleProcedure</em> - A pointer to a procedure to call for
+each valid handle in the duplicated handle table.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>An opaque pointer to the handle table. Returns NULL if an error
+occurred. The following errors can occur:</p>
+<p>- Insufficient memory</p>
+</blockquote>
+<h2 id="exdestroyhandletable">11.5 ExDestroyHandleTable</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExDestroyHandleTable(</strong></p>
+<p><strong>IN PVOID</strong>
+<em>HandleTableHandle</em><strong>,</strong></p>
+<p><strong>IN EX_DESTROY_HANDLE_ROUTINE</strong>
+<em>DestroyHandleProcedure</em> <strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function destorys the specified handle table. It first locks the
+handle table to prevent others from accessing it, and then invalidates
+the handle table and frees the memory associated with it.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - An opaque pointer to a handle table</p>
+<p><em>DestroyHandleProcedure</em> - A pointer to a procedure to call
+for each valid handle in the handle table being destroyed.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exdumphandletable">11.6 ExDumpHandleTable</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExDumpHandleTable(</strong></p>
+<p><strong>IN PVOID</strong>
+<em>HandleTableHandle</em><strong>,</strong></p>
+<p><strong>IN EX_DUMP_HANDLE_ROUTINE</strong>
+<em>DumpHandleProcedure</em> <strong>OPTIONAL,</strong></p>
+<p><strong>IN PVOID</strong> <em>Stream</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function prints out a formatted dump of the specified handle
+table.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - an opaque pointer to a handle table.</p>
+<p><em>DumpHandleProcedure</em> - A pointer to a procedure to call for
+each valid handle in the handle table being dumped.</p>
+<p><em>Stream</em> - I/O stream to send the output to. Defaults to
+stdout.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exenumhandletable">11.7 ExEnumHandleTable</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ExEnumHandleTable(</strong></p>
+<p><strong>IN PVOID</strong>
+<em>HandleTableHandle</em><strong>,</strong></p>
+<p><strong>IN EX_ENUMERATE_HANDLE_ROUTINE</strong>
+<em>EnumHandleProcedure</em><strong>,</strong></p>
+<p><strong>IN PVOID</strong>
+<em>EnumParameter</em><strong>,</strong></p>
+<p><strong>OUT PHANDLE</strong> <em>Handle</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function enumerates all the valid handles in a handle table. For
+each valid handle in the handle table, this functions calls an
+enumeration procedure specified by the caller. If the enumeration
+procedure returns TRUE, then the enumeration is stop, the current handle
+is returned to the caller via the optional Handle parameter and this
+function returns TRUE to indicated that the enumeration stopped at a
+specific handle.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - An opaque pointer to a handle table.</p>
+<p><em>EnumHandleProcedure</em> - A pointer to a procedure to call for
+each valid handle in the handle table being enumerated.</p>
+<p><em>EnumParameter</em> - An unterpreted 32-bit value that is passed
+to the EnumHandleProcedure each time it is called.</p>
+<p><em>Handle</em> - An optional pointer to a variable that will receive
+the Handle value that the enumeration stopped at. Contents of the
+variable only valid if this function returns TRUE.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>TRUE if the enumeration stopped at a specific handle. FALSE
+otherwise.</p>
+</blockquote>
+<h2 id="excreatehandle">11.8 ExCreateHandle</h2>
+<p><strong>HANDLE</strong></p>
+<p><strong>ExCreateHandle(</strong></p>
+<p><strong>IN PVOID</strong>
+<em>HandleTableHandle</em><strong>,</strong></p>
+<p><strong>IN PVOID</strong> <em>Pointer</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function create a handle in the specified handle table. If there
+is insufficient room in the handle table for a new entry, then the
+handle table is reallocated to a larger size.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - An opaque pointer to a handle table</p>
+<p><em>Pointer</em> - Initial value of the handle table entry if the
+entry size is one. The low order bit must be zero. If the entry size is
+not one, then it is a pointer to an array of 32-bit values that are the
+initial value of the handle table entry. The number of 32-bit values in
+the array is the size of each handle table entry. The low order bit of
+the first 32-bit value in the array must be zero.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The handle created or NULL if an error occurred. The following errors
+can occur:</p>
+<p>- Invalid handle table</p>
+<p>- Low order bit of the first pointer is not zero</p>
+<p>- Insufficient memory</p>
+</blockquote>
+<h2 id="exdestroyhandle">11.9 ExDestroyHandle</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ExDestroyHandle(</strong></p>
+<p><strong>IN PVOID</strong>
+<em>HandleTableHandle</em><strong>,</strong></p>
+<p><strong>IN HANDLE</strong> <em>Handle</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function removes a handle from a handle table.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - An opaque pointer to a handle table</p>
+<p><em>Handle</em> - Handle returned by ExCreateHandle for this handle
+table</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns TRUE if the handle was successfully deleted from the handle
+table. Returns FALSE otherwise.</p>
+</blockquote>
+<h2 id="exmaphandletopointer">11.10 ExMapHandleToPointer</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ExMapHandleToPointer(</strong></p>
+<p><strong>IN PVOID</strong>
+<em>HandleTableHandle</em><strong>,</strong></p>
+<p><strong>IN HANDLE</strong> <em>Handle</em><strong>,</strong></p>
+<p><strong>OUT PVOID</strong> <em>HandleValue</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function maps a handle into a pointer. It always returns with
+the handle table locked, so the caller must call
+ExUnlockHandleTable.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>HandleTableHandle</em> - An opaque pointer to a handle table</p>
+<p><em>Handle</em> - Handle returned by ExCreateHandle for this handle
+table</p>
+<p><em>HandleValue</em> - A pointer to a variable that is to receive the
+value of the handle. If the passed handle table has a handle table entry
+size of one, then HandleValue is the 32-bit value associated with the
+passed handle. If the handle table entry size is more than one, then
+HandleValue is a pointer to the handle table entry itself.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>This function returns TRUE if the handle table mutex was acquired and
+FALSE if just the handle table spin lock was acquired. The return value
+of this function should be passed as the ReleaseMutex parameter to the
+ExUnlockHandleTable function.</p>
+<p>If the returned value is FALSE and the HandleValue variable is set to
+NULL, then an error occurred. The following errors can occur:</p>
+<p>- Invalid handle table</p>
+<p>- Invalid handle</p>
+</blockquote>
+<h1 id="probe-and-validate-arguments"><br />
+12. Probe and Validate Arguments</h1>
+<blockquote>
+<p>This module contains the routine to probe variable length buffers for
+read or write accessibility and to ensure correct alignment.</p>
+</blockquote>
+<h2 id="probeforread">12.1 ProbeForRead</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ProbeForRead(</strong></p>
+<p><strong>IN PVOID</strong> <em>Address</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Length</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Alignment</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function probes a structure for read accessibility and ensures
+correct alignment of the structure. If the structure is not accessible
+or has incorrect alignment, then an exception is raised.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Address</em> - Supplies a pointer to the structure to be
+probed.</p>
+<p><em>Length</em> - Supplies the length of the structure.</p>
+<p><em>Alignment</em> - Supplies the required alignment of the structure
+expressed as the number of bytes in the primitive datatype (e.g., 1 for
+char, 2 for short, 4 for long, and 8 for quad).</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="probeforwrite">12.2 ProbeForWrite</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ProbeForWrite(</strong></p>
+<p><strong>IN PVOID</strong> <em>Address</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Length</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Alignment</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function probes a structure for write accessibility and ensures
+correct alignment of the structure. If the structure is not accessible
+or has incorrect alignment, then an exception is raised.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Address</em> - Supplies a pointer to the structure to be
+probed.</p>
+<p><em>Length</em> - Supplies the length of the structure.</p>
+<p><em>Alignment</em> - Supplies the required alignment of the structure
+expressed as the number of bytes in the primitive datatype (e.g., 1 for
+char, 2 for short, 4 for long, and 8 for quad).</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="probeandreadchar">12.3 ProbeAndReadChar</h2>
+<p><strong>CHAR</strong></p>
+<p><strong>ProbeAndReadChar(</strong></p>
+<p><strong>IN PCHAR</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandreaduchar">12.4 ProbeAndReadUchar</h2>
+<p><strong>UCHAR</strong></p>
+<p><strong>ProbeAndReadUchar(</strong></p>
+<p><strong>IN PUCHAR</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandreadshort">12.5 ProbeAndReadShort</h2>
+<p><strong>SHORT</strong></p>
+<p><strong>ProbeAndReadShort(</strong></p>
+<p><strong>IN PSHORT</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandreadlong">12.6 ProbeAndReadLong</h2>
+<p><strong>LONG</strong></p>
+<p><strong>ProbeAndReadLong(</strong></p>
+<p><strong>IN PLONG</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandreadulong">12.7 ProbeAndReadUlong</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ProbeAndReadUlong(</strong></p>
+<p><strong>IN PULONG</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandreadquad">12.8 ProbeAndReadQuad</h2>
+<p><strong>QUAD</strong></p>
+<p><strong>ProbeAndReadQuad(</strong></p>
+<p><strong>IN PQUAD</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandreaduquad">12.9 ProbeAndReadUquad</h2>
+<p><strong>UQUAD</strong></p>
+<p><strong>ProbeAndReadUquad(</strong></p>
+<p><strong>IN PUQUAD</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandreadhandle">12.10 ProbeAndReadHandle</h2>
+<p><strong>HANDLE</strong></p>
+<p><strong>ProbeAndReadHandle(</strong></p>
+<p><strong>IN PHANDLE</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandreadboolean">12.11 ProbeAndReadBoolean</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ProbeAndReadBoolean(</strong></p>
+<p><strong>IN PBOOLEAN</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwritechar">12.12 ProbeForWriteChar</h2>
+<p><strong>CHAR</strong></p>
+<p><strong>ProbeForWriteChar(</strong></p>
+<p><strong>IN PCHAR</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwriteuchar">12.13 ProbeForWriteUchar</h2>
+<p><strong>UCHAR</strong></p>
+<p><strong>ProbeForWriteUchar(</strong></p>
+<p><strong>IN PUCHAR</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwriteshort">12.14 ProbeForWriteShort</h2>
+<p><strong>SHORT</strong></p>
+<p><strong>ProbeForWriteShort(</strong></p>
+<p><strong>IN PSHORT</strong> <em>Address</em></p>
+<h2 id="section"> )</h2>
+<h2 id="probeforwriteushort">12.15 ProbeForWriteUshort</h2>
+<p><strong>USHORT</strong></p>
+<p><strong>ProbeForWriteUshort(</strong></p>
+<p><strong>IN PUSHORT</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwritelong">12.16 ProbeForWriteLong</h2>
+<p><strong>LONG</strong></p>
+<p><strong>ProbeForWriteLong(</strong></p>
+<p><strong>IN PLONG</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwriteulong">12.17 ProbeForWriteUlong</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ProbeForWriteUlong(</strong></p>
+<p><strong>IN PULONG</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwritequad">12.18 ProbeForWriteQuad</h2>
+<p><strong>QUAD</strong></p>
+<p><strong>ProbeForWriteQuad(</strong></p>
+<p><strong>IN PQUAD</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwriteuquad">12.19 ProbeForWriteUquad</h2>
+<p><strong>UQUAD</strong></p>
+<p><strong>ProbeForWriteUquad(</strong></p>
+<p><strong>IN PUQUAD</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwritehandle">12.20 ProbeForWriteHandle</h2>
+<p><strong>HANDLE</strong></p>
+<p><strong>ProbeForWriteHandle(</strong></p>
+<p><strong>IN PHANDLE</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeforwriteboolean">12.21 ProbeForWriteBoolean</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ProbeForWriteBoolean(</strong></p>
+<p><strong>IN PBOOLEAN</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwritechar">12.22 ProbeAndWriteChar</h2>
+<p><strong>CHAR</strong></p>
+<p><strong>ProbeAndWriteChar(</strong></p>
+<p><strong>IN PCHAR</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwriteuchar">12.23 ProbeAndWriteUchar</h2>
+<p><strong>UCHAR</strong></p>
+<p><strong>ProbeAndWriteUchar(</strong></p>
+<p><strong>IN PUCHAR</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwriteshort">12.24 ProbeAndWriteShort</h2>
+<p><strong>SHORT</strong></p>
+<p><strong>ProbeAndWriteShort(</strong></p>
+<p><strong>IN PSHORT</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwriteushort">12.25 ProbeAndWriteUshort</h2>
+<p><strong>USHORT</strong></p>
+<p><strong>ProbeAndWriteUshort(</strong></p>
+<p><strong>IN PUSHORT</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwritelong">12.26 ProbeAndWriteLong</h2>
+<p><strong>LONG</strong></p>
+<p><strong>ProbeAndWriteLong(</strong></p>
+<p><strong>IN PLONG</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwriteulong">12.27 ProbeAndWriteUlong</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>ProbeAndWriteUlong(</strong></p>
+<p><strong>IN PULONG</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwritequad">12.28 ProbeAndWriteQuad</h2>
+<p><strong>QUAD</strong></p>
+<p><strong>ProbeAndWriteQuad(</strong></p>
+<p><strong>IN PQUAD</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwriteuquad">12.29 ProbeAndWriteUquad</h2>
+<p><strong>UQUAD</strong></p>
+<p><strong>ProbeAndWriteUquad(</strong></p>
+<p><strong>IN PUQUAD</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwritehandle">12.30 ProbeAndWriteHandle</h2>
+<p><strong>HANDLE</strong></p>
+<p><strong>ProbeAndWriteHandle(</strong></p>
+<p><strong>IN PHANDLE</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h2 id="probeandwriteboolean">12.31 ProbeAndWriteBoolean</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ProbeAndWriteBoolean(</strong></p>
+<p><strong>IN PBOOLEAN</strong> <em>Address</em></p>
+<p><strong>)</strong></p>
+<h1 id="perform-restricted-interlock-operations"><br />
+13. Perform Restricted Interlock Operations</h1>
+<blockquote>
+<p>This module implements functions to support interlocked operations in
+a general way such that all the data that is operated on can be pageable
+including the locks themselves.</p>
+<p>NOTE: The code in this module has been very carefully aligned such
+that no interlocked routine can cross a page boundary. Care must be
+taken when making any changes to this module to ensure that a page
+crossing does not occur.</p>
+</blockquote>
+<h2 id="exinterlockedaddlong">13.1 ExInterlockedAddLong</h2>
+<p><strong>LONG</strong></p>
+<p><strong>ExInterlockedAddLong(</strong></p>
+<p><strong>IN PLONG</strong> <em>Addend</em><strong>,</strong></p>
+<p><strong>IN LONG</strong> <em>Increment</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function performs an interlocked add of an increment value to an
+addend variable of type long. The initial value of the addend variable
+is returned as the function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Addend</em> (r16) - Supplies a pointer to a variable whose value
+is to be adjusted by the increment value.</p>
+<p><em>Increment</em> (r17) - Supplies the increment value to be added
+to the addend variable.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the addend variable.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The initial value of the addend variable.</p>
+</blockquote>
+<h2 id="exinterlockedaddshort">13.2 ExInterlockedAddShort</h2>
+<p><strong>SHORT</strong></p>
+<p><strong>ExInterlockedAddShort(</strong></p>
+<p><strong>IN PSHORT</strong> <em>Addend</em><strong>,</strong></p>
+<p><strong>IN SHORT</strong> <em>Increment</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function performs an interlocked add of an increment value to an
+addend variable of type short. The initial value of the addend variable
+is returned as the function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Addend</em> (r16) - Supplies a pointer to a variable whose value
+is to be adjusted by the increment value.</p>
+<p><em>Increment</em> (r17) - Supplies the increment value to be added
+to the addend variable.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the addend variable.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The initial value of the addend variable.</p>
+</blockquote>
+<h2 id="exinterlockedinsertheadlist">13.3
+ExInterlockedInsertHeadList</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExInterlockedInsertHeadList(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListEntry</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function inserts an entry at the head of a doubly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+doubly linked list into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> (r17) - Supplies a pointer to the entry to be
+inserted at the head of the list.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exinterlockedinserttaillist">13.4
+ExInterlockedInsertTailList</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExInterlockedInsertTailList(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListEntry</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function inserts an entry at the tail of a doubly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+doubly linked list into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> (r17) - Supplies a pointer to the entry to be
+inserted at the tail of the list.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exinterlockedremoveheadlist">13.5
+ExInterlockedRemoveHeadList</h2>
+<p><strong>PLIST_ENTRY</strong></p>
+<p><strong>ExInterlockedRemoveHeadList(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function removes an entry from the head of a doubly linked list
+so that access to the list is synchronized in a multiprocessor system.
+If there are no entries in the list, then a value of NULL is returned.
+Otherwise, the address of the entry that is removed is returned as the
+function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+doubly linked list from which an entry is to be removed.</p>
+<p><em>Lock</em> (r17) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The address of the entry removed from the list, or NULL if the list
+is empty.</p>
+</blockquote>
+<h2 id="exinterlockedpopentrylist">13.6 ExInterlockedPopEntryList</h2>
+<p><strong>PSINGLE_LIST_ENTRY</strong></p>
+<p><strong>ExInterlockedPopEntryList(</strong></p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function removes an entry from the front of a singly linked list
+so that access to the list is synchronized in a multiprocessor system.
+If there are no entries in the list, then a value of NULL is returned.
+Otherwise, the address of the entry that is removed is returned as the
+function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+singly linked list from which an entry is to be removed.</p>
+<p><em>Lock</em> (r17) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The address of the entry removed from the list, or NULL if the list
+is empty.</p>
+</blockquote>
+<h2 id="exinterlockedpushentrylist">13.7 ExInterlockedPushEntryList</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExInterlockedPushEntryList(</strong></p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong>
+<em>ListEntry</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function inserts an entry at the head of a singly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+singly linked list into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> (r17) - Supplies a pointer to the entry to be
+inserted at the head of the list.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h1 id="allocate-and-free-spin-locks"><br />
+14. Allocate and Free Spin Locks</h1>
+<blockquote>
+<p>This module implements the executive functions to allocate and free
+spin locks.</p>
+</blockquote>
+<h2 id="exallocatespinlock">14.1 ExAllocateSpinLock</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExAllocateSpinLock(</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>SpinLock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function allocates and initializes a spin lock.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SpinLock</em> - Supplies a pointer to a spin lock.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="exfreespinlock">14.2 ExFreeSpinLock</h2>
+<p><strong>VOID</strong></p>
+<p><strong>ExFreeSpinLock(</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>SpinLock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function frees a previously allocated spin lock.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SpinLock</em> - Supplies a pointer to a spin lock.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h1 id="perform-general-interlocked-operations"><br />
+15. Perform General Interlocked Operations</h1>
+<blockquote>
+<p>This module implements functions to support interlocked operations in
+a general way such that all the data that is operated on can be pageable
+including the locks themselves.</p>
+<p>NOTE: The code in this module has been very carefully aligned such
+that no interlocked routine can cross a page boundary. Care must be
+taken when making any changes to this module to ensure that a page
+crossing does not occur.</p>
+</blockquote>
+<h2 id="rtlinterlockedaddlong">15.1 RtlInterlockedAddLong</h2>
+<p><strong>LONG</strong></p>
+<p><strong>RtlInterlockedAddLong(</strong></p>
+<p><strong>IN PLONG</strong> <em>Addend</em><strong>,</strong></p>
+<p><strong>IN LONG</strong> <em>Increment</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function performs an interlocked add of an increment value to an
+addend variable of type long. The initial value of the addend variable
+is returned as the function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Addend</em> (r16) - Supplies a pointer to a variable whose value
+is to be adjusted by the increment value.</p>
+<p><em>Increment</em> (r17) - Supplies the increment value to be added
+to the addend variable.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the addend variable.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The initial value of the addend variable.</p>
+</blockquote>
+<h2 id="rtlinterlockedaddshort">15.2 RtlInterlockedAddShort</h2>
+<p><strong>SHORT</strong></p>
+<p><strong>RtlInterlockedAddShort(</strong></p>
+<p><strong>IN PSHORT</strong> <em>Addend</em><strong>,</strong></p>
+<p><strong>IN SHORT</strong> <em>Increment</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function performs an interlocked add of an increment value to an
+addend variable of type short. The initial value of the addend variable
+is returned as the function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Addend</em> (r16) - Supplies a pointer to a variable whose value
+is to be adjusted by the increment value.</p>
+<p><em>Increment</em> (r17) - Supplies the increment value to be added
+to the addend variable.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the addend variable.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The initial value of the addend variable.</p>
+</blockquote>
+<h2 id="rtlinterlockedinsertheadlist">15.3
+RtlInterlockedInsertHeadList</h2>
+<p><strong>VOID</strong></p>
+<p><strong>RtlInterlockedInsertHeadList(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListEntry</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function inserts an entry at the head of a doubly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+doubly linked list into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> (r17) - Supplies a pointer to the entry to be
+inserted at the head of the list.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="rtlinterlockedinserttaillist">15.4
+RtlInterlockedInsertTailList</h2>
+<p><strong>VOID</strong></p>
+<p><strong>RtlInterlockedInsertTailList(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListEntry</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function inserts an entry at the tail of a doubly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+doubly linked list into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> (r17) - Supplies a pointer to the entry to be
+inserted at the tail of the list.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="rtlinterlockedremoveheadlist">15.5
+RtlInterlockedRemoveHeadList</h2>
+<p><strong>PLIST_ENTRY</strong></p>
+<p><strong>RtlInterlockedRemoveHeadList(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function removes an entry from the head of a doubly linked list
+so that access to the list is synchronized in a multiprocessor system.
+If there are no entries in the list, then a value of NULL is returned.
+Otherwise, the address of the entry that is removed is returned as the
+function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+doubly linked list from which an entry is to be removed.</p>
+<p><em>Lock</em> (r17) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The address of the entry removed from the list, or NULL if the list
+is empty.</p>
+</blockquote>
+<h2 id="rtlinterlockedremoveheadlist-1">15.6
+RtlInterlockedRemoveHeadList</h2>
+<p><strong>PLIST_ENTRY</strong></p>
+<p><strong>RtlInterlockedRemoveHeadList(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function removes an entry from the head of a doubly linked list
+so that access to the list is synchronized in a multiprocessor system.
+If there are no entries in the list, then a value of NULL is returned.
+Otherwise, the address of the entry that is removed is returned as the
+function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+doubly linked list from which an entry is to be removed.</p>
+<p><em>Lock</em> (r17) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The address of the entry removed from the list, or NULL if the list
+is empty.</p>
+</blockquote>
+<h2 id="rtlinterlockedpopentrylist">15.7 RtlInterlockedPopEntryList</h2>
+<p><strong>PSINGLE_LIST_ENTRY</strong></p>
+<p><strong>RtlInterlockedPopEntryList(</strong></p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function removes an entry from the front of a singly linked list
+so that access to the list is synchronized in a multiprocessor system.
+If there are no entries in the list, then a value of NULL is returned.
+Otherwise, the address of the entry that is removed is returned as the
+function value.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+singly linked list from which an entry is to be removed.</p>
+<p><em>Lock</em> (r17) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>The address of the entry removed from the list, or NULL if the list
+is empty.</p>
+</blockquote>
+<h2 id="rtlinterlockedpushentrylist">15.8
+RtlInterlockedPushEntryList</h2>
+<p><strong>VOID</strong></p>
+<p><strong>RtlInterlockedPushEntryList(</strong></p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong>
+<em>ListHead</em><strong>,</strong></p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong>
+<em>ListEntry</em><strong>,</strong></p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function inserts an entry at the head of a singly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> (r16) - Supplies a pointer to the head of the
+singly linked list into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> (r17) - Supplies a pointer to the entry to be
+inserted at the head of the list.</p>
+<p><em>Lock</em> (r18) - Supplies a pointer to a spin lock to be used to
+synchronize access to the list.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h1 id="perform-operations-on-counted-strings"><br />
+16. Perform Operations on Counted Strings</h1>
+<blockquote>
+<p>This module defines functions for manipulating counted strings
+(STRING). A counted string is a data structure containing three fields.
+The Buffer field is a pointer to the string itself. The MaximumLength
+field contains the maximum number of bytes that can be stored in the
+memory pointed to by the Buffer field. The Length field contains the
+current length, in bytes, of the string pointed to by the Buffer field.
+Users of counted strings should not make any assumptions about the
+existence of a null byte at the end of the string, unless the null byte
+is explicitly included in the Length of the string.</p>
+</blockquote>
+<h2 id="rtlinitstring">16.1 RtlInitString</h2>
+<p><strong>VOID</strong></p>
+<p><strong>RtlInitString(</strong></p>
+<p><strong>OUT PSTRING</strong>
+<em>DestinationString</em><strong>,</strong></p>
+<p><strong>IN PSZ</strong> <em>SourceString</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The RtlInitString function initializes a Windows NT counted string.
+The DestinationString is initialized to point to the SourceString and
+the Length and MaximumLength fields of DestinationString are initialized
+to the length of the SourceString, which is zero if SourceString is not
+specified.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>DestinationString</em> - Pointer to the counted string to
+initialize</p>
+<p><em>SourceString</em> - Optional pointer to a null terminated string
+that the counted string is to point to.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="rtlcopystring">16.2 RtlCopyString</h2>
+<p><strong>VOID</strong></p>
+<p><strong>RtlCopyString(</strong></p>
+<p><strong>OUT PSTRING</strong>
+<em>DestinationString</em><strong>,</strong></p>
+<p><strong>IN PSTRING</strong> <em>SourceString</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The RtlCopyString function copies the SourceString to the
+DestinationString. If SourceString is not specified, then the Length
+field of DestinationString is set to zero. The MaximumLength and Buffer
+fields of DestinationString are not modified by this function.</p>
+<p>The number of bytes copied from the SourceString is either the Length
+of SourceString or the MaximumLength of DestinationString, whichever is
+smaller.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>DestinationString</em> - Pointer to the destination string.</p>
+<p><em>SourceString</em> - Optional pointer to the source string.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="rtlcomparestring">16.3 RtlCompareString</h2>
+<p><strong>LONG</strong></p>
+<p><strong>RtlCompareString(</strong></p>
+<p><strong>IN PSTRING</strong> <em>String1</em><strong>,</strong></p>
+<p><strong>IN PSTRING</strong> <em>String2</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>CaseInSensitive</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The RtlCompareString function compares two counted strings. The
+return value indicates if the strings are equal or String1 is less than
+String2 or String1 is greater than String2.</p>
+<p>The CaseInSensitive parameter specifies if case is to be ignored when
+doing the comparison.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>String</em>1 - Pointer to the first string.</p>
+<p><em>String</em>2 - Pointer to the second string.</p>
+<p><em>CaseInsensitive</em> - TRUE if case should be ignored when doing
+the comparison.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Signed value that gives the results of the comparison:</p>
+<p>Zero - String1 equals String2</p>
+<p>&lt; Zero - String1 less than String2</p>
+<p>&gt; Zero - String1 greater than String2</p>
+</blockquote>
+<h2 id="rtlequalstring">16.4 RtlEqualString</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>RtlEqualString(</strong></p>
+<p><strong>IN PSTRING</strong> <em>String1</em><strong>,</strong></p>
+<p><strong>IN PSTRING</strong> <em>String2</em><strong>,</strong></p>
+<p><strong>IN BOOLEAN</strong> <em>CaseInSensitive</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>The RtlEqualString function compares two counted strings for
+equality.</p>
+<p>The CaseInSensitive parameter specifies if case is to be ignored when
+doing the comparison.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>String</em>1 - Pointer to the first string.</p>
+<p><em>String</em>2 - Pointer to the second string.</p>
+<p><em>CaseInsensitive</em> - TRUE if case should be ignored when doing
+the comparison.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Boolean value that is TRUE if String1 equals String2 and FALSE
+otherwise.</p>
+</blockquote>
+<h1 id="debugging-support-functions"><br />
+17. Debugging Support Functions</h1>
+<blockquote>
+<p>This module implements functions to support debugging Windows NT.
+Each function executes a trap r31,r29,r0 instruction with a special
+value in R31. The simulator decodes this trap instruction and dispatches
+to the correct piece of code in the simulator based on the value in R31.
+See the simscal.c source file in the simulator source directory.</p>
+</blockquote>
+<h2 id="dbgbreakpoint">17.1 DbgBreakPoint</h2>
+<p><strong>VOID</strong></p>
+<p><strong>DbgBreakPoint()</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function executes a breakpoint instruction. Useful for enter the
+debugger under program control.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>None</em>.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="dbgcommand">17.2 DbgCommand</h2>
+<p><strong>VOID</strong></p>
+<p><strong>DbgCommand(</strong></p>
+<p><strong>PCH</strong> <em>Command</em><strong>,</strong></p>
+<p><strong>ULONG</strong> <em>Parameter</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function passes a string to the debugger to execute as if it was
+type by the user.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Command</em> - a pointer to a string that contains one or more
+debugger commands. Multiple commands are separated by either a semicolon
+or newline character.</p>
+<p><em>Parameter</em> - a 32 bit parameter that is stored in $9
+simulator variable.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="dbgqueryinstructioncounter">17.3 DbgQueryInstructionCounter</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>DbgQueryInstructionCounter()</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function returns the current value of the i860 simulator's
+instruction counter.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>None</em>.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>32 bit instruction counter.</p>
+</blockquote>
+<h2 id="dbgprint">17.4 DbgPrint</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>DbgPrint(</strong></p>
+<p><strong>IN PCH</strong> <em>Format</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function displays a formatted string on the debugging console.
+The syntax of it's argments is the same as accepted by the Microsoft C
+Runtime printf routines with the addition of the following format
+specifiers:</p>
+<p>S - argument is a PSTRING (pointer to STRING)</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Format</em> - specifies a pointer to the format string.</p>
+<p><em>Remaining</em> arguments are variable and depend upon the
+contents of the format string. Maximum of 8 arguments may be
+specified.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Number of characters displayed on the debugging console.</p>
+</blockquote>
+<h2 id="dbgprompt">17.5 DbgPrompt</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>DbgPrompt(</strong></p>
+<p><strong>IN PCH</strong> <em>Prompt</em><strong>,</strong></p>
+<p><strong>OUT PCH</strong> <em>Response</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>MaximumResponseLength</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function displays the prompt string on the debugging console and
+then reads a line of text from the debugging console. The line read is
+returned in the memory pointed to by the second parameter. The third
+parameter specifies the maximum number of characters that can be stored
+in the response area.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>Prompt</em> - specifies the text to display as the prompt.</p>
+<p><em>Response</em> - specifies where to store the response read from
+the debugging console.</p>
+<p><em>Prompt</em> - specifies the maximum number of characters that can
+be stored in the Response buffer.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Number of characters stored in the Response buffer. Includes the
+terminating newline character, but not the null character after
+that.</p>
+</blockquote>
+<h2 id="dbgloadimagefilesymbols">17.6 DbgLoadImageFileSymbols</h2>
+<p><strong>ULONG</strong></p>
+<p><strong>DbgLoadImageFileSymbols(</strong></p>
+<p><strong>IN PCH</strong> <em>FileName</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function attempts to load any symbolic debugging information
+from an image file into the debugger.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>FileName</em> - specifies the name of the image file to load
+symbols from.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns 0 if the image file is not found or is not a valid image
+file. Otherwise returns the entry point address from the image file
+header.</p>
+</blockquote>
+<h2 id="dbgsetdirbaseforimage">17.7 DbgSetDirBaseForImage</h2>
+<p><strong>VOID</strong></p>
+<p><strong>DbgSetDirBaseForImage(</strong></p>
+<p><strong>IN PCH</strong> <em>ImagePathName</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>DirBase</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function identifies the dirbase value to associate with an image
+file whose sybols have been loaded with the DbgLoadImageFileSymbols
+function. The first parameter should point to the path name returned by
+the DbgLoadImageFileSymbols function. The second parameter is the 20 bit
+DTB value that is associated with the process into which the image file
+was loaded.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ImagePathName</em> - specifies the fully qualified path name of
+the image file that has been loaded into a Windows NT address space.</p>
+<p><em>DirBase</em> - specifies the 20 bit DTB value that is associated
+with the Windows NT process that will run the image file.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="dbgkilldirbase">17.8 DbgKillDirBase</h2>
+<p><strong>VOID</strong></p>
+<p><strong>DbgKillDirBase(</strong></p>
+<p><strong>IN ULONG</strong> <em>DirBase</em></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function tells the debugger when a particular process context is
+being destroyed. This allows the debugger to remove any process specific
+breakpoints from its breakpoint table.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>DirBase</em> - the 20 bit DTB value that is associated with the
+Windows NT process that is being destroyed.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>None.</p>
+</blockquote>
+<h2 id="dbgcheckpointsimulator">17.9 DbgCheckpointSimulator</h2>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>DbgCheckpointSimulator(</strong></p>
+<p><strong>IN PCH</strong> <em>FileName</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong></p>
+<p><u>Routine Description:</u></p>
+<blockquote>
+<p>This function saves the entire state of the i860 simulator to the
+specified file. It returns FALSE when the checkpoint operation is
+completed. It returns TRUE when the function returns due to having been
+restarted.</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>FileName</em> - an optional parameter that specifies the name of
+the file to save the state of the simulator in. If not specified, then
+the file name defaults to the image file name with a .CHK extension.</p>
+<p><u>Return Value:</u></p>
+<blockquote>
+<p>Returns FALSE when the checkpoint is complete. Returns TRUE if the
+simulator has been restarted from the checkpoint file.</p>
+</blockquote>

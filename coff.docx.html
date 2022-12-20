@@ -1,0 +1,1454 @@
+<p>This template contains hidden text that describes various features of
+the template. To see the hidden text, get into Options and set `show
+hidden text' to Yes. After you've read the hidden text, you may want to
+delete it. It does no harm to leave it in. <strong>HOWEVER, you must
+either delete this paragraph or make it hidden (Alt-E)!</strong></p>
+<p>Portable Systems Group</p>
+<p>NT OS/2 Linker/Librarian/Image Format Specification</p>
+<p><strong>Author:</strong> Michael J. O'Leary</p>
+<p><em>Revision 1.3, May 31, 1990</em></p>
+<p>Do not remove any of the division marks (:::) in this template. They
+control the basic layout of the document, including the way page numbers
+are printed.</p>
+<p>The text below (".Begin Table C.") is hidden text that is necessary
+for the table of contents to work correctly. Don't delete the hidden
+text, or you'll end up with the TOC at the end of your document.</p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>1.1 Design Goals 1</p>
+<p>1.2 Constraints 1</p>
+<p>2. Coff 1</p>
+<p>2.1 What is Coff? 1</p>
+<p>2.2 Why Coff? 2</p>
+<p>2.3 Coff Structure 2</p>
+<p>2.3.1 Coff File Layout 2</p>
+<p>2.3.2 Coff File Header 4</p>
+<p>2.3.3 Coff Optional Header 5</p>
+<p>2.3.4 Coff Section Header 7</p>
+<p>2.3.5 Coff Relocation Entry 11</p>
+<p>2.3.6 Coff Linenumber Entry 11</p>
+<p>2.3.7 Coff Symbol Table Entry 11</p>
+<p>2.3.8 Coff Auxiliary Symbol Table Entry 14</p>
+<p>2.3.8.1 Coff Symbol Table Ordering 14</p>
+<p>2.3.9 Coff String Table 16</p>
+<p>2.3.10 Overlays 16</p>
+<p>2.3.11 Common Areas 16</p>
+<p>2.3.12 16-bit Offset Definition 16</p>
+<p>3. Fixups 16</p>
+<p>3.1 Based Relocations 16</p>
+<p>3.2 Relocation Types 17</p>
+<p>3.2.1 I860 Relocation Types 17</p>
+<p>3.2.2 386 Relocation Types 19</p>
+<p>3.3 DLL Support 19</p>
+<p>3.3.1 Thunks 20</p>
+<p>3.3.2 Export Section 23</p>
+<p>4. Image Activation 24</p>
+<p>5. Resources 25</p>
+<p>6. CodeView Support 25</p>
+<p>6.1 Incremental Linking 25</p>
+<p>6.2 Linker Command Line 26</p>
+<p>6.3 Linker Switches 26</p>
+<p>7. Librarian 26</p>
+<p>7.1 Librarian Switches 27</p>
+<p>7.2 Library File Layout 27</p>
+<p>7.2.1 Library File Header 28</p>
+<p>7.2.2 Library Member Header 28</p>
+<p>7.2.3 Linker Member 29</p>
+<p>7.2.4 Secondary Linker Member 29</p>
+<p>7.2.5 Long Names Member 30</p>
+<p>.End Table C.</p>
+<p>Create section headers by using the H1-H4 styles. You make a line a
+header by typing Alt-H-n, where n is 1-4, when the cursor is anywhere
+within the line. You don't need to make the header text bold; the style
+does that for you. You can switch a paragraph back to normal by typing
+either Alt-X-P or Alt-P-S.</p>
+<p>The following text shows how to format various textual elements using
+the SPEC style sheet. You should remove these examples.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This specification describes the Linker and Librarian for the NT OS/2
+system. The Common Object File Format (COFF) standard with extensions
+needed to support Dynamic Linked Libraries (DLL's) and new languages
+such as C++ will be used both as the Object Module Format (OMF) produced
+by the compilers/assemblers and the executable image format used by the
+operating system to load a program.</p>
+<h2 id="design-goals">1.1 Design Goals</h2>
+<p>This is an example of a bulleted list. Note the way one tab is used
+before the bullet and another tab is used after the bullet. Use the L1
+key code for a first-level bulleted list and the L2 key code for a
+bulleted list within a list.</p>
+<p>o Fastest possible image activation.</p>
+<p>o Minimize and localize pages that can't be shared and require
+fixups.</p>
+<p>o Able to base a DLL or image at a prefered memory location.</p>
+<p>o Linker is the only program that modifies or constructs images.</p>
+<p>o Resource compiler will produce object fed to linker.</p>
+<p>o Need to easily support extensions to image format.</p>
+<p>o Linker will support multiple sections in objects.</p>
+<h2 id="constraints">1.2 Constraints</h2>
+<p>o Must be able to distinguish Cruiser Images vs NT images.</p>
+<p>o Header must have common flags.</p>
+<p>o DLL support compatible with Cruiser.</p>
+<p>o Support transfer of control (calls) and data references.</p>
+<p>o All init routines called before program entry.</p>
+<p>o Must be compatible with Intel i860 assembler.</p>
+<p>o Understand basic coff.</p>
+<p>o Identify Intel extensions.</p>
+<h1 id="coff">2. Coff</h1>
+<h2 id="what-is-coff">2.1 What is Coff?</h2>
+<p>Coff (Common Object File Format) is the formal definition for the
+structure of machine code files in the UNIX System V environment. All
+machine code files, whether fully linked executables, compiled
+applications, or system libraries, are COFF structured files. This will
+also become the formal definition for NT OS/2.</p>
+<p>The COFF definition describes a complex data structure that
+represents object files, executable files, and archive (library) files.
+The Coff data structure defines fields for machine code, relocation
+information, symbolic information, and more. The contents of these
+fields are accessed by an organized system of pointers. Assemblers,
+compilers, linkers, and archivers manipulate the contents of the COFF
+data structure to achieve their particular objective.</p>
+<h2 id="why-coff">2.2 Why Coff?</h2>
+<p>Coff was chosen over the Crusier Linear Executable Format because of
+the following reasons.</p>
+<p>o Crusier images are not mappable.</p>
+<p>o No mappable image header.</p>
+<p>o Text and data pages are not laid out in the file such that they can
+be direclty mapped and paged into memory. Must grovel over a mapping
+table to determine page table contents.</p>
+<p>o Preloaded pages prohibit mapping.</p>
+<p>o Certain fields are not on their natural alignments.</p>
+<p>o Iterated data pages prohibit mapping.</p>
+<p>o Crusier format contains 386 specifics.</p>
+<p>o Wasted space for fields that will never be used.</p>
+<p>o Verify Record Table.</p>
+<p>o Resident Name Table.</p>
+<p>o Checksums.</p>
+<p>o Fixups are by page/offset instead of by virtual address.</p>
+<p>o Resource Compiler modifies executable image.</p>
+<p>o Current i860 tools support COFF. We don't want to have to do
+another assembler.</p>
+<h2 id="coff-structure">2.3 Coff Structure</h2>
+<h3 id="coff-file-layout">2.3.1 Coff File Layout</h3>
+<p>For NT OS/2, the following diagram shows the structure of a basic
+coff file. All headers must be at the beginning of the file. All other
+parts of the file can be in any order. An executable file will always be
+in the order show in this diagram.</p>
+<p><strong><br />
+</strong> Ö‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑───────┐<br />
+virtual ° FILE HEADER ° relative<br />
+pointers° TargetMachine ° sizes<br />
+° NumberOfSections--------------û‑Ì<br />
+° TimeDateStamp ° °<br />
+Ö‑‑‑‑‑‑‑À------PointerToSymbolTable ° °<br />
+° ° NumberOfSymbols---------------û‑é‑‑‑‑‑‑‑Ì<br />
+° ° SizeOfOptionalHeader----------ûÌ° °<br />
+° ° Characteristics °°° °<br />
+° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────‑À°° °<br />
+° ° OPTIONAL HEADER °°° °<br />
+│ │ TargetVersionStamp │││ │<br />
+│ │ LinkerVersionStamp │││ │<br />
+│ │ SizeOfCode │││ │<br />
+│ │ SizeOfInitializedData │││ │<br />
+│ │ SizeOfUninitializedData │││ │<br />
+│ │ AddressOfEntryPoint │││ │<br />
+│ │ BaseOfCode │││ │<br />
+│ │ BaseOfData │││ │<br />
+│ │ ImageBase │││ │<br />
+│ │ TargetOperatingSystem │││ │<br />
+│ │ TargetSubsystem │││ │<br />
+│ │ ImageVersionStamp │││ │<br />
+│ │ SizeOfImage │││ │<br />
+│ │ SizeOfHeaders │││ │<br />
+│ │ SizeOfHeap │││ │<br />
+│ │ SizeOfHeapCommit │││ │<br />
+│ │ SizeOfStack │││ │<br />
+│ │ SizeOfStackCommit │││ │<br />
+│ │ ZeroBits │││ │<br />
+│ │ CheckSum │││ │<br />
+│┌──────┤------PointerToBaseRelocations │││ │<br />
+││ │ NumberOfBaseRelocations-------├┼┼──┐ │<br />
+││ │ AddressOfProcessInitRoutine │││ │ │<br />
+││ │ AddressOfThreadInitRoutine │││ │ │<br />
+││ │ AddressOfDllTable │││ │ │<br />
+││ │ SectionNumberByType[6] ├┘│ │ │<br />
+││ │ AdditionalMachineValues[8] │ │ │ │<br />
+°│ û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────‑À ° │ °<br />
+°│ ° SECTION HEADER ° ° │ °<br />
+°│ ° Name (e.g.,.text) ° ° │ °</p>
+<p>°│ ° PhysicalAddress ° ° │ °</p>
+<p>°│ ° VirtualAddress ° ° │ °</p>
+<p>°│ ° SizeOfRawData-----------------û‑é‑Ì│ °</p>
+<p>°│ Ö‑‑‑À------PointerToRelocations ° ° °│ °</p>
+<p>°│ ° Ö‑À------PointerToRawData ° ° °│ °</p>
+<p>°│Ö‑é‑é‑À------PointerToLineNumbers ° ° °│ °</p>
+<p>°│° ° ° ° NumberOfRelocationEntries-----û‑é‑é┼Ì °</p>
+<p>°│° ° ° ° NumberOfLineNumberEntries-----û‑é‑é┼é‑Ì °</p>
+<p>°│° ° ° ° Characteristics ° ° °│° ° °</p>
+<p>°│° ° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° °│° ° °</p>
+<p>°│° ° ° ° other section header ° ° °│° ° °</p>
+<p>°│° ° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° °│° ° °</p>
+<p>°│° ° ° ° last section header û‑ì °│° ° °</p>
+<p>°│° ° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À °│° ° °</p>
+<p>°└┼─┼─┼─┤ base relocations │ °│° ° °</p>
+<p>° ° ° ° ° ├───┼┘° ° °</p>
+<p>° ° ° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° ° ° °</p>
+<p>° ° ° Û‑À raw data (.text) ° ° ° ° °</p>
+<p>° ° ° ° û‑‑‑ì ° ° °</p>
+<p>° ° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° ° °</p>
+<p>° ° ° ° other sections raw data ° ° ° °</p>
+<p>° ° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° ° °</p>
+<p>° ° Û‑‑‑À first relocation entry ° ° ° °</p>
+<p>° ° ° virtual address ° ° ° °</p>
+<p>° ° ° symbol table index ° ° ° °</p>
+<p>° ° ° relocation type ° ° ° °</p>
+<p>° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° ° °</p>
+<p>° ° ° last relocation entry û‑‑‑‑‑ì ° °</p>
+<p>° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° °</p>
+<p>° ° ° other sections relocations ° ° °</p>
+<p>° ° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° °</p>
+<p>° Û‑‑‑‑‑À first line number entry ° ° °</p>
+<p>° ° symbol table index ° ° °</p>
+<p>° ° line number ° ° °</p>
+<p>° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À ° °</p>
+<p>° ° last line number entry û‑‑‑‑‑‑‑ì °</p>
+<p>° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À °</p>
+<p>° ° other sections line numbers ° °</p>
+<p>° û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À °</p>
+<p>Û‑‑‑‑‑‑‑À symbol table ° °</p>
+<p>° name or string pointer ° °</p>
+<p>° virtual address ° °</p>
+<p>° section number ° °</p>
+<p>° type ° °</p>
+<p>° class ° °</p>
+<p>° number aux entries ° °</p>
+<p>° û‑‑‑‑‑‑‑‑‑ì</p>
+<p>û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────À</p>
+<p>° [size] string table ° SymPtr+NumSyms*SizeSym</p>
+<p>Û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑──────ì</p>
+<h3 id="coff-file-header"><br />
+2.3.2 Coff File Header</h3>
+<p>The file header size and format is that of standard COFF.</p>
+<p>typedef struct <strong>_FILE_HEADER</strong> {</p>
+<p><strong>USHORT</strong> <em>TargetMachine</em>;</p>
+<p><strong>USHORT</strong> <em>NumberOfSections</em>;</p>
+<p><strong>ULONG</strong> <em>TimeDateStamp</em>;</p>
+<p><strong>ULONG</strong> <em>PointerToSymbolTable</em>;</p>
+<p><strong>ULONG</strong> <em>NumberOfSymbols</em>;</p>
+<p><strong>USHORT</strong> <em>SizeOfOptionalHeader</em>;</p>
+<p><strong>USHORT</strong> <em>Characteristics</em>;</p>
+<p>} <strong>FILE_HEADER</strong>, <strong>*PFILE_HEADER</strong>;</p>
+<p><u>FILE_HEADER Structure:</u></p>
+<p><em>TargetMachine</em> ——Indicates the target machine the
+object/image file is executable.</p>
+<p>TargetEnvironment Flags:</p>
+<p><strong>COFF_FILE_TARGET_UNKNOWN</strong> ——Indicates unknown target
+machine.</p>
+<p><strong>COFF_FILE_TARGET_860</strong> ——Indicates the object/image is
+binary compatable with the Intel i860 instruction set.</p>
+<p><strong>COFF_FILE_TARGET_386</strong> ——Indicates object/image is
+binary compatable with the Intel 386 instruction set.</p>
+<p><strong>COFF_FILE_TARGET_MIPS</strong> ——Indicates object/image is
+binary compatable with the Mips instruction set.</p>
+<p><em>NumberOfSections</em> ——Indicates the number of section headers
+contained in the file. The number of the first section is one.</p>
+<p><em>TimeDateStamp</em> ——Indicates the time and date when the file
+was created. Number of elapsed seconds since 00:00:00 GMT, January 1,
+1970.</p>
+<p><em>PointerToSymbolTable</em> ——A file pointer (offset from the
+beginning of the file) to the start of the symbol table. The symbol
+table is sector aligned on disk.</p>
+<p><em>NumberOfSymbols</em> ——Indicates the number of symbol table
+entries. Each entry is 18 bytes in length.</p>
+<p><em>SizeOfOptionalHeader</em> ——Indicates the size of the optional
+header.</p>
+<p><em>Characteristics</em> ——Indicates the characteristics of the
+object file.</p>
+<p>Characteristics Flags:</p>
+<p><strong>COFF_FILE_RELOCS_STRIPPED</strong> ——Relocation information
+stripped from file.</p>
+<p><strong>COFF_FILE_EXECUTABLE_IMAGE</strong> ——No unresolved external
+references.</p>
+<p><strong>COFF_FILE_LINE_NUMS_STRIPPED</strong> ——Line numbers stripped
+from file.</p>
+<p><strong>COFF_FILE_LOCAL_SYMS_STRIPPED</strong> ——Local symbols
+stripped from file.</p>
+<p><strong>COFF_FILE_MINIMAL_OBJECT</strong> ——Reserved.</p>
+<p><strong>COFF_FILE_UPDATE_OBJECT</strong> ——Reserved.</p>
+<p><strong>COFF_FILE_BYTES_REVERSED</strong> ——Bytes of machine word are
+reversed.</p>
+<p><strong>COFF_FILE_MACHINE_16BITS</strong> ——16 bit word machine.</p>
+<p><strong>COFF_FILE_MACHINE_32BITS</strong> ——32 bit word machine.</p>
+<p><strong>COFF_FILE_PATCH</strong> ——Reserved.</p>
+<p><strong>COFF_FILE_NT_EXTENSIONS</strong> ——If set, specifies the file
+contains new section headers and padded symbol table.</p>
+<p><strong>COFF_FILE_DLL</strong> ——Image is a Dynamic Link Library.</p>
+<p><strong>COFF_FILE_BYTES_REVERSED_LO</strong> ——Bytes of machine are
+reversed.</p>
+<p><strong>COFF_FILE_BYTES_REVERSED_HI</strong> ——Bytes of machine are
+reversed. You can test either of the above two bits, they are in the
+same bit position in each short word. This allows you to identify if the
+coff object/image was written for a big or little endian machine.</p>
+<h3 id="coff-optional-header">2.3.3 Coff Optional Header</h3>
+<p>There is no standard COFF optional header size and format. NT defines
+the optional header as:</p>
+<p>typedef struct <strong>_OPTIONAL_HEADER</strong> {</p>
+<p><strong>USHORT</strong> <em>TargetVersionStamp</em>;</p>
+<p><strong>USHORT</strong> <em>LinkerVersionStamp</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfCode</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfInitializedData</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfUninitializedData</em>;</p>
+<p><strong>ULONG</strong> <em>AddressOfEntryPoint</em>;</p>
+<p><strong>ULONG</strong> <em>BaseOfCode</em>;</p>
+<p><strong>ULONG</strong> <em>BaseOfData</em>;</p>
+<p><strong>ULONG</strong> <em>ImageBase</em>;</p>
+<p><strong>USHORT</strong> <em>TargetOperatingSystem</em>;</p>
+<p><strong>USHORT</strong> <em>TargetSubsystem</em>;</p>
+<p><strong>ULONG</strong> <em>ImageVersionStamp</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfImage</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfHeaders</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfHeap</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfHeapCommit</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfStack</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfStackCommit</em>;</p>
+<p><strong>ULONG</strong> <em>ZeroBits</em>;</p>
+<p><strong>ULONG</strong> <em>CheckSum</em>;</p>
+<p><strong>ULONG</strong> <em>AddressOfBaseRelocations;</em></p>
+<p><strong>ULONG</strong> <em>NumberOfBaseRelocations;</em></p>
+<p><strong>PVOID</strong> <em>AddressOfProcessInitRoutines</em>;</p>
+<p><strong>PVOID</strong> <em>AddressOfThreadInitRoutines</em>;</p>
+<p><strong>ULONG</strong> <em>AddressOfDllTable</em>;</p>
+<p><strong>USHORT</strong> <em>SectionNumberByTYpe[6]</em>;</p>
+<p><strong>ULONG</strong> <em>AdditionalMachineValues[8];</em></p>
+<p>} <strong>OPTIONAL_HEADER</strong>,
+<strong>*POPTIONAL_HEADER</strong>;</p>
+<p><u>OPTIONAL_HEADER Structure:</u></p>
+<p><em>TargetVersionStamp</em> ——Indicates operating system version.</p>
+<p><em>LinkerVersionStamp</em> ——Indicates which version of the linker
+was used to build image.</p>
+<p><em>SizeOfCode</em> ——Indicates the number of bytes of code.</p>
+<p><em>SizeOfInitializedData</em> ——Indicates the number of bytes of
+initialized data.</p>
+<p><em>SizeOfUnInitializedData</em> ——Indicates the number of bytes of
+uninitialized data.</p>
+<p><em>AddressOfEntryPoint</em> ——Relative virtual address of starting
+point of image. This value added to the ImageBase is the virtual address
+of the entrypoint.</p>
+<p><em>BaseOfCode</em> ——Indicates the relative virtual address (64K
+aligned) of the origin of the first byte of code. This value added to
+the ImageBase is the virtual address of the code.</p>
+<p><em>BaseOfData</em> ——Indicates the relative virtual address (64K
+aligned) of the origin of the first byte of data. This value added to
+the ImageBase is the virtual address of the data.</p>
+<p><em>ImageBase</em> ——Indicates the virtual address (64K aligned) of
+the origin of the file header.</p>
+<p><em>TargetOperatingSystem</em> ——Indicates operating system and
+system version on which the image is executable.</p>
+<p>TargetOperatingSystem Flags:</p>
+<p><strong>COFF_OPTIONAL_TARGET_OS_UNKNOWN</strong> ——Indicates unknown
+target environment.</p>
+<p><strong>COFF_OPTIONAL_TARGET_OS_NTOS2</strong> ——Indicates image is
+targeted for NT OS/2.</p>
+<p><em>TargetSubsystem</em> ——Indicates which subsystem of the operating
+system the image is intended to run under.</p>
+<p>TargetSubsystem Flags:</p>
+<p><strong>COFF_OPTIONAL_TARGET_SUBSYSTEM_UNKNOWN</strong> ——Indicates
+unknown subsystem.</p>
+<p><strong>COFF_OPTIONAL_TARGET_SUBSYSTEM_NATIVE</strong> ——Indicates
+image runs under the native operating system. Subsystems are native
+images.</p>
+<p><strong>COFF_OPTIONAL_TARGET_SUBSYSTEM_OS2</strong> ——Indicates image
+is to run in the OS/2 subsystem.</p>
+<p><strong>COFF_OPTIONAL_TARGET_SUBSYSTEM_POSIX</strong> ——Indicates
+image is to run in the Posix subsystem.</p>
+<p><em>ImageVersionStamp</em> ——Indicates image version. To be used for
+backword compatibility. This stamp can be set by the user with the
+Version: switch.</p>
+<p><em>SizeOfImage</em> ——Indicates the virtual size of the image.</p>
+<p><em>SizeOfHeaders</em> ——Indicates the total size of all headers.</p>
+<p><em>SizeOfHeap</em> ——Indicates the maximum size the heap is allowed
+to grow.</p>
+<p><em>SizeOfHeapCommit</em> ——Indicates the initial heap size.</p>
+<p><em>SizeOfStack</em> ——Indicates the maximum size the stack is
+allowed to grow.</p>
+<p><em>SizeOfStackCommit</em> ——Indicates the initial stack size.</p>
+<p><em>ZeroBits</em> ——Indicates how memory is to be allocated.</p>
+<p><em>PointerToBaseRelocations</em> ——A file pointer to a table that is
+used to apply relocations to the image if the image can't be based at
+its desired base location. The first long word of the base table
+indicates the number of base table entries that follow.
+PointerToBaseTable will be zero if the image doesn't have a base table.
+The base table structure is defined later in this document.</p>
+<p><em>AddressOfProcessInitRoutines</em> ——TBD.</p>
+<p><em>AddressOfThreadInitRoutines</em> ——TBD.</p>
+<p><em>AddressOfDllTable</em> ——The relative virtual address of a table
+that defines DLL's. This is described later in this document.</p>
+<p><em>SectionNumberByType</em> ——Is any array of interesting section
+numbers.</p>
+<p>SectionNumberByType index values:</p>
+<p><strong>COFF_SECTION_TYPE_DEBUG</strong> ——Indicates the section with
+contains the debug information.</p>
+<p><strong>COFF_SECTION_EXPORTS</strong> ——Indicates the section with
+contains the export table.</p>
+<p><strong>COFF_SECTION_RESOURCE</strong> ——Indicates the section with
+contains the resource data.</p>
+<p><strong>COFF_SECTION_SECURITY</strong> ——Indicates the section with
+contains security information.</p>
+<p><strong>COFF_SECTION_EXCEPTION</strong> ——Indicates the section with
+contains the exception tables.</p>
+<p>The optional header is used only for images. If an object file
+contains an optional header of the proper size, it is used in the
+following manner:</p>
+<p>If <em>TargetSubsystem</em> is not
+<strong>COFF_OPTIONAL_TARGET_SUBSYSTEM_UNKNOWN</strong>, then a
+subsystem is being defined. It tells the linker that the following
+sections within this file are for a particular subsystem. With this
+information, the linker can guarantee that different subsystem
+components won't be mixed together. Each library should contain one of
+these records.</p>
+<p>If <em>AddressOfEntryPoint</em> is non-zero, then an entrypoint is
+being defined. This allows a compiler to supply the entrypoint without
+using the linker command line switch.</p>
+<p>All other fields are ignored.</p>
+<h3 id="coff-section-header">2.3.4 Coff Section Header</h3>
+<p>All section headers must follow the file header (or optional header
+if there is one).</p>
+<p>An object or image can contain any number of sections and in any
+order. The linker combines any sections with the same name and with the
+same flags. For example, if a compiler wants to keep all constants
+together, then the compiler could use a section name of .const in every
+object that contained constants. The linker will merge these sections
+together (provided they also had the same flag attribute such as R/O).
+In some coff implementations, if a section is empty (i.e., object
+contains no .bss), a section header still identifies the section, but
+would contain a zero size. For NT OS/2, this extra section header is not
+required.</p>
+<p>Section names must start with a period (.). For each section, a
+special symbol will be defined by the linker. The period (.) will be
+replaced with a colon (:). This will be the next address after the
+section. Thus if a section is named <strong>.text</strong>, then the
+linker will create the symbol <strong>:text</strong>.</p>
+<p>Grouping of sections hasn't been determined yet.</p>
+<p>There are two styles of the section header. The first section header
+size and format is that of standard COFF. The second section header is
+an extension added to Coff. Both headers are the same size, but
+different format. The <strong>COFF_OPTIONAL_NT_EXTENSIONS</strong> flag
+in the file header specifies which section header the object contains.
+Section headers can not be mixed within one object, they must all be of
+one type. The image file will always have the
+<strong>COFF_OPTIONAL_NT_EXTENSIONS</strong> flag set, and thus the
+image will always contain new section headers.</p>
+<p>The standard Coff section header has the following format:</p>
+<p>typedef struct <strong>_OLD_SECTION_HEADER</strong> {</p>
+<p><strong>UCHAR</strong> <em>Name</em>[8];</p>
+<p><strong>ULONG</strong> <em>PysicalAddress</em>;</p>
+<p><strong>ULONG</strong> <em>VirtualAddress</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfRawData</em>;</p>
+<p><strong>ULONG</strong> <em>PointerToRawData</em>;</p>
+<p><strong>ULONG</strong> <em>PointerToRelocations</em>;</p>
+<p><strong>ULONG</strong> <em>PointerToLinenumbers</em>;</p>
+<p><strong>USHORT</strong> <em>NumberOfRelocations</em>;</p>
+<p><strong>USHORT</strong> <em>NumberOfLineNumbers</em>;</p>
+<p><strong>ULONG</strong> <em>Characteristics</em>;</p>
+<p>} <strong>OLD_SECTION_HEADER</strong>,
+<strong>*POLD_SECTION_HEADER</strong>;</p>
+<p>The new section header the following format:</p>
+<p>typedef struct <strong>_NEW_SECTION_HEADER</strong> {</p>
+<p><strong>UCHAR</strong> <em>Name</em>[8];</p>
+<p><strong>ULONG</strong> <em>NumberOfLinenumbers</em>;</p>
+<p><strong>ULONG</strong> <em>VirtualAddress</em>;</p>
+<p><strong>ULONG</strong> <em>SizeOfRawData</em>;</p>
+<p><strong>ULONG</strong> <em>PointerToRawData</em>;</p>
+<p><strong>ULONG</strong> <em>PointerToRelocations</em>;</p>
+<p><strong>ULONG</strong> <em>PointerToLinenumbers</em>;</p>
+<p><strong>ULONG</strong> <em>NumberOfRelocations</em>;</p>
+<p><strong>ULONG</strong> <em>Characteristics</em>;</p>
+<p>} <strong>NEW_SECTION_HEADER</strong>,
+<strong>*PNEW_SECTION_HEADER</strong>;</p>
+<p><u>SECTION_HEADER Structure:</u></p>
+<p><em>Name</em> ——Eight character null padded section name.</p>
+<p><em>PysicalAddress</em> ——Indicates the physical address of the
+section. This field only exits within the old section header. Its value
+is never used.</p>
+<p><em>VirtualAddress</em> ——Indicates the relative virtual address of
+the section.</p>
+<p><em>SizeOfRawData</em> ——Indicates the size in bytes of the sections
+raw data.</p>
+<p><em>PointerToRawData</em> ——A file pointer (offset from the beginning
+of the file) to the raw data for this sections.</p>
+<p><em>PointerToRelocations</em> ——A file pointer (offset from the
+beginning of the file) to the relocation entries for this section. The
+relocation entries are sector aligned on disk.</p>
+<p><em>PointerToLinenumbers</em> ——A file pointer (offset from the
+beginning of the file) to the line number entries for this section. The
+line number entries are sector aligned on disk.</p>
+<p><em>NumberOfRelocations</em> ——Indicates the number of relocation
+entries for this section.</p>
+<p><em>NumberOfLinenumbers</em> ——Indicates the number of line number
+entries for this section.</p>
+<p><em>Characteristics</em> ——This flag represent three kinds of
+information:</p>
+<p>o Section Type</p>
+<p>o Section Content</p>
+<p>o Section Memory Mapping</p>
+<p>The flags determines how the linker and system loader handle the
+section. A section can only be of one type, one content, but can have a
+combination of memory flags set.</p>
+<p>For now, all NT/OS2 objects and images will be of type
+<strong>COFF_SCN_TYPE_REGULAR</strong> except for those sections that
+want 16-bit offset addressing. These sections will be of type
+<strong>COFF_SCN_TYPE_GROUPED</strong>.</p>
+<p>Section grouping is controlled by using a colon (:) in the section
+name. For example, if you have four objects each containing sections by
+the name of .DATA, .DATA:1, and .DATA:2, which all have the SAME FLAGS,
+then the linker will only create one section called .DATA which is a
+combination of all the sections but grouped in the following order:</p>
+<p>Raw data for section .DATA</p>
+<p>┌───────────────┐</p>
+<p>│Object 1 DATA │</p>
+<p>│Object 2 DATA │</p>
+<p>│Object 3 DATA │</p>
+<p>│Object 4 DATA │</p>
+<p>│Object 1 DATA:1│</p>
+<p>│Object 2 DATA:1│</p>
+<p>│Object 3 DATA:1│</p>
+<p>│Object 4 DATA:1│</p>
+<p>│Object 1 DATA:2│</p>
+<p>│Object 2 DATA:2│</p>
+<p>│Object 3 DATA:2│</p>
+<p>│Object 4 DATA:2│</p>
+<p>└───────────────┘</p>
+<p>Further more, the linker performs grouping within a file. If a file
+contains multiple sections with the same group name, the linker will
+group all raw data with the same group name within the file together. A
+good example of this would be a library with many members each
+containing a .DATA:1 group. The linker will combine all .DATA:1 raw data
+extracted from the library together before it combines groups of the
+same name from other libraries.</p>
+<p>If a sections name is 8 characters (without the colon), then the
+linker will not allow it to contain groups.</p>
+<p>Characteristics Flags:</p>
+<p><strong>COFF_SCN_TYPE_REGULAR</strong> ——.</p>
+<p><strong>COFF_SCN_TYPE_DUMMY</strong> ——.</p>
+<p><strong>COFF_SCN_TYPE_NO_LOAD</strong> ——.</p>
+<p><strong>COFF_SCN_TYPE_GROUPED</strong> ——Used for 16-bit offset
+code.</p>
+<p><strong>COFF_SCN_TYPE_NO_PAD</strong> ——Specifies if section should
+not be padded to next boundary before being combined with other like
+section.</p>
+<p><strong>COFF_SCN_TYPE_COPY</strong> ——Reserved.</p>
+<p><strong>COFF_SCN_CNT_CODE</strong> ——Section contains code.</p>
+<p><strong>COFF_SCN_CNT_INITIALIZED_DATA</strong> ——Section contains
+initialized data.</p>
+<p><strong>COFF_SCN_CNT_UNINITIALIZED_DATA</strong> ——Section contains
+uninitialized data.</p>
+<p><strong>COFF_SCN_CNT_OTHER</strong> ——Reserved.</p>
+<p><strong>COFF_SCN_CNT_INFO</strong> ——Section contains comments or
+some other type of information.</p>
+<p>A comment section can contain any type of information and can include
+relocations for this information. The first two long words of the raw
+data are reserved and are defined as InfoType and InfoVersion.</p>
+<p>InfoType Flags:</p>
+<p><strong>COFF_SCN_INFO_UNKNOWN</strong> ——Indicates unknown
+information.</p>
+<p><strong>COFF_SCN_INFO_DIRECTIVE</strong> ——Indicates raw data
+contains linker directives such as entrypoint, full/partial/no
+debugging, etc. The compiler can set linker options by use of these
+directives. Usually the sections is also marked as discardable so this
+information doesn't become part of the image. InfoVersion is the linker
+version required to understand these directives. The current linker must
+have this version number or greater. The next long word is the number of
+directives being set, followed by the directives themselves (to be
+defined later). If the linker finds more than one directive of the same
+type (ie, two entrypoints) the linker will generated a warning and will
+use the first directive found.</p>
+<p><strong>COFF_SCN_INFO_COMPILER</strong> ——Indicates raw data contains
+compiler information such as compiler type (i.e., C, Pascal, Fortran)
+and flags used. InfoVersion indicates the compiler version.</p>
+<p><strong>COFF_SCN_INFO_CODEVIEW</strong> ——Indicates raw data contains
+CodeView information, and InfoVersion can either be the compiler or
+debugger version (to be determined later).</p>
+<p><strong>COFF_SCN_CNT_OVERLAY</strong> ——Section contains an
+overlay.</p>
+<p><strong>COFF_SCN_CNT_DISCARD</strong> ——Section contents will not
+become part of image. Directives to the linker will usually be marked
+discardable (ie, entrypoint defined by compiler).</p>
+<p><strong>COFF_SCN_MEM_NOT_CACHED</strong> ——Section is not
+cachable.</p>
+<p><strong>COFF_SCN_MEM_NOT_PAGED</strong> ——Section is not
+pageable.</p>
+<p><strong>COFF_SCN_MEM_SHARED</strong> ——Section is shareable.</p>
+<p><strong>COFF_SCN_MEM_EXECUTE</strong> ——Section is executable.</p>
+<p><strong>COFF_SCN_MEM_READ</strong> ——Section is readable.</p>
+<p><strong>COFF_SCN_MEM_WRITE</strong> ——Section is writeable.</p>
+<h3 id="coff-relocation-entry">2.3.5 Coff Relocation Entry</h3>
+<p>The relocation entries size and format is that of standard COFF.</p>
+<p>typedef struct <strong>_RELOCATION_ENTRY</strong> {</p>
+<p><strong>ULONG</strong> <em>VirtualAddress</em>;</p>
+<p><strong>ULONG</strong> <em>SymbolTableIndex</em>;</p>
+<p><strong>USHORT</strong> <em>Type</em>;</p>
+<p>} <strong>RELOCATION_ENTRY</strong>,
+<strong>*PRELOCATION_ENTRY</strong>;</p>
+<p><u>RELOCATION_ENTRY Structure:</u></p>
+<p><em>VirtualAddress</em> ——Indicates the virtual address (position) in
+the section to be relocated.</p>
+<p><em>SymbolTableIndex</em> ——Indicates the symbol table index (zero
+based) of the item that is referenced.</p>
+<p><em>Type</em> ——Indicates the relocation type. Relocation types are
+defined later in this document.</p>
+<h3 id="coff-linenumber-entry">2.3.6 Coff Linenumber Entry</h3>
+<p>The linenumber entries size and format is that of standard COFF.</p>
+<p>typedef struct <strong>_LINENUMBER_ENTRY</strong> {</p>
+<p>union {</p>
+<p><strong>ULONG</strong> <em>SymbolTableIndex</em>;</p>
+<p><strong>ULONG</strong> <em>VirtualAddress</em>;</p>
+<p>}</p>
+<p><strong>USHORT</strong> <em>Linenumber</em>;</p>
+<p>} <strong>LINENUMBER_ENTRY</strong>,
+<strong>*PLINENUMBER_ENTRY</strong>;</p>
+<p><u>LINENUMBER_ENTRY Structure:</u></p>
+<p><em>SymbolTableIndex</em> ——If Linenumber is zero, indicates the
+symbol table index (zero based) of the function name.</p>
+<p><em>VirtualAddress</em> ——If Linenumber is not zero, indicates
+virtual address of line number.</p>
+<p><em>Linenumber</em> ——Indicates the line number relative to the start
+of the function.</p>
+<h3 id="coff-symbol-table-entry">2.3.7 Coff Symbol Table Entry</h3>
+<p>The symbol table entry size and format is that of standard COFF.</p>
+<p>typedef struct <strong>_SYMBOL_TABLE_ENTRY</strong> {</p>
+<p><strong>UCHAR</strong> <em>Name</em>[8];</p>
+<p><strong>ULONG</strong> <em>Value</em>;</p>
+<p><strong>SHORT</strong> <em>SectionNumber</em>;</p>
+<p><strong>USHORT</strong> <em>Type</em>;</p>
+<p><strong>CHAR</strong> <em>StorageClass</em>;</p>
+<p><strong>CHAR</strong> <em>NumberOfAuxiliaryEntries</em>;</p>
+<p>} <strong>SYMBOL_TABLE_ENTRY</strong>,
+<strong>*PSYMBOL_TABLE_ENTRY</strong>;</p>
+<p><u>SYMBOL_TABLE_ENTRY Structure:</u></p>
+<p><em>Name</em> ——Symbol name. If the first four bytes are zero, then
+the last 4 bytes are a pointer to the symbol in the string table. The
+pointer technique is used if the symbol is longer than 8 bytes.</p>
+<p><em>Value</em> ——Symbols value dependent on section number, storage
+class, and type.</p>
+<p><em>SectionNumber</em> ——The section number the symbol is defined
+in.</p>
+<p>SectionNumber meaning:</p>
+<p><strong>COFF_SYM_DEBUG</strong> ——Indicates value represents special
+symbolic debug information.</p>
+<p><strong>COFF_SYM_ABSOLUTE</strong> ——Indicates value is an absolute
+value.</p>
+<p><strong>COFF_SYM_UNDEFINED</strong> ——Indicates that value is used as
+common.</p>
+<p><strong>COFF_SYM_DEFINED</strong> ——Indicates that the symbol is
+defined.</p>
+<p><em>Type</em> ——Symbolic type.</p>
+<p>Type flags:</p>
+<p><strong>COFF_SYM_TYPE_NULL</strong> ——Indicates no type.</p>
+<p><strong>COFF_SYM_TYPE_VOID</strong> ——Indicates type void.</p>
+<p><strong>COFF_SYM_TYPE_CHAR</strong> ——Indicates type character.</p>
+<p><strong>COFF_SYM_TYPE_SHORT</strong> ——Indicates type short
+integer.</p>
+<p><strong>COFF_SYM_TYPE_INT</strong> ——Indicates type integer.</p>
+<p><strong>COFF_SYM_TYPE_LONG</strong> ——Indicates type long
+integer.</p>
+<p><strong>COFF_SYM_TYPE_FLOAT</strong> ——Indicates type floating
+point.</p>
+<p><strong>COFF_SYM_TYPE_DOUBLE</strong> ——Indicates type double
+word.</p>
+<p><strong>COFF_SYM_TYPE_STRUCT</strong> ——Indicates type structure.</p>
+<p><strong>COFF_SYM_TYPE_UNION</strong> ——Indicates type union.</p>
+<p><strong>COFF_SYM_TYPE_ENUM</strong> ——Indicates type enumeration.</p>
+<p><strong>COFF_SYM_TYPE_MOE</strong> ——Indicates type member of
+enumeration.</p>
+<p><strong>COFF_SYM_TYPE_UCHAR</strong> ——Indicates type unsigned
+character.</p>
+<p><strong>COFF_SYM_TYPE_USHORT</strong> ——Indicates type unsigned short
+integer.</p>
+<p><strong>COFF_SYM_TYPE_TYPE_UINT</strong> ——Indicates type unsigned
+integer.</p>
+<p><strong>COFF_SYM_TYPE_ULONG</strong> ——Indicates type unsigned long
+integer.</p>
+<p><em>StorageClass</em> ——Storage class of the symbol.</p>
+<p>StorageClass flags:</p>
+<p><strong>COFF_SYM_CLASS_EXTERNAL</strong></p>
+<p><strong>COFF_SYM_CLASS_DLL_EXTERNAL</strong></p>
+<p><strong>COFF_SYM_CLASS_AUTOMATIC</strong></p>
+<p><strong>COFF_SYM_CLASS_REGISTER</strong></p>
+<p><strong>COFF_SYM_CLASS_LABEL</strong></p>
+<p><strong>COFF_SYM_CLASS_UNDEFINED_LABEL</strong></p>
+<p><strong>COFF_SYM_CLASS_STATIC</strong></p>
+<p><strong>COFF_SYM_CLASS_UNDEFINED_STATIC</strong></p>
+<p><strong>COFF_SYM_CLASS_MEMBER_OF_STRUCT</strong></p>
+<p><strong>COFF_SYM_CLASS_ARGUMENT</strong></p>
+<p><strong>COFF_SYM_CLASS_STRUCT_TAG</strong></p>
+<p><strong>COFF_SYM_CLASS_MEMBER_OF_UNION</strong></p>
+<p><strong>COFF_SYM_CLASS_UNION_TAG</strong></p>
+<p><strong>COFF_SYM_CLASS_TYPE_DEFINTION</strong></p>
+<p><strong>COFF_SYM_CLASS_ENUM_TAG</strong></p>
+<p><strong>COFF_SYM_CLASS_MEMBER_OF_ENUM</strong></p>
+<p><strong>COFF_SYM_CLASS_REGISTER_PARAM</strong></p>
+<p><strong>COFF_SYM_CLASS_BIT_FIELD</strong></p>
+<p><strong>COFF_SYM_CLASS_BLOCK</strong></p>
+<p><strong>COFF_SYM_CLASS_FUNCTION</strong></p>
+<p><strong>COFF_SYM_CLASS_END_OF_STRUCT</strong></p>
+<p><strong>COFF_SYM_CLASS_FILE</strong></p>
+<p><strong>COFF_SYM_CLASS_SECTION</strong></p>
+<p><em>NumberOfAuxiliaryEntries</em> ——Number of auxiliary entries that
+further define this symbol.</p>
+<h3 id="coff-auxiliary-symbol-table-entry">2.3.8 Coff Auxiliary Symbol
+Table Entry</h3>
+<p>In general, auxiliary entries either implement a linked list
+structure within the symbol table that is used for efficient access of
+the symbol table data by both the linker and debugger, or contain
+debug/relocation information that is outside the scope of the symbol
+table entry structure. The following auxiliary entries are defined:</p>
+<p>o Filename - This is the first auxiliary entry in the symbol table.
+The contents of the auxiliary entry is either the filename (if the name
+is 14 characters or less), or a pointer to the string table where larger
+filenames are placed. Filename may contain a path.</p>
+<p>o Section Names - This auxiliary entry follows the symbol entry for a
+section name. It contains the section length, the number of relocation
+entries for the section, and the number of line number entries for the
+section. This information can also be found in the section header, but
+by placing the information in the auxiliary entry, the debugger can
+obtain all needed information directly from the symbol table.</p>
+<p>o Tagname - To be defined.</p>
+<p>o Function - To be defined. Will probably contain prototype
+information.</p>
+<p>o Block - Include special entries such as .bb (begin block), .eb (end
+block), .bf (begin function), .ef (end function) and .eos (end of
+structure).</p>
+<p>o Array</p>
+<h4 id="coff-symbol-table-ordering">2.3.8.1 Coff Symbol Table
+Ordering</h4>
+<p>Because of symbolic debugging requirments, the order of symbols in
+the symbol table is very important. Symbols appear in the following
+sequence:</p>
+<p>┌────────────────────┐</p>
+<p>│ .file filename1 │</p>
+<p>├────────────────────┤</p>
+<p>│ .define function1 │</p>
+<p>├────────────────────┤</p>
+<p>│ .define local var1 │</p>
+<p>│ for function1 │</p>
+<p>├────────────────────┤</p>
+<p>│ ... │</p>
+<p>├────────────────────┤</p>
+<p>│ .define local varN │</p>
+<p>│ for function1 │</p>
+<p>├────────────────────┤</p>
+<p>│ .begin function │</p>
+<p>├────────────────────┤</p>
+<p>│ .block begin │</p>
+<p>├────────────────────┤</p>
+<p>│ ... │</p>
+<p>├────────────────────┤</p>
+<p>│ .end block │</p>
+<p>├────────────────────┤</p>
+<p>│ .end function │</p>
+<p>├────────────────────┤</p>
+<p>│ statics │</p>
+<p>├────────────────────┤</p>
+<p>│ ... │</p>
+<p>├────────────────────┤</p>
+<p>│ .file filename2 │</p>
+<p>├────────────────────┤</p>
+<p>│ .define function1 │</p>
+<p>├────────────────────┤</p>
+<p>│ .define local var1 │</p>
+<p>│ for function2 │</p>
+<p>├────────────────────┤</p>
+<p>│ ... │</p>
+<p>│ ... │</p>
+<p>├────────────────────┤</p>
+<p>│ statics │</p>
+<p>├────────────────────┤</p>
+<p>│ ... │</p>
+<p>├────────────────────┤</p>
+<p>│ defined global │</p>
+<p>│ symbols │</p>
+<p>├────────────────────┤</p>
+<p>│ undefined global │</p>
+<p>│ symbols │</p>
+<p>└────────────────────┘</p>
+<h3 id="coff-string-table"><br />
+2.3.9 Coff String Table</h3>
+<p>The string table is the final component of the symbolic information.
+If in a symbol entry, the first four characters of the symbol's name are
+NULL, then the last four characters represent an offset (relative to the
+start of the string table) into the string table where the symbol's name
+is stored. Symbol names are NULL-terminated, thus the symbol's name can
+be any length.</p>
+<p>The first four bytes in the string table represent a long value that
+specifies the number of bytes in the string table. An empty string table
+has a length field, but the value stored there is 0.</p>
+<p>Internal symbols generated by compilers should try to be 8 characters
+or less, for these are the most efficent and require the less space.</p>
+<h3 id="overlays">2.3.10 Overlays</h3>
+<p>o To be defined</p>
+<h3 id="common-areas">2.3.11 Common Areas</h3>
+<p>Common areas are defined by the symbol record containing a non-zero
+value, and a zero (undefined) section number. In this case, the value is
+the size (number of bytes) of the symbol. The linker merges symbols of
+the same name and allocates the largest required space in a section
+called .common with content of
+<strong>COFF_SCN_TYPE_UNINITIALIZED_DATA</strong>.</p>
+<h3 id="bit-offset-definition">2.3.12 16-bit Offset Definition</h3>
+<p>When sections have the SECTION_TYPE_GROUP flag set, the linker
+combines sections with the same name but different content flags into
+one section. The combined section must be 64K or less, otherwise the
+linker will generate an error. A special symbol will be defined by the
+linker that will be the address of the middle of the section, thus
+signed 16-bit displacements can be used by compilers. The special symbol
+defined by the linker will be that of the section name but the '.'
+(period) will be replaced with a ';' (semi-colon).</p>
+<p>It hasn't been determined how grouping of sections with different
+memory flags occur. In the worst case, they must be all of one kind,
+probably R/W.</p>
+<h1 id="fixups">3. Fixups</h1>
+<p>o Fixups will be performed in user mode. Thus, no code is required to
+verify fixups are valid (in the event an image has been tampered
+with).</p>
+<p>o If the image is mapped at its specified based address, then the
+only runtime fixups required are those for DLL's. If the image is not
+mapped at the specified base address, then the fixups have to be
+re-applied.</p>
+<p>o The linker will generate thunks for calls to DLL's, thus the fixups
+are to read/write data, not to code. Thus no Icache flushes are
+necessary.</p>
+<p>o The linker will have a switch to indicate if fixups should occur as
+they are needed, or for a whole DLL at a time.</p>
+<h2 id="based-relocations">3.1 Based Relocations</h2>
+<p>The base relocations are used to re-apply fixups when an image's
+based address is unavailable at load time. The structure of a based
+entry follows:</p>
+<p>typedef struct <strong>_BASED_RELOCATION_ENTRY</strong> {</p>
+<p><strong>ULONG</strong> <em>VirtualAddress</em>;</p>
+<p><strong>ULONG</strong> <em>Value</em>;</p>
+<p><strong>USHORT</strong> <em>Type</em>;</p>
+<p>} <strong>BASED_RELOCATION_ENTRY</strong>,
+<strong>*PBASED_RELOCATION_ENTRY</strong>;</p>
+<p><u>BASED_RELOCATION_ENTRY Structure:</u></p>
+<p><em>VirtualAddress</em> ——Indicates the virtual address (position) in
+the image to be relocated.</p>
+<p><em>Value</em> ——Indicates the value of the item that is referenced.
+This value plus the new base should replace the word located at the
+virtual address.</p>
+<p><em>Type</em> ——Indicates the relocation type. Relocation types are
+defined later in this document.</p>
+<h2 id="relocation-types">3.2 Relocation Types</h2>
+<h3 id="i860-relocation-types">3.2.1 I860 Relocation Types</h3>
+<p>o COFF_REL_I860_ABSOLUTE</p>
+<p>This relocation is ignored.</p>
+<p>o COFF_REL_I860_DIR32</p>
+<p>*(long *)Location += Addr</p>
+<p>o COFF_REL_I860_PAIR</p>
+<p>Defines PairAddr.</p>
+<p>o COFF_REL_I860_HIGH</p>
+<p>*(short *)Location = ((Addr + PairAddr) &gt;&gt; 16)</p>
+<p>o COFF_REL_I860_LOW0</p>
+<p>*(short *)Location += (short)Addr</p>
+<p>o COFF_REL_I860_LOW1</p>
+<p>*(short *)Location += (short)Aligned(Addr, 2)</p>
+<p>o COFF_REL_I860_LOW2</p>
+<p>*(short *)Location += (short)Aligned(Addr, 4)</p>
+<p>o COFF_REL_I860_LOW3</p>
+<p>*(short *)Location += (short)Aligned(Addr, 8)</p>
+<p>o COFF_REL_I860_LOW4</p>
+<p>*(short *)Location += (short)Aligned(Addr, 16)</p>
+<p>o COFF_REL_I860_SPLIT0</p>
+<p>T1 = *(long *)Location<br />
+T2 = (((T1 &gt;&gt; 5) &amp; 0xf800) | (T1 &amp; 0x7ff)) + Addr<br />
+T2 = ((T2 &lt;&lt; 5) &amp; 0x1f0000) | (T2 &amp; 0x7ff)<br />
+*(long *)Location = T2 | (T1 &amp; (~0x1f07ff))</p>
+<p>o COFF_REL_I860_SPLIT1</p>
+<p>T1 = *(long *)Location<br />
+T2 = (((T1 &gt;&gt; 5) &amp; 0xf800) | (T1 &amp; 0x7fe)) +
+Aligned(Addr,2)<br />
+T2 = ((T2 &lt;&lt; 5) &amp; 0x1f0000) | (T2 &amp; 0x7fe)<br />
+*(long *)Location = T2 | (T1 &amp; (~0x1f07fe))</p>
+<p>o COFF_REL_I860_SPLIT2</p>
+<p>T1 = *(long *)Location<br />
+T2 = (((T1 &gt;&gt; 5) &amp; 0xf800) | (T1 &amp; 0x7fc)) + Aligned(Addr,
+4)<br />
+T2 = ((T2 &lt;&lt; 5) &amp; 0x1f0000) | (T2 &amp; 0x7fc)<br />
+*(long *)Location = T2 | (T1 &amp; (~0x1f07fc))</p>
+<p>o COFF_REL_I860_HIGHADJ</p>
+<p>*(short *)Location = ((Addr + rel1.r_symndx) &gt;&gt; 16)<br />
+if ((Addr + rel1.r_symndx) &amp; 0x8000)<br />
+*(short *)Location += 1</p>
+<p>o COFF_REL_I860_BRADDR</p>
+<p>Addr = Addr - ((VirtAddr - PhysAddr) + 4 + VirtAddr<br />
+if ((Addr &gt;= 0x4000000L) || (Addr &lt; -0x4000000L))<br />
+" Too Far "</p>
+<p>I'll explain the previous relocation types by sample i860 code.</p>
+<p>orh h%foo,r0,r31 // COFF_REL_I860_HIGH<br />
+or l%foo,r31,r31 // COFF_REL_I860_LOW0<br />
+ld.l 0(r31),r16</p>
+<p>The first 2 instructions moves the address of the memory location
+labeled foo into r31. The COFF_REL_I860_HIGH type instructs the linker
+to extract the upper 16 bit of the address of foo for use as immediate
+operand in the orh instruction. Similarly, the COFF_REL_I860_LOW0 type
+instructs the linker to extract the lower 16 bit of the address of foo
+for use as immediate operand in the or instruction. The final ld.l loads
+the memory location referenced by r31 into r16.</p>
+<p>Alternatively, you can use</p>
+<p>orh ha%foo,r0,r3 // COFF_REL_I860_HIGHADJ, PAIR<br />
+ld.l l%foo(r31),r16 // COFF_REL_I860_LOW0</p>
+<p>to load foo into r16. The COFF_REL_I860_HIGHADJ type behaves like the
+COFF_REL_I860_HIGH type except that it adds 1 to the extracted upper 16
+bit if bit 15 of the address value is set. This adjustment is needed
+because load/store arithmetic instructions sign-extend the 16-bit
+immediate operand. If you used</p>
+<p>orh h%foo,r0,r31 // COFF_REL_I860_HIGH<br />
+ld.l l%foo(r31),r16 // COFF_REL_I860_LOW0</p>
+<p>you will load from the wrong address when bit 15 of foo is set.
+Immediate operands are 0-extended in logical instructions.</p>
+<p>orh ha%foo,r0,r31 // COFF_REL_I860_HIGHADJ, PAIR<br />
+ld.b l%foo(r31),r16 // COFF_REL_I860_LOW0<br />
+ld.s l%foo(r31),r16 // COFF_REL_I860_LOW1<br />
+ld.l l%foo(r31),r16 // COFF_REL_I860_LOW2<br />
+<br />
+orh ha%foof,r0,r31 // COFF_REL_I860_HIGHADJ, PAIR<br />
+fld.l l%foof(r31),f16// COFF_REL_I860_LOW2<br />
+fld.d l%foof(r31),f16// COFF_REL_I860_LOW3<br />
+fld.q l%foof(r31),f16// COFF_REL_I860_LOW4</p>
+<p>The variaous COFF_REL_I860_LOW types are used to extract the lower 16
+bits of a constant or and address label. The linker verifies alignment
+of the immediate offsets (Intel i860 Programmer Reference Manual section
+5.2 programming notes) because the lower bits of the immediate are used
+to encode the operand length. See appendix B of the Intel i860
+Programmers Reference Manual for the instruction format.</p>
+<p>COFF_REL_I860_LOW1 verifies alignment of the immediate to 2 byte
+boundary.<br />
+COFF_REL_I860_LOW2 verifies alignment of the immediate to 4 byte
+boundary.<br />
+COFF_REL_I860_LOW3 verifies alignment of the immediate to 8 byte
+boundary.<br />
+COFF_REL_I860_LOW4 verifies alignment of the immediate to 16 byte
+boundary.</p>
+<p>orh ha%foo,r0,r31 // COFF_REL_I860_HIGHADJ, PAIR<br />
+st.b r16,l%foo(r31) // COFF_REL_I860_SPLIT0<br />
+st.s r16,l%foo(r31) // COFF_REL_I860_SPLIT1<br />
+st.l r16,l%foo(r31) // COFF_REL_I860_SPLIT2</p>
+<p>The COFF_REL_I860_SPLIT types are used by the st instruction (fst
+uses the COFF_REL_I860_LOW fixups). They verify the alignment of the
+immediate as well as split the immediate over bit 20..16 and 10..0 of
+the instruction. The alignment is needed because bit 0 and bit 28 are
+used to encode operand length.</p>
+<p>COFF_REL_I860_SPLIT1 verifies alignment of immediate to 2 byte
+boundary.<br />
+COFF_REL_I860_SPLIT2 verifies alignment of immediate to 4 byte
+boundary.</p>
+<p>br foo<br />
+nop<br />
+foo: nop // COFF_REL_I860_BRADDR</p>
+<p>The COFF_REL_I860_BRADDR type is used to fixup a br to an address
+label. The linker computes the offset of the target label relative to
+the current PC + 4.</p>
+<h3 id="relocation-types-1">3.2.2 386 Relocation Types</h3>
+<p>o COFF_REL_I386_ABSOLUTE</p>
+<p>o COFF_REL_I386_DIR16</p>
+<p>o COFF_REL_I386_REL16</p>
+<p>o COFF_REL_I386_DIR32</p>
+<p>o COFF_REL_I386_REL32</p>
+<h2 id="dll-support">3.3 DLL Support</h2>
+<p>o An executable image which is a DLL will:</p>
+<p>o Have an export section which contains the ordinals, function names,
+and function address of each exported routine.</p>
+<p>o May contain init code if AddressOfEntryPoint != 0.</p>
+<p>o An executable image which uses a DLL will</p>
+<p>o Have a Dll Descriptor table for each DLL used. These tables will be
+grouped together and the optional header will contain the address of the
+first table.</p>
+<p>o Thunks for the DLL that will be snaped at load time.</p>
+<h3 id="thunks">3.3.1 Thunks</h3>
+<p>The best way to describe thunks is show an example. The following
+example is i860 code.</p>
+<p>Suppose we had the following Definition file:</p>
+<p>GetVersion=DosCalls.GetVersion<br />
+GetMachineMode=DosCalls.GetMachineMode<br />
+GetMode=VioCalls.GetMode<br />
+Foo=DosCalls.128</p>
+<p>and the following user code:</p>
+<p>call GetVersion<br />
+call GetMode<br />
+call GetMachineMode<br />
+call Foo</p>
+<p>The image would end up contain the following code:</p>
+<p>call thunk1<br />
+call thunk2<br />
+call thunk3<br />
+call thunk4</p>
+<p>thunk1:<br />
+br DosCallsThunkRoutine<br />
+ld.c fir,r31<br />
+.word relative address of GetVersionThunkData</p>
+<p>thunk2:<br />
+br VioCallsThunkRoutine<br />
+ld.c fir,r31<br />
+.word relative address of GetModeThunkData</p>
+<p>thunk3:<br />
+br DosCallsThunkRoutine<br />
+ld.c fir,r31<br />
+.word relative address of GetMachineModeThunkData</p>
+<p>thunk4:<br />
+br DosCallsThunkRoutine<br />
+ld.c fir r31<br />
+.word relative address of Ordinal128ThunkData</p>
+<p>DosCallsThunkRoutine:<br />
+ld.l 0(r31),r30<br />
+add r30,r31,r30<br />
+ld.l 0(r30), r29<br />
+bri r29<br />
+nop</p>
+<p>VioCallsThunkRoutine:<br />
+ld.l 4(r31),r30<br />
+add r30,r31,r30<br />
+ld.l 0(r30), r29<br />
+bri r29<br />
+nop</p>
+<p>Notice that DosCallsThunkRoutine and VioCallsThunkRoutine are
+identical. The reason for this is purely for debugging reasons. With
+different thunk routines, the user can set a breakpoint at the thunk
+routine for a specific DLL or a profiler could show which functions
+within which DLL are being called. The ideal situation would be to only
+generate one thunk routine if debugging isn't enabled, otherwise
+generate a thunk routine per DLL. However, I haven't figured out a way
+to do this yet, so until then, each DLL will have its own thunk
+routine.</p>
+<p>Thunk data has the following format:</p>
+<p>typedef struct <strong>_THUNK_DATA</strong> {</p>
+<p><strong>PTHUNK_BY_NAME</strong> <em>Function;</em></p>
+<p>} <strong>THUNK_DATA</strong>, <strong>*PTHUNK_DATA</strong>;</p>
+<p><u>THUNK_DATA Structure:</u></p>
+<p><em>Function</em> ——Specifies either an ordinal number or a pointer
+to THUNK_BY_NAME structure. If it is an ordinal number, it will have a
+value less than 64K.</p>
+<p>typedef struct <strong>_THUNK_BY_NAME</strong> {</p>
+<p><strong>ULONG</strong> <em>Hint;</em></p>
+<p><strong>UCHAR</strong> <em>Name[1];</em></p>
+<p>} <strong>THUNK_BY_NAME</strong>,
+<strong>*PTHUNK_BY_NAME</strong>;</p>
+<p><u>THUNK_BY_NAME Structure:</u></p>
+<p><em>Hint</em> ——A hint value that can be used to reference into the
+ExportNames in the EXPORT_SECTION_DATA.</p>
+<p><em>Name</em> ——The functions name.</p>
+<p>Thus by example, we have:</p>
+<p>DosCallsThunkData:<br />
+<br />
+GetVersionThunkData:<br />
+.word pointer to hint &amp; "GetVersion"</p>
+<p>GetMachineModeThunkData<br />
+.word pointer to hint &amp; "GetMachineMode"</p>
+<p>Ordinal128ThunkData:<br />
+.word 128</p>
+<p>VioCallsThunkData:<br />
+<br />
+GetModeThunkData:<br />
+.word pointer to hint &amp; "GetMode"</p>
+<p>The DLL descriptor is defined as:</p>
+<p>typedef struct <strong>_DLL_DESCRIPTOR</strong> {</p>
+<p><strong>ULONG</strong> <em>Characteristics;</em></p>
+<p><strong>PUCHAR</strong> <em>Name;</em></p>
+<p><strong>PVOID</strong> <em>FirstThunk;</em></p>
+<p>} <strong>DLL_DESCRIPTOR</strong>,
+<strong>*PDLL_DESCRIPTOR</strong>;</p>
+<p><u>DLL_DESCRIPTOR Structure:</u></p>
+<p><em>Characteristics</em> ——TBD.</p>
+<p><em>Name</em> ——A pointer to the name of the DLL.</p>
+<p><em>FirstThunk</em> ——A pointer to the first thunk for this DLL.</p>
+<p>The linker places all DLL descriptors contigously in the image file.
+An empty DLL descriptor (both fields are zero) is appended to the list
+of DLL descriptors.The PointerToDLLTable in the optional headers points
+to the first DLL descriptor.</p>
+<p>The purpose of the DLL descriptor is that once a snap occurs, it is
+possible to snap all thunks for the DLL at once. The linker places all
+the thunks for a particular DLL contiguously. It also appends an
+additional thunk data record to the list. This record will have both
+function_ordinal and function_name set to zero. This signifies the end
+of the DLL thunk data.</p>
+<p>Thus, by example we have:</p>
+<p>┌──────────────────────┐</p>
+<p>│characteristics │</p>
+<p>├──────────────────────┤</p>
+<p>│pointer to "VioCalls" │</p>
+<p>├──────────────────────┤</p>
+<p>┌──┤pointer to first thunk│</p>
+<p>│ ├──────────────────────┤</p>
+<p>│ │characteristics │</p>
+<p>│ ├──────────────────────┤</p>
+<p>│ │pointer to "DosCalls" │</p>
+<p>│ ├──────────────────────┤</p>
+<p>│┌─┤pointer to first thunk│</p>
+<p>││ ├──────────────────────┤</p>
+<p>││ │0 │</p>
+<p>││ ├──────────────────────┤</p>
+<p>││ │0 │</p>
+<p>││ ├──────────────────────┤</p>
+<p>││ │0 │</p>
+<p>││ ├──────────────────────┤</p>
+<p>││ │0 │</p>
+<p>││ └──────────────────────┘</p>
+<p>││</p>
+<p>││ THUNK DATA</p>
+<p>││ ┌────────────────────────────────┐</p>
+<p>│└─┤ pointer to "GetVersion" │</p>
+<p>│ ├────────────────────────────────┤</p>
+<p>│ │ pointer to "GetMachineMode" │</p>
+<p>│ ├────────────────────────────────┤</p>
+<p>│ │ 128 │</p>
+<p>│ ├────────────────────────────────┤</p>
+<p>│ │ 0 │</p>
+<p>│ ├────────────────────────────────┤</p>
+<p>└──┤ pointer to "GetMode" │</p>
+<p>├────────────────────────────────┤</p>
+<p>│ 0 │</p>
+<p>└────────────────────────────────┘</p>
+<p>The linker doesn't know if a function is within a DLL and it doesn't
+have to. The thunk and thunk data will be extracted from a library that
+was created by the librarian from a definition file.</p>
+<h3 id="export-section">3.3.2 Export Section</h3>
+<p>The export section will be the first section header of an image that
+is flaged as a DLL. The raw data of the section has the following
+format:</p>
+<p>typedef struct <strong>_EXPORT_SECTION_DATA</strong> {</p>
+<p><strong>ULONG</strong> <em>Characteristics;</em></p>
+<p><strong>PSZ</strong> <em>DllName;</em></p>
+<p><strong>ULONG</strong> <em>VersionStamp;</em></p>
+<p><strong>ULONG</strong> <em>Base;</em></p>
+<p><strong>ULONG</strong> <em>NumberOfOrdinals;</em></p>
+<p><strong>ULONG</strong> <em>NumberOfNames;</em></p>
+<p><strong>PVOID</strong> <em>*AddressOfOrdinalFunction;</em></p>
+<p><strong>PEXPORT_NAME_TABLE</strong> <em>ExportNames;</em></p>
+<p>} <strong>EXPORT_SECTION_DATA</strong>,
+<strong>*PEXPORT_SECTION_DATA</strong>;</p>
+<p><u>EXPORT_SECTION_DATA Structure:</u></p>
+<p><em>Characteristics</em> ——TBD.</p>
+<p><em>DllName</em> ——A pointer to the name of the DLL.</p>
+<p><em>VersionStamp</em> ——TBD.</p>
+<p><em>Base</em> ——TBD.</p>
+<p><em>NumberOfOrdinals</em> ——Indicates the number of ordinal
+functions.</p>
+<p><em>NumberOfNames</em> ——Indicates the number of named functions.</p>
+<p><em>AddressOfOrdinalFunction</em> ——A virtual address of the ordinal
+function.</p>
+<p><em>ExportNames</em> ——A pointer to the function exported by
+name.</p>
+<p>typedef struct <strong>_EXPORT_NAME_TABLE</strong> {</p>
+<p><strong>PSZ</strong> <em>ExportedName;</em></p>
+<p><strong>ULONG</strong> <em>Ordinal;</em></p>
+<p>} <strong>EXPORT_NAME_TABLE</strong>,
+<strong>*PEXPORT_NAME_TABLE</strong>;</p>
+<p><u>EXPORT_NAME_TABLE Structure:</u></p>
+<p><em>DllName</em> ——A pointer to the name of the Function.</p>
+<p><em>Ordinal</em> ——The ordinal assigned to the function.</p>
+<h1 id="image-activation">4. Image Activation</h1>
+<p>o Image headers, section headers, inport/export lists and debug
+information must all be mappable.</p>
+<p>o Based images and DLL's.</p>
+<p>o Sections are aligned on sector boundaries and are mapped on 64K
+virtual addresses.</p>
+<p>o The only kernel memory resident structures is the information to
+resolve a virtual page to a disk location.</p>
+<p>Psedo code for activating FOO.EXE.</p>
+<p>Activate("FOO.EXE");<br />
+<br />
+<br />
+Activate (Image_Name)<br />
+{<br />
+Handle = CreateSection(Image_Name, ..., ...);<br />
+Image_Base = MapView(Handle, ..., ...);<br />
+if (Image_Base-&gt;Optional_Header.PreferredImageBase !=
+Image_Base){<br />
+perform_local_fixups();<br />
+}<br />
+Load_DLL(Image_Base);<br />
+}<br />
+<br />
+<br />
+Load_DLL (Image_Base)<br />
+{<br />
+If (ImageBase-&gt;Section_Header[0].Name == '.export') {<br />
+while (Fetch_Next_DLL_Name() != NULL) {<br />
+DLL_Handle = CreateSection(DLL_Name, ..., ...);<br />
+DLL_Base = MapView(DLL_Handle, ..., ...);<br />
+if (DLL_Base-&gt;Optional_Header.PreferredImageBase != DLL_Base) {<br />
+perform_local_fixups();<br />
+}<br />
+Load_DLL(DLL_Base);<br />
+if (Image_Base-&gt;Optional_Header.EntryPoint) {<br />
+call (Image_Base-&gt;Optional_Header.EntryPoint());<br />
+}<br />
+perform_DLL_fixups();<br />
+}</p>
+<h1 id="resources">5. Resources</h1>
+<p>Resources are used for internationalzation. For example, if all the
+error messages of an image are in a resource, then the object containing
+the resource can be replaced with a new resource object that contains
+the error messages in another language.</p>
+<p>o Bitmaps, Fonts, Icons and Strings can all be resources.</p>
+<p>o The resource compiler will not modify the executable images as is
+done today in OS/2. Instead, the resource compiler will produce either
+assembler or c language code that can be compiled and then linked with
+the retain flag set so it can be incrementally linked later.</p>
+<p>o Resouces will be combined into one section.</p>
+<p>o The resource section will have a reserved name. Currently this name
+is .resrc.</p>
+<p>o The section flag will be marked as
+<strong>COFF_SCN_CNT_INITIALIZED_DATA</strong>.</p>
+<p>The current OS/2 implib program will be incorporated into the linker.
+It will read a definition file and produce a library which contains the
+thunk code for DLL entry points.</p>
+<h1 id="codeview-support">6. CodeView Support</h1>
+<p>CodeView information will reside in a section with content being
+<strong>COFF_SCN_TYPE_INFO</strong>. The Linker does not know about the
+internal structure of the CodeView information. The section can contain
+relocation entries for the information.</p>
+<p>o How duplicate debug information might be discarded hasn't been
+decided yet.</p>
+<h2 id="incremental-linking">6.1 Incremental Linking</h2>
+<p>Incremental linking is used to replace specific parts of an image
+file. This is how you change resources.</p>
+<p>The linker will be able to incrementally link objects provided the
+retain switch was used before incremental linking is desired. The linker
+will retain the needed relocation entries for each object that refers to
+a specific section. The linker replaces the old section with the new
+section and re-applys the fixups. NOTE: If the size of the section
+grows, and can't fit in the padded space left from sector aligning, it
+hasn't been decided if the linker will move everything or just return an
+error indicating full linking must occur.</p>
+<p>Incremental linking is accomplished by linking an executable image
+with 1 or more objects.</p>
+<h2 id="linker-command-line">6.2 Linker Command Line</h2>
+<p>The linker can except switches, objects, libraries, and the
+definition file in any order on the command line. Only one definition
+file can be specified. The linker processes the object files (in order)
+before processing the libraries.</p>
+<h2 id="linker-switches">6.3 Linker Switches</h2>
+<p>o Debug:[None,Full,Partial]</p>
+<p>o Def:<em>Filename</em></p>
+<p>o Dll</p>
+<p>o Map:[<em>Filename</em>]</p>
+<p>o Base:<em>Address</em> (64K aligned)</p>
+<p>o Entry:<em>SymbolName</em></p>
+<p>o Force</p>
+<p>o Include:<em>SymbolName</em></p>
+<p>o Out:<em>Filename</em></p>
+<p>o Stack<em>:Size</em></p>
+<p>o Version:<em>Number</em></p>
+<p>o Retain=[All,<em>ObjectName</em>]:[All,<em>SectionName</em>]</p>
+<p>o Fixup=<em>DllLibraryName</em>:[All,1by1,None]</p>
+<h1 id="librarian">7. Librarian</h1>
+<p>o The librarian will be imbedded into the linker or will at least
+share a DLL.</p>
+<p>o Multiple objects of the same name will NOT be allowed in the same
+library.</p>
+<p>o Multiple symbols of the same name will NOT be allowed in the same
+library.</p>
+<p>The librarian has two functions:</p>
+<p>The first function of the librarian is to simply merge files
+together. When the librarian builds a library, a member header is
+created for each file that is a member of the library. This allows
+removal of each individual file from a library. Any file can become a
+member of a library. When the files being added to a library are not
+COFF objects, the librarian acts like a simple file merger. You can
+merge an unlimited number of files together into one large file. This
+file will not be considered a valid library for linking purposes. A
+valid library to be used by the linker is created by merging only COFF
+objects together.</p>
+<p>When a library contains only COFF objects, the librarian performs its
+second function, which is to build a symbol table for all defined
+external functions within the library. This symbol table is called the
+linker member, because it allows the linker to perform fast lookup on
+defined functions within the library. Once the linker member is created,
+only COFF objects can be added to the library.</p>
+<h2 id="librarian-switches">7.1 Librarian Switches</h2>
+<p>o Remove:Membername</p>
+<p>o Def:Filename</p>
+<p>o List</p>
+<p>Membername is the name of the file. The linker member name is
+backslash (/).</p>
+<h2 id="library-file-layout">7.2 Library File Layout</h2>
+<p>┌──────────────────┐</p>
+<p>│ !&lt;arcg&gt;\n │</p>
+<p>├──────────────────┤</p>
+<p>│ MEMBER HEADER │</p>
+<p>│ name │</p>
+<p>│ date │</p>
+<p>│ uid │</p>
+<p>│ gid │</p>
+<p>│ mode │</p>
+<p>│ size │</p>
+<p>│ '\n │</p>
+<p>├──────────────────┤</p>
+<p>│ File 1 Contents │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>├──────────────────┤</p>
+<p>│ MEMBER HEADER │</p>
+<p>│ name │</p>
+<p>│ date │</p>
+<p>│ uid │</p>
+<p>│ gid │</p>
+<p>│ mode │</p>
+<p>│ size │</p>
+<p>│ '\n │</p>
+<p>├──────────────────┤</p>
+<p>│ File 2 Contents │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>├──────────────────┤</p>
+<p>│etc ... │</p>
+<p>│ │</p>
+<p>└──────────────────┘</p>
+<h3 id="library-file-header">7.2.1 Library File Header</h3>
+<p>A library file always starts with the 8 characters
+<strong>!&lt;arch&gt;\n</strong> where \n is a newline character.</p>
+<h3 id="library-member-header">7.2.2 Library Member Header</h3>
+<p>The library member header size and format is that of standard COFF
+archive files.</p>
+<p>typedef struct <strong>_MEMBER_HEADER</strong> {</p>
+<p><strong>CHAR</strong> <em>Name[16]</em>;</p>
+<p><strong>CHAR</strong> <em>Date[12]</em>;</p>
+<p><strong>CHAR</strong> <em>UserID[6]</em>;</p>
+<p><strong>CHAR</strong> <em>GroupID[6]</em>;</p>
+<p><strong>CHAR</strong> <em>Mode[8]</em>;</p>
+<p><strong>CHAR</strong> <em>Size[10]</em>;</p>
+<p><strong>CHAR</strong> <em>EndHeader[2]</em>;</p>
+<p>} <strong>MEMBER_HEADER</strong>,
+<strong>*PMEMBER_HEADER</strong>;</p>
+<p><u>MEMBER_HEADER Structure:</u></p>
+<p><em>Name</em> ——Is the file name of the member. It is terminated with
+a backslash (/) character, followed by spaces if needed to fill out the
+rest of the character array. The member name is stored this way only if
+the file name is less than 16 characters long. If the file name is 16
+characters or more (path name is included), the the member names begins
+with a backslash (/) character, followed by ascii digits which are used
+as an offset into the long name table (described below).</p>
+<p><em>Date</em> ——Is the members creation data as an ASCII string of
+decimal characters.</p>
+<p><em>UserID</em> ——To be defined.</p>
+<p><em>GroupID</em> ——To be defined.</p>
+<p><em>Mode</em> ——To be defined.</p>
+<p><em>Size</em> ——Defines the size of the member in bytes. The size can
+be used to find the header of the next member.</p>
+<p><em>EndHeader</em> ——Contains the string <strong>`\n</strong> (grave
+accent followed by a newline character).</p>
+<p>NOTE: A member header always starts on an even-byte boundary. A
+newline character (\n) is used for filling if the members contents ends
+on an odd-byte boundary.</p>
+<h3 id="linker-member">7.2.3 Linker Member</h3>
+<p>If the file contains a COFF object, then a linker member is built by
+the librarian, and is the first member of the archive file. The linker
+member is sorted by member header offsets. The linker member is standard
+coff and is constructed in the following manner:</p>
+<p>┌────────────────────────┐</p>
+<p>│ MEMBER HEADER │</p>
+<p>│ name "/ " │</p>
+<p>│ date │</p>
+<p>│ uid │</p>
+<p>│ gid │</p>
+<p>│ mode │</p>
+<p>│ size │</p>
+<p>│ '\n │</p>
+<p>├────────────────────────┤</p>
+<p>│ number of symbols │</p>
+<p>├────────────────────────┤</p>
+<p>│ member header offset │</p>
+<p>│ for symbol name1 │</p>
+<p>├────────────────────────┤</p>
+<p>│ member header offset │</p>
+<p>│ for symbol name2 │</p>
+<p>├────────────────────────┤</p>
+<p>│ . │</p>
+<p>│ . │</p>
+<p>│ . │</p>
+<p>├────────────────────────┤</p>
+<p>│ member header offset │</p>
+<p>│ for symbol nameN │</p>
+<p>├────────────────────────┤</p>
+<p>│ symbol name1 │</p>
+<p>│ symbol name2 │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>│ symbol nameN │</p>
+<p>└────────────────────────┘</p>
+<h3 id="secondary-linker-member">7.2.4 Secondary Linker Member</h3>
+<p>A second linker member is built by the NT librarian. This is not
+standard, but most existing tools should ignore the second linker
+member. The second linker member is sorted by symbols names. The second
+linker member is constructed in the following manner:</p>
+<p>┌────────────────────────┐</p>
+<p>│ MEMBER HEADER │</p>
+<p>│ name "/ " │</p>
+<p>│ date │</p>
+<p>│ uid │</p>
+<p>│ gid │</p>
+<p>│ mode │</p>
+<p>│ size │</p>
+<p>│ '\n │</p>
+<p>├────────────────────────┤</p>
+<p>│ number of offsets │</p>
+<p>├────────────────────────┤</p>
+<p>│ member header 1 offset │</p>
+<p>├────────────────────────┤</p>
+<p>│ member header 2 offset │</p>
+<p>├────────────────────────┤</p>
+<p>│ . │</p>
+<p>│ . │</p>
+<p>│ . │</p>
+<p>├────────────────────────┤</p>
+<p>│ number of symbols │</p>
+<p>├────────────────────────┤</p>
+<p>│ member offset index │</p>
+<p>│ for symbol name1 │</p>
+<p>├────────────────────────┤</p>
+<p>│ member offset index │</p>
+<p>│ for symbol name2 │</p>
+<p>├────────────────────────┤</p>
+<p>│ . │</p>
+<p>│ . │</p>
+<p>│ . │</p>
+<p>├────────────────────────┤</p>
+<p>│ member offset index │</p>
+<p>│ for symbol nameN │</p>
+<p>├────────────────────────┤</p>
+<p>│ symbol name1 │</p>
+<p>│ symbol name2 │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>│ symbol nameN │</p>
+<p>├────────────────────────┤</p>
+<p>│ full member 1 filename │</p>
+<p>│ full member 2 filename │</p>
+<p>│ │</p>
+<p>│ │</p>
+<p>│ full member N filename │</p>
+<p>└────────────────────────┘</p>
+<h3 id="long-names-member">7.2.5 Long Names Member</h3>
+<p>The NT linker builds a long name table if any of the file names being
+added to the library are longer than 15 characters. This is not standard
+COFF, but is part of the new System V ABI. The long name table is
+constructed in the following manner:</p>
+<p>┌────────────────────────┐</p>
+<p>│ MEMBER HEADER │</p>
+<p>│ name "// " │</p>
+<p>│ date │</p>
+<p>│ uid │</p>
+<p>│ gid │</p>
+<p>│ mode │</p>
+<p>│ size │</p>
+<p>│ '\n │</p>
+<p>├────────────────────────┤</p>
+<p>│ asciiz strings │</p>
+<p>└────────────────────────┘</p>
+<p><strong><br />
+Revision History</strong></p>
+<p>Original Draft 1.0, November 06, 1989</p>
+<p>Revision 1.1, January 10, 1990</p>
+<p>Revision 1.2, Febuary 26, 1990</p>
+<p>Revision 1.3, May 31, 1990</p>

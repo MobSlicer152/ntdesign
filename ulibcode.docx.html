@@ -1,0 +1,1117 @@
+<p>Portable Systems Group</p>
+<p>NT Utilities Coding Conventions</p>
+<p><strong>Author:</strong> David J. Gilman</p>
+<p>Revision 1.1, October 29, 1990</p>
+<p>Revision 1.0, October 18, 1990</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. The Existing Code Rule 1</p>
+<p>3. Module Headers 1</p>
+<p>4. Function Headers 3</p>
+<p>4.1 Modifiers 3</p>
+<p>4.2 Function Declarations 4</p>
+<p>4.3 Function Definitions 5</p>
+<p>5. Header Files 6</p>
+<p>5.1 Header File Inclusion 6</p>
+<p>5.1.1 Description 6</p>
+<p>5.1.2 Special Header Files 7</p>
+<p>5.1.2.1 Ulibdef.hxx 7</p>
+<p>5.1.2.2 Ulib.hxx 7</p>
+<p>6. Naming 8</p>
+<p>6.1 Variable Names 8</p>
+<p>6.1.1 Initial Caps Format 9</p>
+<p>6.1.2 Unstructured Format 9</p>
+<p>6.2 Data Type Names 9</p>
+<p>6.3 Returning or Accepting Pointers 11</p>
+<p>6.4 Structure Fields, Class Member Data and<br />
+Enumeration Constants 11</p>
+<p>6.5 Macro and Constant Names 11</p>
+<p>7. Indentation and Placement of Braces 12</p>
+<p>8. Language Usage Guidelines 15</p>
+<p>8.1 Known Problems 15</p>
+<p>8.2 C++ Specific Guidelines 15</p>
+<p>8.3 Debugging Support 16</p>
+<p>9. Appendix A ‑ Example : Class EXAMPLE 16</p>
+<p>9.1 Ulib.hxx 16</p>
+<p>9.2 Example.hxx 17</p>
+<p>9.3 Examplep.hxx 18</p>
+<p>9.4 Example.inl 19</p>
+<p>9.5 Example.cxx 20</p>
+<p>9.6 Client.cxx 23</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This document describes the coding conventions that are used by the
+<strong>NT OS/2</strong> <strong>Utilities</strong> group. Both the
+document and the conventions are heavily based on the document, "NT OS/2
+Coding Conventions" written by Helen Custer and Mark Lucovsky.</p>
+<p>There are primarily two reasons why the <strong>NT OS/2
+Utilities</strong> group warrants a separate convention. First, work is
+done on existing code from many different sources. Second, all new code
+will be written in C++. This requires a number of changes and additions
+from the convention documented in the above mentioned document.</p>
+<p>All code written for <strong>NT OS/2</strong>
+<strong>Utilities</strong> adheres to a common coding style. This style
+gives the utilities a uniform appearance which allows group members to
+read, modify, and maintain each other's modules without learning several
+different coding conventions.</p>
+<p>The following items are standardized:</p>
+<p>o Module headers</p>
+<p>o Function (member and non‑member) headers and declarations</p>
+<p>o Header file format</p>
+<p>o Names of variables, data types (including classes), structure
+fields, macros, and constants</p>
+<p>o Control structure indentation and placement of braces</p>
+<h1 id="the-existing-code-rule">2. The Existing Code Rule</h1>
+<p>When existing code is being ported to <strong>NT OS/2</strong>, every
+effort should be made to maintain the conventions and style that already
+exist in that code.</p>
+<h1 id="module-headers">3. Module Headers</h1>
+<p>The following prototype should appear at the beginning of each
+module. The source to the prototype can be found in the file
+<em>\nt\public\oak\inc\modhdr.c.</em></p>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+name-of-module-filename<br />
+<br />
+Abstract:<br />
+<br />
+abstract-for-module.<br />
+<br />
+Author:<br />
+<br />
+name-of-author (email-name) creation-date-dd-Mmm-yyyy<br />
+<br />
+[Environment:]<br />
+<br />
+optional-environment-info (e.g. kernel mode only...)<br />
+<br />
+[Notes:]<br />
+<br />
+optional-notes<br />
+<br />
+Revision History:<br />
+<br />
+most-recent-revision-date email-name<br />
+description<br />
+.<br />
+.<br />
+.<br />
+least-recent-revision-date email-name<br />
+description<br />
+<br />
+--*/</p>
+<p>/ Note that no Revision History will be maintained until after the
+product has been released. /</p>
+<p>The following is a sample of a completed module header:</p>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+object.hxx<br />
+<br />
+Abstract:<br />
+<br />
+Definition of the root class for the ULIB class hierarchy.<br />
+<br />
+Author:<br />
+<br />
+David J. Gilman (davegi) 12-Oct-1990<br />
+<br />
+Environment:<br />
+<br />
+ULIB, User Mode<br />
+<br />
+Notes:<br />
+<br />
+Note the PURE VIRTUAL functions.<br />
+<br />
+--*/</p>
+<p>\ The /*++ &lt;text&gt; --*/ construct is used by a comment extractor
+program that will be developed to assist in our documentation
+efforts.\</p>
+<h1 id="function-headers">4. Function Headers</h1>
+<p>In C++ member functions are declared within a class definition. These
+declarations contain a lot of information and as such will be enhanced
+by the use of <em>modifiers.</em> Some of these modifiers are also used
+by the function definition.</p>
+<h2 id="modifiers">4.1 Modifiers</h2>
+<p>There are essentially three different types of modifiers; function
+specifiers, type specifiers and argument direction. All can be used by
+function declarations. Those that can also be used in function
+definitions are noted.</p>
+<p>o All member function declarations are preceded by one of the
+following modifiers:</p>
+<p><strong>VIRTUAL</strong><br />
+Indicates that the implementation of a member function can be overridden
+by a derived class</p>
+<p><strong>NONVIRTUAL</strong><br />
+Indicates that the implementation of a member function can not be
+overridden by a derived class</p>
+<p><strong>STATIC</strong><br />
+Indicates that the member function is static and therefore callable
+without an object instance of the class.</p>
+<p>o Member function declarations may also be preceded by the following
+modifier:</p>
+<p><strong>CONST</strong> (definition)<br />
+Indicates that the function returns a constant value (usually a
+pointer).</p>
+<p>o All formal arguments are preceded by one of the following
+modifiers:</p>
+<p><strong>IN</strong> (definition)<br />
+Indicates that the argument is a non-modifiable input value (i.e.,
+call-by-value semantics)</p>
+<p><strong>OUT</strong> (definition)<br />
+Indicates that the argument is an address which refers to a variable or
+structure that will be modified by the function (i.e., call-by-reference
+semantics)</p>
+<p><strong>IN OUT</strong> (definition)<br />
+Indicates that the argument is the address of an input variable or
+structure that is both read and written by the function (i.e.,
+call-by-reference semantics).</p>
+<p>o Formal arguments may also be followed by one of the following
+modifiers:</p>
+<p><strong>OPTIONAL</strong><br />
+Indicates that an argument can be or NULL (or zero). To determine
+whether the actual value supplied is NULL, the programmer must use the
+macro ARGUMENT_PRESENT, which takes the argument and returns a value of
+type BOOLEAN. OPTIONAL arguments must be specified by the caller and can
+occur at any position in the argument list</p>
+<p><strong>DEFAULT<br />
+</strong>Indicates that the argument is optional and need not be
+specified by the caller. DEFAULT arguments may only occur at the end
+(<em>i.e.</em> right end) of an argument list and must be initialized in
+the class definition</p>
+<p>o Member function declarations may also be followed by the following
+modifiers:</p>
+<p><strong>CONST</strong> (definition)<br />
+Indicates that the member function is <em>safe</em>. That is, it does
+not directly, or indirectly via a call, modify the object's state</p>
+<p><strong>PURE</strong><br />
+Indicates that the member function is a pure virtual function. That is,
+all derived classes must supply their own implementation</p>
+<p>o The order of the arguments in the comment block is the same as the
+order in which they appear in the function declaration.</p>
+<h2 id="function-declarations">4.2 Function Declarations</h2>
+<p>When a member function is declared in a class definition, it's
+declaration contains the function prototype and appropriate modifiers.
+For example:</p>
+<p>NONVIRTUAL<br />
+CONST<br />
+POBJECT<br />
+GetNext (<br />
+IN POBJECT LastObject,<br />
+OUT BOOLEAN WrapAround<br />
+) CONST</p>
+<p>Note that modifiers, types and argument names should be aligned.</p>
+<h2 id="function-definitions">4.3 Function Definitions</h2>
+<p>Below is a prototype function definition and declaration. The
+definition form is to appear with the implementation of the function.
+The source to the prototype can be found in the file
+<em>\nt\public\oak\inc\prochdr.cxx</em>.</p>
+<p>Note that a form‑feed character should appear one line before the
+"return‑type" line. This convention is noted in this document with the
+string "&lt;form‑feed&gt;".</p>
+<p>The function declaration follows:</p>
+<p>&lt;form-feed&gt;<br />
+modifier<br />
+.<br />
+.<br />
+.<br />
+return-type<br />
+procedure-name (<br />
+direction type-name argument-name [modifier],<br />
+direction type-name argument-name [modifier]<br />
+.<br />
+.<br />
+.<br />
+) [modifier]<br />
+<br />
+/*++<br />
+<br />
+Routine Description:<br />
+<br />
+description-of-function.<br />
+<br />
+Arguments:<br />
+<br />
+argument-name - Supplies (IN) | Returns (OUT) description of
+argument.<br />
+.<br />
+.<br />
+<br />
+Return Value:<br />
+<br />
+return-value - Description of conditions needed to return value.<br />
+- or -<br />
+None.<br />
+<br />
+--*/<br />
+<br />
+{<br />
+.<br />
+.<br />
+.<br />
+}</p>
+<p>/ Note the space between the procedure name and the opening
+parenthesis for it's argument list. This is needed so that overloaded
+operators will be more readable. /</p>
+<p>The following is a sample of a completed member function
+declaration:</p>
+<p>&lt;form-feed&gt;<br />
+NONVIRTUAL<br />
+CONST<br />
+POBJECT<br />
+COLLECTION::GetNext (<br />
+IN POBJECT LastObject OPTIONAL<br />
+) CONST<br />
+<br />
+/*++<br />
+<br />
+Routine Description:<br />
+<br />
+Get the next object from the collection.<br />
+<br />
+Arguments:<br />
+<br />
+LastObject ‑ Supplies the current object.<br />
+<br />
+Return Value:<br />
+<br />
+POBJECT ‑ A constant pointer to the next OBJECT in the<br />
+COLLECTION.<br />
+<br />
+--*/<br />
+<br />
+{<br />
+.<br />
+.<br />
+.<br />
+}</p>
+<h1 id="header-files">5. Header Files</h1>
+<p>The following sections define the requirements for inclusion and
+format of header files.</p>
+<h2 id="header-file-inclusion">5.1 Header File Inclusion</h2>
+<h3 id="description">5.1.1 Description</h3>
+<p>There are two types of header files used by the <strong>NT OS/2
+Utilities</strong>:</p>
+<p>o Header files that are private to a single class:</p>
+<p>o Types, constants etc.</p>
+<p>o Inline functions</p>
+<p>o A public header file that contains the class declaration and
+associated types, constants etc.</p>
+<p>The naming convention for private header files is
+&lt;class‑name&gt;<em>p.h</em>xx. For example, the private header file
+for the object class, would be called <em>objectp.h</em>xx.</p>
+<p>The public style of header files are the most important as they
+define class interfaces. An example can be found in section .</p>
+<p>Header files should not be nested. That is, one header file should
+not include another.</p>
+<h3 id="special-header-files">5.1.2 Special Header Files</h3>
+<p>There are two special header files used by the ULIB class library:
+ulibdef.hxx and ulib.hxx. These files are exceptions to the nested
+include file rule.</p>
+<h4 id="ulibdef.hxx">5.1.2.1 Ulibdef.hxx</h4>
+<p>The file <em>\nt\private\os2\programs\ulib\inc\ulibdef.hxx</em>
+contains global information which is required by all classes and
+client's of ULIB. It should <em>not</em> be directly included. Rather,
+it will be included by <em>ulib.hxx</em>.</p>
+<h4 id="ulib.hxx">5.1.2.2 Ulib.hxx</h4>
+<p>The file <em>\nt\private\os2\programs\ulib\inc\ulib.hxx</em> is the
+master header file for the ULIB library. It should be included by all
+classes and clients of ULIB by the statement</p>
+<p>#include "ulib.hxx"</p>
+<p>In turn <em>ulib.hxx</em> will include, in the correct order, the
+header files that are needed by a particular class. This will be
+controlled by symbols of the form</p>
+<p>_<em>CLASSNAME_</em></p>
+<p>which will be defined by the class client.</p>
+<p>Class definitions will support this architecture by conditionally
+expanding to themselves, or to nothing if they have already been
+expanded.</p>
+<p>As mentioned, class writers will use <em>ulib.hxx</em>. This will
+ensure that it is accurate and usable by any class clients. This means
+that special care should be taken to ensure that private header files
+are not listed within <em>ulib.hxx.</em></p>
+<p>In the example below, if the class definition in
+<em>collection.hxx</em> was not previously referenced, then the macro
+_COLLECTION_ is defined and the header file is expanded. Otherwise,
+_COLLECTION_ is already defined and the remainder of the header file is
+ignored. This results in the header file being included only once.</p>
+<p>The following header file style should be used:</p>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+object.hxx<br />
+<br />
+Abstract:<br />
+<br />
+Definition of the abstract container class.<br />
+<br />
+Author:<br />
+<br />
+David J. Gilman (davegi) 12-Oct-1990<br />
+<br />
+Environment:<br />
+<br />
+ULIB, User Mode<br />
+<br />
+Notes:<br />
+<br />
+Revision History:<br />
+<br />
+--*/<br />
+<br />
+#if ! defined( _COLLECTION_ )<br />
+#define _COLLECTION_<br />
+.<br />
+.<br />
+.<br />
+<br />
+//<br />
+// <em>body</em><br />
+//<br />
+<br />
+#endif // _COLLECTION_</p>
+<h1 id="naming">6. Naming</h1>
+<p>The following sections describe the naming conventions for variables,
+structure fields, types, constants, and macros.</p>
+<h2 id="variable-names">6.1 Variable Names</h2>
+<p>Variable names are either in "initial caps" format, or they are
+unstructured. The following two sections describe when each is
+appropriate.</p>
+<p>Note that the <strong>NT OS/2</strong> system, utilities included, do
+not use the Hungarian naming convention used in some of the other
+Microsoft products.</p>
+<h3 id="initial-caps-format">6.1.1 Initial Caps Format</h3>
+<p>All global variables and formal argument names must use the initial
+caps format. The following rules define this format:</p>
+<p>o Words within a name are spelled out; abbreviations are
+discouraged.</p>
+<p>o The first character of each word in a name is capitalized.</p>
+<p>o Acronyms are treated as words, that is, only the first character of
+the acronym is capitalized.</p>
+<p>The following list shows some sample names that conform to these
+rules:</p>
+<p>NumberOfBytes</p>
+<p>TcbAddress</p>
+<p>BilledProcess</p>
+<h3 id="unstructured-format">6.1.2 Unstructured Format</h3>
+<p>Local variables may appear in either the initial caps format, or in a
+format of the programmer's preference. The following list shows some
+possibilities for local variable names:</p>
+<p>loopindex</p>
+<p>LoopIndex</p>
+<p>loop_index</p>
+<h2 id="data-type-names">6.2 Data Type Names</h2>
+<p>A set of primitive data types for use in the <strong>NT OS/2
+Utilities</strong> is defined in <em>ulibdef.hxx.</em> All <strong>NT
+OS/2</strong> <strong>Utilities</strong> software must declare variables
+using these defined types rather than standard C++ types, where
+appropriate. The following are some examples of <strong>NT OS/2</strong>
+<strong>Utilities</strong> types:</p>
+<p>ULONG</p>
+<p>PULONG</p>
+<p>VOID</p>
+<p>PVOID</p>
+<p>BOOLEAN</p>
+<p>PBOOLEAN</p>
+<p>All new type names should be created in uppercase using
+<strong>typedef</strong>. Words within the name may either be packed
+together or separated by underscores. All types should have a
+corresponding <strong>typedef</strong> which defines a pointer and a
+reference to the type. The name for the pointer is the type name with a
+"P" prefix. Similarly the reference is the type name with a "R"
+prefix.</p>
+<p>The following example illustrates how to use <strong>typedef</strong>
+to create a class type:</p>
+<p>typedef class COLLECTION : public OBJECT {<br />
+<br />
+public:<br />
+<br />
+NONVIRTUAL<br />
+COLLECTION (<br />
+IN ULONG InitialNumberOfElements,<br />
+IN ULONG IncrementNumberOfElements DEFAULT = 10<br />
+);<br />
+<br />
+VIRTUAL<br />
+~COLLECTION (<br />
+);<br />
+<br />
+NONVIRTUAL<br />
+POBJECT<br />
+QueryNextElement (<br />
+IN POBJECT CurrentElement<br />
+) CONST;<br />
+<br />
+VIRTUAL<br />
+CONST<br />
+POBJECT<br />
+GetNextElement (<br />
+IN POBJECT CurrentElement<br />
+) PURE;<br />
+<br />
+protected:<br />
+<br />
+POBJECT mCollection;<br />
+<br />
+private:<br />
+<br />
+ULONG _InitialNumberOfElements;<br />
+ULONG _IncrementNumberOfElements;<br />
+} POINTER_AND_REFERENCE_TYPES( COLLECTION );</p>
+<p>Note that there should only be one <em>public:,</em> one
+<em>protected:</em> and one <em>private</em>: section in each class
+definition. In addition constructors and destructors should appear at
+the top of the list followed by logical groupings of other member
+functions.</p>
+<p>C++ does not require a typedef for structures, and enumerated types
+as it considers them to be types when they are defined. However typedefs
+should be used so that a pointer and reference to the type are defined
+at the same time as the underlying type. For example,</p>
+<p>typedef struct RANGE {<br />
+ULONG Start<br />
+ULONG Count;<br />
+} POINTER_AND_REFERENCE_TYPES( RANGE );</p>
+<p>typedef enum COLLECTION_TYPE {<br />
+Array,<br />
+List,<br />
+Table<br />
+} POINTER_AND_REFERENCE_TYPES( COLLECTION_TYPE );</p>
+<h2 id="returning-or-accepting-pointers">6.3 Returning or Accepting
+Pointers</h2>
+<p>In order to minimize performance impacts of using objects, the
+following conventions are used when pointers to objects, or other
+dynamic structures, are passed to and from an object:</p>
+<p>o Member function names that have the prefix:</p>
+<p>o <strong>Query<br />
+</strong>Return a pointer to an object which will be de‑allocated by the
+client.</p>
+<p>o <strong>Get</strong><br />
+Return a constant pointer which will be de‑allocated by the object.</p>
+<p>o <strong>Set</strong><br />
+Take a pointer to an object which will be de‑allocated by the
+object.</p>
+<p>o <strong>Put</strong><br />
+Take a pointer to an object which will be de‑allocated by the
+client.</p>
+<h2
+id="structure-fields-class-member-data-and-enumeration-constants">6.4
+Structure Fields, Class Member Data and<br />
+Enumeration Constants</h2>
+<p>Notice from the above examples that structure field names,
+enumeration constants and class member data should follow initial caps
+format. They should not have field name prefixes tied to a type.</p>
+<p>The subtle exception to this rule is for member data. The names used
+for a class' member data should be preceded by an '_' so that they can
+be more easily recognized in member function implementations.</p>
+<h2 id="macro-and-constant-names">6.5 Macro and Constant Names</h2>
+<p>All macros and manifest constants should have uppercase names. Words
+within a name may either be packed together, or separated by
+underscores.</p>
+<p>The following statements illustrate some manifest constant and macro
+names:</p>
+<p>#define PAGE_SIZE 4096<br />
+#define CONTAINING_RECORD(address, type, field) \<br />
+((type *)((LONG)(address) - \<br />
+(LONG)(&amp;((type *)0)-&gt;field)))</p>
+<p>Any macro that is likely to be replaced by a function at a later time
+should use the naming conventions for functions.</p>
+<p>In C++ it is preferable to use constant variables and inline
+functions instead of manifest constants and macros.</p>
+<h1 id="indentation-and-placement-of-braces">7. Indentation and
+Placement of Braces</h1>
+<p>Source files should contain real tab characters. Tab stops should be
+set to four characters. This can be accomplished for the following tools
+by adding the following entry to the <em>tools.ini</em> file:</p>
+<p>[pwb]<br />
+entab:1<br />
+filetab:4<br />
+tabstops:4<br />
+realtabs:yes<br />
+<br />
+[list]<br />
+tabamt:4<br />
+<br />
+[ppr]<br />
+flags = -e 4</p>
+<p>/ The entries for list and ppr do not work. /</p>
+<p>The following skeletal statements illustrate the proper indentation
+and placement of braces for C++ control structures.</p>
+<p>&lt;form-feed&gt;<br />
+INT<br />
+FooBar(<br />
+INT ArgumentOne,<br />
+PULONG ArgumentTwo<br />
+)<br />
+<br />
+/*++<br />
+<br />
+Routine Description:<br />
+<br />
+This is the routine description.<br />
+<br />
+Arguments:<br />
+<br />
+ArgumentOne - Supplies the value for argument 1.<br />
+<br />
+ArgumentTwo - Supplies the address of argument 2.<br />
+<br />
+Return Value:<br />
+<br />
+0 - Success<br />
+<br />
+1 - Failure<br />
+<br />
+--*/<br />
+<br />
+{<br />
+//<br />
+// Local variables are indented one tab (tabs are 4 spaces)<br />
+//<br />
+<br />
+ULONG LocalVariable1;<br />
+LONG Counter;<br />
+<br />
+//<br />
+// for loops<br />
+// - all for loops must have braces<br />
+// - closing brace is at same indentation level as<br />
+// for statement<br />
+//<br />
+<br />
+for ( Counter = 0; Counter &lt; 10; Counter++ ) {<br />
+<br />
+//<br />
+// Body of loop<br />
+//<br />
+<br />
+}<br />
+<br />
+//<br />
+// if statement<br />
+//<br />
+<br />
+if ( Counter == 0 ) {<br />
+<br />
+//<br />
+// Then statements<br />
+//<br />
+<br />
+}<br />
+<br />
+//<br />
+// if then else<br />
+//<br />
+<br />
+if ( Counter == 1 ) {<br />
+<br />
+//<br />
+// Then statements<br />
+//<br />
+<br />
+} else {<br />
+<br />
+//<br />
+// Else statements<br />
+//<br />
+<br />
+}<br />
+<br />
+//<br />
+// switch statement<br />
+//<br />
+<br />
+switch ( Counter ) {<br />
+<br />
+case 1 :<br />
+<br />
+//<br />
+// case 1 statements<br />
+//<br />
+break;<br />
+<br />
+case 2 :<br />
+<br />
+//<br />
+// case 2 statements<br />
+//<br />
+break;<br />
+<br />
+default :<br />
+<br />
+//<br />
+// default case<br />
+//<br />
+break;<br />
+<br />
+}<br />
+}</p>
+<h1 id="language-usage-guidelines">8. Language Usage Guidelines</h1>
+<p>The <strong>NT OS/2 Utilities</strong> are written in portable C++ as
+defined by "The Annotated C++ Reference Manual" written by Margaret A.
+Ellis and Bjarne Stroustrup<a href="#fn1" class="footnote-ref"
+id="fnref1" role="doc-noteref"><sup>1</sup></a>. Care should be taken
+not to write any code that breaks with this language definition or with
+the ANSI C standard. When the two language definitions are at odds, side
+with the C++ definition.</p>
+<h2 id="known-problems">8.1 Known Problems</h2>
+<p>There are two known problems that have been encountered by the
+<strong>NT OS/2</strong> group:</p>
+<p>o Left Hand Side Typecasts</p>
+<p>ULONG i;<br />
+( FLOAT ) i = 2.0; // PROBLEM!</p>
+<p>o Zero Length Arrays in Structures</p>
+<p>struct X {<br />
+ULONG i;<br />
+ULONG arr[ ]; // PROBLEM!<br />
+};</p>
+<p>Fortunately, C++ will not allow either of these constructs.</p>
+<h2 id="c-specific-guidelines">8.2 C++ Specific Guidelines</h2>
+<p>Following are a number of C++ specific guidelines which will aid in
+readability, consistency and debugging:</p>
+<p>o File names should have the following extensions:</p>
+<p>o <strong>hxx</strong><br />
+for class definitions and related types and constants</p>
+<p>o <strong>inl</strong><br />
+for inline function implementations</p>
+<p>o <strong>cxx</strong><br />
+for non‑inline function implementations.</p>
+<p>o In order to benefit from C++'s strong type checking:</p>
+<p>o Dynamic allocation and de‑allocation should be performed with the
+C++ <em>new</em> and <em>delete</em> operators.</p>
+<p>o Constant, global variables should be used in lieu of pre‑processor
+definitions.</p>
+<p>o Do not declare inline functions within a class definition.</p>
+<p>o Declare inline functions in the appropriate <em>.inl</em> file as
+described above and as shown in .</p>
+<p>o Do not use multiple inheritance.</p>
+<p>o Avoid using global, static objects.</p>
+<p>o Do not use the C++ specific form of casting (<em>i.e.</em> ULONG( x
+) ).</p>
+<p>o Do not declare protected member data (use private data and access
+member functions).</p>
+<h2 id="debugging-support">8.3 Debugging Support</h2>
+<p>Debug code is enabled by the compiler symbol <em>DBG</em>. Debug code
+should not be defined within the body of non‑debug code. Instead a macro
+should be defined which conditionally compiles to a, possibly inlined,
+function call. For example (from <em>ulibdef.hxx</em>),</p>
+<p>#if defined( DBG )<br />
+#define DebugAssert( b ) DbgAssert( b )<br />
+#else<br />
+#define DbgAssert<br />
+#endif // DBG</p>
+<p>Programmers should use the symbol <em>REGISTER</em> instead of the
+C++ storage specifier, <em>register</em>. This will disable register
+storage when <em>DBG</em> is enabled.</p>
+<p>The macro, <em>INLINE_INCLUDE</em>, should be used to conditionally
+(depending on <em>DBG</em>) include (or compile) inline functions. See
+for an example. Note that usage of this macro will cause the
+<em>DBG</em> symbol to effect the list of source files to be compiled.
+This macro will make tracing and stepping of inline functions
+easier.</p>
+<h1 id="appendix-a-example-class-example">9. Appendix A ‑ Example :
+Class EXAMPLE</h1>
+<h2 id="ulib.hxx-1">9.1 Ulib.hxx</h2>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+ulib.hxx<br />
+<br />
+Abstract:<br />
+<br />
+Master include file for the ULIB class hierarchy.<br />
+<br />
+Author:<br />
+<br />
+David J. Gilman (davegi) 19-Oct-1990<br />
+<br />
+Environment:<br />
+<br />
+ULIB<br />
+<br />
+Notes:<br />
+<br />
+Revision History:<br />
+<br />
+--*/<br />
+<br />
+#include "ulibdef.hxx"<br />
+#include "object.hxx"<br />
+.<br />
+.<br />
+.<br />
+#if defined( _EXAMPLE_ )<br />
+<br />
+//<br />
+// <em>include files that the EXAMPLE class <u>definition</u> (not<br />
+</em>// <em>implementation) is dependent upon</em><br />
+//<br />
+<br />
+#include "example.hxx"<br />
+<br />
+#endif // _EXAMPLE_</p>
+<h2 id="example.hxx">9.2 Example.hxx</h2>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+example.hxx<br />
+<br />
+Abstract:<br />
+<br />
+Definition for class EXAMPLE.<br />
+<br />
+Author:<br />
+<br />
+David J. Gilman (davegi) 19-Oct-1990<br />
+<br />
+Environment:<br />
+<br />
+ULIB<br />
+<br />
+Notes:<br />
+<br />
+Revision History:<br />
+<br />
+--*/<br />
+<br />
+#if ! defined( _EXAMPLE_ )<br />
+#define _EXAMPLE_<br />
+<br />
+typedef class EXAMPLE : public OBJECT {<br />
+<br />
+public:<br />
+<br />
+NONVIRTUAL<br />
+EXAMPLE (<br />
+IN ULONG Value<br />
+);<br />
+<br />
+VIRTUAL<br />
+~EXAMPLE (<br />
+);<br />
+<br />
+VIRTUAL<br />
+ULONG<br />
+SetValue (<br />
+IN ULONG Value<br />
+);<br />
+<br />
+NONVIRTUAL<br />
+ULONG<br />
+QueryValueDoubled (<br />
+) CONST;<br />
+<br />
+private:<br />
+<br />
+ULONG mValue;<br />
+<br />
+} POINTER_AND_REFERENCE_TYPES( EXAMPLE );<br />
+<br />
+INLINE_INCLUDE( example.inl );<br />
+<br />
+#endif // _EXAMPLE_</p>
+<h2 id="examplep.hxx">9.3 Examplep.hxx</h2>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+examplep.hxx<br />
+<br />
+Abstract:<br />
+<br />
+Private header file for class EXAMPLE.<br />
+<br />
+Author:<br />
+<br />
+David J. Gilman (davegi) 19-Oct-1990<br />
+<br />
+Environment:<br />
+<br />
+ULIB<br />
+<br />
+Notes:<br />
+<br />
+Revision History:<br />
+<br />
+--*/<br />
+<br />
+#if ! defined( _EXAMPLE_P )<br />
+#define _EXAMPLE_P<br />
+<br />
+CONST DOUBLEVALUE = 2;<br />
+<br />
+#endif // _EXAMPLE_P</p>
+<h2 id="example.inl">9.4 Example.inl</h2>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+example.inl<br />
+<br />
+Abstract:<br />
+<br />
+Inline functions for class EXAMPLE.<br />
+<br />
+Author:<br />
+<br />
+David J. Gilman (davegi) 19-Oct-1990<br />
+<br />
+Environment:<br />
+<br />
+ULIB<br />
+<br />
+Notes:<br />
+<br />
+Revision History:<br />
+<br />
+--*/<br />
+<br />
+#define _EXAMPLE_<br />
+#include "ulib.hxx"<br />
+<br />
+#include "examplep.hxx"<br />
+<br />
+&lt;form‑feed&gt;<br />
+<br />
+ULONG<br />
+EXAMPLE::QueryValueDoubled (<br />
+) CONST<br />
+<br />
+/*++<br />
+<br />
+Routine Description:<br />
+<br />
+Compute double the value.<br />
+<br />
+Arguments:<br />
+<br />
+None.<br />
+<br />
+Return Value:<br />
+<br />
+ULONG ‑ double the value.<br />
+<br />
+--*/<br />
+<br />
+{<br />
+return( mValue * DOUBLEVALUE );<br />
+}</p>
+<h2 id="example.cxx">9.5 Example.cxx</h2>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+example.cxx<br />
+<br />
+Abstract:<br />
+<br />
+Implementation for class EXAMPLE.<br />
+<br />
+Author:<br />
+<br />
+David J. Gilman (davegi) 19-Oct-1990<br />
+<br />
+Environment:<br />
+<br />
+ULIB<br />
+<br />
+Notes:<br />
+<br />
+Revision History:<br />
+<br />
+--*/<br />
+<br />
+#define _EXAMPLE_<br />
+#include "ulib.hxx"<br />
+<br />
+#include "examplep.hxx"<br />
+<br />
+<br />
+&lt;form‑feed&gt;<br />
+<br />
+EXAMPLE::EXAMPLE (<br />
+ULONG Value<br />
+)<br />
+<br />
+/*++<br />
+<br />
+Routine Description:<br />
+<br />
+Construct an EXAMPLE object.<br />
+<br />
+Arguments:<br />
+<br />
+Value ‑ Initial value for the EXAMPLE object.<br />
+<br />
+Return Value:<br />
+<br />
+None.<br />
+<br />
+--*/<br />
+<br />
+{<br />
+mValue = Value;<br />
+}</p>
+<p>&lt;form‑feed&gt;<br />
+<br />
+EXAMPLE::~EXAMPLE (<br />
+)<br />
+<br />
+/*++<br />
+<br />
+Routine Description:<br />
+<br />
+Destroy an EXAMPLE object.<br />
+<br />
+Arguments:<br />
+<br />
+None.<br />
+<br />
+Return Value:<br />
+<br />
+None.<br />
+<br />
+--*/<br />
+<br />
+{<br />
+DbgPrint( "Example destroying...\n" );;<br />
+}</p>
+<p>&lt;form‑feed&gt;<br />
+<br />
+ULONG<br />
+EXAMPLE::SetValue (<br />
+ULONG Value<br />
+)<br />
+<br />
+/*++<br />
+<br />
+Routine Description:<br />
+<br />
+Set an EXAMPLE's value.<br />
+<br />
+Arguments:<br />
+<br />
+Value ‑ The value to set in EXAMPLE.<br />
+<br />
+Return Value:<br />
+<br />
+ULONG ‑ The set value.<br />
+<br />
+--*/<br />
+<br />
+{<br />
+return( mValue = Value );<br />
+}</p>
+<h2 id="client.cxx">9.6 Client.cxx</h2>
+<blockquote>
+<p>/*++<br />
+<br />
+Copyright (c) 1990 Microsoft Corporation<br />
+<br />
+Module Name:<br />
+<br />
+client.cxx<br />
+<br />
+Abstract:<br />
+<br />
+Sample usage of class EXAMPLE.<br />
+<br />
+Author:<br />
+<br />
+David J. Gilman (davegi) 19-Oct-1990<br />
+<br />
+Environment:<br />
+<br />
+ULIB<br />
+<br />
+Notes:<br />
+<br />
+Revision History:<br />
+<br />
+--*/<br />
+<br />
+extern "C" {<br />
+#include &lt;stdio.h&gt;<br />
+};<br />
+<br />
+#define _EXAMPLE_<br />
+#include "ulib.hxx"</p>
+<p>&lt;form‑feed&gt;<br />
+<br />
+VOID<br />
+main (<br />
+)<br />
+<br />
+/*++<br />
+<br />
+Routine Description:<br />
+<br />
+Constructs and demonstrates usage of an EXAMPLE object.<br />
+<br />
+Arguments:<br />
+<br />
+None.<br />
+<br />
+Return Value:<br />
+<br />
+None.<br />
+<br />
+--*/<br />
+<br />
+EXAMPLE example = 4;<br />
+PEXAMPLE pexample;<br />
+<br />
+pexample = &amp;example;<br />
+<br />
+printf( "Value = %d\n", example.QueryValueDoubled( ) / 2 );<br />
+printf( "Value = %d\n", pexample-&gt;QueryValueDoubled( ) / 2 );<br />
+}</p>
+</blockquote>
+<p><strong><br />
+Revision History</strong></p>
+<p>Revision 1.1, October 29, 1990 ‑ djg</p>
+<p>1. Changed definition of IN argument modifier.</p>
+<p>2. Added IN OUT argument modifier.</p>
+<p>3. Added POINTER_AND_REFERENCE_TYPES macro.</p>
+<p>4. Added STATIC member modifier.</p>
+<p>5. Clarified OPTIONAL versus DEFAULT argument modifiers.</p>
+<p>6. Changed member data prefix from 'm' to '_'.</p>
+<p>7. Added style guidelines for public, private and protected
+sections.</p>
+<p>8. Miscellaneous edits for clarity.</p>
+<p>Revision 1.0, October 18, 1990 ‑ djg</p>
+<p>1. Incorporated comments from stever and loup.</p>
+<p>2. Added reference types.</p>
+<p>3. Fixed formatting errors.</p>
+<p>Original Draft, October 16, 1990 - djg</p>
+<section id="footnotes" class="footnotes footnotes-end-of-document"
+role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>This book is also referred to as the "ANSI Base
+Document".<a href="#fnref1" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>

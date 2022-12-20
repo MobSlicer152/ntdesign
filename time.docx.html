@@ -1,0 +1,227 @@
+<p>This template contains hidden text that describes various features of
+the template. To see the hidden text, get into Options and set `show
+hidden text' to Yes. After you've read the hidden text, you may want to
+delete it. It does no harm to leave it in. <strong>HOWEVER, you must
+either delete this paragraph or make it hidden (Alt-E)!</strong></p>
+<p>Portable Systems Group</p>
+<p>NT OS/2 Time Conversion Specification</p>
+<p><strong>Author:</strong> Gary D. Kimura</p>
+<p>Revision 1.2, August 14, 1990</p>
+<p>Do not remove any of the division marks (:::) in this template. They
+control the basic layout of the document, including the way page numbers
+are printed.</p>
+<p>The text below (".Begin Table C.") is hidden text that is necessary
+for the table of contents to work correctly. Don't delete the hidden
+text, or you'll end up with the TOC at the end of your document.</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Converting From TIME to TIME_FIELDS 2</p>
+<p>3. Converting From TIME_FIELDS to TIME 2</p>
+<p>4. Converting From TIME to OS/2-Based Time 3</p>
+<p>5. Converting From OS/2-Based Time to TIME 3</p>
+<p>6. Converting From TIME to POSIX-Based Time 4</p>
+<p>7. Converting From POSIX-Based Time to TIME 4</p>
+<p>.End Table C.</p>
+<p>Create section headers by using the H1-H4 styles. You make a line a
+header by typing Alt-H-n, where n is 1-4, when the cursor is anywhere
+within the line. You don't need to make the header text bold; the style
+does that for you. You can switch a paragraph back to normal by typing
+either Alt-X-P or Alt-P-S.</p>
+<p>The following text shows how to format various textual elements using
+the SPEC style sheet. You should remove these examples.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes the <strong>NT</strong>
+<strong>OS/2</strong> routines that implement absolute time conversion.
+Time, in <strong>NT</strong> <strong>OS/2</strong>, is expressed as a
+64-bit signed large integer value with 100ns resolution and contained in
+variables of type <strong>TIME</strong>. Absolute times, such as August
+29, 1989 at 11:08:30.245, are expressed as positive values (excluding
+zero), while time intervals (e.g., 1 hour and 20 minutes) are expressed
+as negative values (including zero).</p>
+<p>The routines described in this document deal with absolute time and
+converting from a value of type <strong>TIME</strong> to a structure
+representing year, month, day, hour, minute, second, and millisecond,
+and back again. They do not address the manipulation of time intervals
+or time zones. Time interval manipulation is simply done using large
+integer arithmetic, and the time zone issue is beyond the realm of the
+package.</p>
+<p>Though <strong>NT OS/2</strong> time has a 100ns resolution, the
+routines described here have only a one millisecond resolution. Time
+precision smaller than a millisecond is either ignored or lost by these
+routines.</p>
+<p>The basis for <strong>NT OS/2</strong> time is the beginning of the
+year 1601 AD, which is chosen because 1601 AD is the start of a new
+quadricentury. The algorithms used in this package are based on the
+Gregorian calendar.</p>
+<p>The structure <strong>TIME_FIELDS</strong> is used to represent a
+time value divided into its logical components. The declaration for
+<strong>TIME_FIELDS</strong> is the following:</p>
+<p><strong>typedef</strong> <strong>struct</strong>
+<strong>_TIME_FIELDS</strong> {</p>
+<p><strong>CSHORT</strong> <em>Year</em>;</p>
+<p><strong>CSHORT</strong> <em>Month</em>;</p>
+<p><strong>CSHORT</strong> <em>Day</em>;</p>
+<p><strong>CSHORT</strong> <em>Hour</em>;</p>
+<p><strong>CSHORT</strong> <em>Minute</em>;</p>
+<p><strong>CSHORT</strong> <em>Second</em>;</p>
+<p><strong>CSHORT</strong> <em>Milliseconds</em>;</p>
+<p><strong>CSHORT</strong> <em>Weekday</em>;</p>
+<p>} <strong>TIME_FIELDS</strong>;</p>
+<p>where:</p>
+<p><em>Year</em> - Denotes the year in a range between 1601 AD to around
+30000 AD.</p>
+<p><em>Month</em> - Denotes the month in a range between 1 (January) to
+12 (December).</p>
+<p><em>Day</em> - Denotes the day in the month with a range between 1 to
+either 28, 29, 30, or 31, depending on the month and the year.</p>
+<p><em>Hour</em> - Denotes the hour, on a 24 hour clock, in a range
+between 0 and 23.</p>
+<p><em>Minute</em> - Denotes the minute in a range between 0 and 59.</p>
+<p><em>Second</em> - Denotes the second in a range between 0 to either
+59 or 60, where 60 denotes a leap second.</p>
+<p><em>Milliseconds</em> - Denotes the fraction of a second in a range
+between 0 and 999.</p>
+<p><em>Weekday</em> - Denotes the day of the week represented by the
+rest of the time fields in a range between 0 (Sunday) and 6 (Saturday).
+This field is only used when translating a 64-bit time value into a time
+field structure and not when mapping the other direction.</p>
+<p>In addition to providing routines to convert between
+<strong>TIME</strong> and a <strong>TIME_FIELDS</strong> structure, this
+package also provides routines that convert between
+<strong>TIME</strong> and <strong>OS/2</strong> time and
+<strong>POSIX</strong> time. <strong>OS/2</strong> time is expressed as
+the number of seconds since the start of 1980. <strong>POSIX</strong>
+time is the number of seconds since the start of 1970.</p>
+<p>The <strong>APIs</strong> that implement time conversion are the
+following:</p>
+<p><strong>RtlTimeToTimeFields</strong> - Converts a
+<strong>TIME</strong> value to a <strong>TIME_FIELDS</strong>
+structure.</p>
+<p><strong>RtlTimeFieldsToTime</strong> - Converts a
+<strong>TIME_FIELDS</strong> structure to a <strong>TIME</strong>
+value.</p>
+<p><strong>RtlTimeToSecondsSince1980</strong> - Converts a
+<strong>TIME</strong> value to seconds with a 1980 base.</p>
+<p><strong>RtlSecondsSince1980ToTime</strong> - Converts seconds with a
+1980 base to a <strong>TIME</strong> value.</p>
+<p><strong>RtlTimeToSecondsSince1970</strong> - Converts a
+<strong>TIME</strong> value to seconds with a 1970 base.</p>
+<p><strong>RtlSecondsSince1970ToTime</strong> - Converts seconds with a
+1970 base to a <strong>TIME</strong> value.</p>
+<h1 id="converting-from-time-to-time_fields">2. Converting From TIME to
+TIME_FIELDS</h1>
+<p>A <strong>TIME</strong> value is converted to a corresponding
+<strong>TIME_FIELDS</strong> structure with the
+<strong>RtlTimeToTimeFields</strong> procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>RtlTimeToTimeFields</strong> (</p>
+<p><strong>IN</strong> <strong>PTIME</strong> <em>Time</em>,</p>
+<p><strong>OUT</strong> <strong>PTIME_FIELDS</strong>
+<em>TimeFields</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Time</em> - Supplies the value being converted</p>
+<p><em>TimeFields</em> - A pointer to the variable being set</p>
+<p>The input time can be any non-negative large integer value and is
+interpreted as the number of 100ns tics since the start of 1601 AD. The
+resulting TimeFields variable will never contain a leap second value of
+60.</p>
+<h1 id="converting-from-time_fields-to-time">3. Converting From
+TIME_FIELDS to TIME</h1>
+<p>A <strong>TIME_FIELDS</strong> structure is converted to a
+corresponding <strong>TIME</strong> value with the
+<strong>RtlTimeFieldsToTime</strong> procedure.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>RtlTimeFieldsToTime</strong> (</p>
+<p><strong>IN</strong> <strong>PTIME_FIELDS</strong>
+<em>TimeFields</em>,</p>
+<p><strong>OUT</strong> <strong>PTIME</strong> <em>Time</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>TimeFields</em> - Supplies the time field structure initialized
+by the caller to convert to a time value</p>
+<p><em>Time</em> - A pointer to the variable being set</p>
+<p>The function result is TRUE if the input time fields is well formed
+and is expressible by a time variable and FALSE otherwise.</p>
+<p>The input time must be well formed (i.e., the year must be 1601 or
+later, month must be between 1 and 12, day must be between 1 and the
+maximum day for the given month and year, hour must be between 0 and 23,
+minute must be between 0 and 59, second must be between 0 and 60 where
+the value 60 is only allowed during the last time in a month, and
+milliseconds must be between 0 and 999). The Weekday field is ignored by
+this procedure.</p>
+<h1 id="converting-from-time-to-os2-based-time">4. Converting From TIME
+to OS/2-Based Time</h1>
+<p>A <strong>TIME</strong> value is converted to the corresponding
+number of seconds since the start of 1980 with the
+<strong>RtlTimeToSecondsSince1980</strong> procedure.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>RtlTimeToSecondsSince1980</strong> (</p>
+<p><strong>IN</strong> <strong>PTIME</strong> <em>Time</em>,</p>
+<p><strong>OUT</strong> <strong>PULONG</strong>
+<em>ElapsedSeconds</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Time</em> - Supplies the value being converted, it must represent
+a time between 1980 AD and around 2115 AD</p>
+<p><em>ElapsedSeconds</em> - A pointer to the variable being set</p>
+<p>The function result is TRUE if the input value is within the range
+expressible by the output value [1980 to 2115] and otherwise FALSE.</p>
+<h1 id="converting-from-os2-based-time-to-time">5. Converting From
+OS/2-Based Time to TIME</h1>
+<p>A <strong>ULONG</strong> value representing the number of elapsed
+seconds since the start of 1980 is converted to a corresponding
+<strong>TIME</strong> value with the
+<strong>RtlSecondsSince1980ToTime</strong> procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>RtlSecondsSince1980ToTime</strong> (</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>ElapsedSeconds</em>,</p>
+<p><strong>OUT</strong> <strong>PTIME</strong> <em>Time</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ElapsedSeconds</em> - Supplies the value (i.e., number of seconds
+since the start of 1980) being converted</p>
+<p><em>Time</em> - A pointer to the variable being set</p>
+<h1 id="converting-from-time-to-posix-based-time">6. Converting From
+TIME to POSIX-Based Time</h1>
+<p>A <strong>TIME</strong> value is converted to the corresponding
+number of seconds since the start of 1970 with the
+<strong>RtlTimeToSecondsSince1970</strong> procedure.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>RtlTimeToSecondsSince1970</strong> (</p>
+<p><strong>IN</strong> <strong>PTIME</strong> <em>Time</em>,</p>
+<p><strong>OUT</strong> <strong>PULONG</strong>
+<em>ElapsedSeconds</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Time</em> - Supplies the value being converted, it must represent
+a time between 1970 AD and around 2105 AD</p>
+<p><em>ElapsedSeconds</em> - A pointer to the variable being set</p>
+<p>The function result is TRUE if the input value is within the range
+expressible by the output value [1970 to 2105] and otherwise FALSE.</p>
+<h1 id="converting-from-posix-based-time-to-time">7. Converting From
+POSIX-Based Time to TIME</h1>
+<p>A <strong>ULONG</strong> value representing the number of elapsed
+seconds since the start of 1970 is converted to a corresponding
+<strong>TIME</strong> value with the
+<strong>RtlSecondsSince1970ToTime</strong> procedure.</p>
+<p><strong>VOID</strong></p>
+<p><strong>RtlSecondsSince1970ToTime</strong> (</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>ElapsedSeconds</em>,</p>
+<p><strong>OUT</strong> <strong>PTIME</strong> <em>Time</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ElapsedSeconds</em> - Supplies the value (i.e., number of seconds
+since the start of 1970) being converted</p>
+<p><em>Time</em> - A pointer to the variable being set</p>
+<p><strong>Revision</strong> <strong>History:</strong></p>
+<p>Original Draft 1.0, August 29, 1989</p>
+<p>Revision 1.1, January 4, 1990</p>
+<p>1. Included zero time as an interval time.</p>
+<p>2. Make 60 a valid value in the second field of the TIME_FIELDS
+structure to handle leap seconds.</p>
+<p>Revision 1.2, August 14, 1990</p>
+<p>1. Fix procedure prototype for RtlTimeFieldsToTime to return a
+BOOLEAN result.</p>

@@ -1,0 +1,1105 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Exception Handling Specification</p>
+<p><strong>Author:</strong> David N. Cutler</p>
+<p>Original Draft 1.0, May 22, 1989</p>
+<p>Revision 1.1, June 2, 1989</p>
+<p>Revision 1.2, June 6, 1989</p>
+<p>Revision 1.3, August, 4, 1989</p>
+<p>Revision 1.4, August, 15, 1989</p>
+<p>Revision 1.5, November 7, 1989</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Goals 1</p>
+<p>3. Exception Architecture 2</p>
+<p>3.1 Frame-Based Exception Handlers 2</p>
+<p>3.2 Exception Dispatching 3</p>
+<p>3.3 Exception Handling and Unwind 4</p>
+<p>3.4 Exception Record 4</p>
+<p>3.5 Exception Context 6</p>
+<p>4. Hardware-Defined Exceptions 7</p>
+<p>4.1 Access Violation 8</p>
+<p>4.2 Breakpoint 8</p>
+<p>4.3 Data-Type Misalignment 8</p>
+<p>4.4 Floating Divide By Zero 8</p>
+<p>4.5 Floating Overflow 9</p>
+<p>4.6 Floating Underflow 9</p>
+<p>4.7 Floating Reserved Operand 9</p>
+<p>4.8 Illegal Instruction 9</p>
+<p>4.9 Privileged Instruction 9</p>
+<p>4.10 Invalid Lock Sequence 10</p>
+<p>4.11 Integer Divide By Zero 10</p>
+<p>4.12 Integer Overflow 10</p>
+<p>4.13 Single Step 10</p>
+<p>5. Windows NT Software-Defined Exceptions 11</p>
+<p>5.1 Guard Page Violation 11</p>
+<p>5.2 Page Read Error 11</p>
+<p>5.3 Paging File Quota Exceeded 11</p>
+<p>6. Standard Exception Handling 11</p>
+<p>6.1 Alignment Faults 12</p>
+<p>6.2 IEEE Floating Faults 12</p>
+<p>7. Exception Handling Interfaces 12</p>
+<p>7.1 Exception Dispatcher 12</p>
+<p>7.2 Exception Handler 13</p>
+<p>7.3 Raise Exception 15</p>
+<p>7.4 Continuing From An Exception 15</p>
+<p>7.5 Unwinding From An Exception 16</p>
+<p>7.6 Last Chance Exception Handling 18</p>
+<p>8. OS/2 2.0 Compatibility 18</p>
+<p>8.1 Windows NT Intel i860 Implementation 19</p>
+<p>8.2 OS/2 2.0 Intel x86 Implementation 19</p>
+<p>8.3 Windows NT Implementation of OS/2 Capabilities 20</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes the exception handling capabilities of
+<strong>Windows NT</strong>. An <em>exception</em> is an event that
+occurs during the execution of a program which requires the execution of
+software outside the normal flow of control.</p>
+<p>Exceptions can result from the execution of certain instruction
+sequences, in which case they are initiated by hardware. Other
+conditions may arise as the result of the execution of a software
+routine (e.g., an invalid parameter value), and are therefore initiated
+explicitly by software.</p>
+<p>When an exception is initiated, a systematic search is performed in
+an attempt to find an <em>exception handler</em> that will dispose of
+(handle) the exception.</p>
+<p>An exception handler is a function written to explicitly deal with
+the possibility that an exception may occur in a certain sequence of
+code.</p>
+<p>Exception handlers are declared in a language-specific syntax and are
+associated with a specific scope of code. The scope may be a block, a
+set of nested blocks, or an entire procedure or function.</p>
+<p><strong>Microsoft</strong> compilers for <strong>Windows NT</strong>
+adhere to a common calling standard which enables exception handlers to
+be <em>established</em> and <em>disestablished</em> in a very efficient
+manner.</p>
+<p>\ The initial hardware target for <strong>Windows NT</strong> is the
+<strong>Intel</strong> <strong>i860</strong>, and therefore, the
+<strong>Microsoft</strong> C compiler for the <strong>i860</strong> will
+be the first compiler that conforms to the required calling standard. As
+<strong>Windows NT</strong> is ported to other architectures, compilers
+will be required to implement a calling standard that is functional
+enough to support the <strong>Windows NT</strong> exception handling
+capabilities. \</p>
+<p>Exception handling capabilities are an integral and pervasive part of
+the <strong>Windows NT</strong> system. They enable a very robust
+implementation of the system software. It is envisioned that ISVs,
+application writers, and third-party compiler writers will see the
+benefits of exception handling capabilities and also use them in a
+pervasive manner.</p>
+<h1 id="goals">2. Goals</h1>
+<p>The goals of the <strong>Windows NT</strong> exception handling
+capabilities are the following:</p>
+<p>o Provide a single mechanism for exception handling that is usable
+across all languages.</p>
+<p>o Provide a single mechanism for the handling of hardware-, as well
+as software-generated exceptions.</p>
+<p>o Provide a single exception handling mechanism that can be used by
+privileged, as well as nonprivileged software.</p>
+<p>o Provide a single mechanism for the handling of exceptions and for
+the capabilities necessary to support sophisticated debuggers.</p>
+<p>o Provide an exception handling architecture with the capabilities
+necessary to emulate the exception handling capabilities of other
+operating systems (e.g. OS/2 and POSIX).</p>
+<p>o Provide an exception handling mechanism that is portable and which
+separates machine-dependent from machine-independent information.</p>
+<p>o Provide an exception handling mechanism that supports the
+structured exception handling extensions being proposed by
+<strong>Microsoft</strong> for the C language (see Structured Exception
+Handling in C by Don MacLaren, May 10, 1989).</p>
+<h1 id="exception-architecture">3. Exception Architecture</h1>
+<p>The overall exception architecture of <strong>Windows NT</strong>
+encompasses the process creation primitives, system service emulation
+subsystems, the <strong>Microsoft</strong> calling standard(s), and
+system routines that raise, dispatch, and unwind exceptions.</p>
+<p>Two optional exception ports may be specified when a process is
+created. These ports are called the debugger port and the system service
+emulation subsystem port.</p>
+<p>When an exception is initiated, an attempt is made to send a message
+to the recipient process's debugger port. If there is no debugger port,
+or the associated debugger does not handle the exception, then a search
+of the current thread's call frames is conducted in an attempt to locate
+an exception handler. If no frame-based handler can be found, or none of
+the frame-based handlers handle the exception, then another attempt is
+made to send a message to the recipient process's debugger port. If
+there is no debugger port, or the associated debugger does not handle
+the exception, then an attempt is made to send a message to the
+recipient process's system service emulation subsystem port. If there is
+no subsystem port, or the subsystem does not handle the exception, then
+the system provides default handling based on the exception type.</p>
+<p>Thus the search hierarchy is:</p>
+<p>1. Debugger first chance</p>
+<p>2. Frame-based handlers</p>
+<p>3. Debugger second chance</p>
+<p>4. Emulation subsystem</p>
+<p>The purpose of this architecture is to provide a very robust
+exception architecture, while at the same time allow for the emulation
+of the exception handling capabilites of various operating system
+environments (e.g., OS/2 2.0 exception handling, POSIX signals,
+etc.).</p>
+<p>Throughout this document, explanations concerning the implementation
+of the <strong>Windows NT</strong> exception architecture are given
+referring to the <strong>Intel</strong> <strong>i860</strong>. It should
+not be inferred that the described implementation is the only possible
+implementation, and in fact, the actual implementation on other hardware
+architectures may be different.</p>
+<h2 id="frame-based-exception-handlers">3.1 Frame-Based Exception
+Handlers</h2>
+<p>An exception handler can be associated with each call frame in the
+procedure call hierarchy of a program. This requires that each procedure
+or function that either saves nonvolatile registers or establishes an
+associated exception handler, have a call frame.</p>
+<p><strong>Microsoft</strong> compilers for <strong>Windows NT</strong>
+adhere to a standard calling convention for the construction of a call
+frame. A call frame for the <strong>Intel</strong> <strong>i860</strong>
+contains the following:</p>
+<p>1. A register save mask that describes the nonvolatile registers
+saved in the frame. These registers are saved in a standard place
+relative to the frame pointer.</p>
+<p>2. Two flags that specify whether an extended register save mask
+and/or exception handler address is present in the frame.</p>
+<p>3. An optional extended register save mask that describes the
+volatile registers saved in the frame. These registers are saved in a
+standard place relative to the frame pointer.</p>
+<p>4. An optional address of an exception handler that is associated
+with the frame.</p>
+<p>Call frames for other architectures contain similar information. The
+exact details of the call frame layout are described in the
+<strong>Microsoft Windows NT</strong> calling standard(s).</p>
+<h2 id="exception-dispatching">3.2 Exception Dispatching</h2>
+<p>When a hardware exception occurs, the <strong>Windows NT</strong>
+trap handling software gets control and saves the hardware state of the
+current thread in a <em>context record</em>. The reason for the trap is
+determined, and an <em>exception record</em> is constructed which
+describes the exception and any pertinent parameters. Executive software
+is then called to dispatch the exception.</p>
+<p>If the previous processor mode was kernel, then the exception
+dispatcher is called to search the kernel stack call frames in an
+attempt to locate an exception handler. If a frame-based handler cannot
+be located, or no frame-based handler handles the exception, then
+<strong>KeBugCheck</strong> is called to shut down system operation.
+Unhandled exceptions emanating from within privileged software are
+considered fatal bugs.</p>
+<p>If the previous processor mode was user, then an attempt is made to
+send a message to the associated debugger port. This message includes
+the exception record and the identification of the client thread. The
+debugger may handle the exception (e.g., breakpoint or single step) and
+modify the thread state as appropriate, or not handle the exception and
+defer to any frame-based exception handlers found on the user stack.</p>
+<p>If the debugger replies that it has handled the exception, then the
+machine state is restored and thread execution is continued. Otherwise,
+if the debugger replies that it has not handled the exception, or there
+is no debugger port, then executive software must prepare to execute the
+exception dispatcher in user mode.</p>
+<p>If the debugger does not dispose of the exception, then stack space
+is allocated on the user stack, and both the exception record and the
+context record are moved to the user stack. The machine state of the
+thread is modified such that thread execution will resume in code that
+is part of the executive, but it executes in user mode.</p>
+<p>The machine state is restored and execution of the thread is resumed
+in user mode within executive code that calls the exception dispatcher
+to search the user stack for an exception handler. If a frame-based
+handler handles the exception, then thread execution is continued.
+Otherwise, if no frame-based handler is found, or no frame-based handler
+handles the exception, then the <strong>NtLastChance</strong> system
+service is executed.</p>
+<p>The purpose of the <strong>NtLastChance</strong> system service is to
+provide the debugger a second chance to handle the exception and to
+provide the system service emulation subsystem associated with the
+thread's process, if any, a chance to perform any subsystem-specific
+exception processing. A second attempt is made to send a message to the
+associated debugger port. This message includes the exception record and
+the identification of the client thread. The debugger may handle the
+exception (e.g., query the user and receive a disposition) and modify
+the thread state as appropriate, or not handle the exception and defer
+to the system service emulation subsystem associated with the thread's
+process.</p>
+<p>If the debugger replies that it has handled the exception, then the
+machine state is restored and thread execution is continued. Otherwise,
+if the debugger replies that it has not handled the exception, or there
+is no debugger port, then an attempt is made to send a message to the
+associated subsystem. This message includes the exception record and the
+identification of the client thread. The subsystem may handle the
+exception and modify the thread state as appropriate, or not handle the
+exception and defer to any default handling supplied by the
+executive.</p>
+<p>If the subsystem replies that it has handled the exception, then the
+machine state is restored and thread execution is continued. Otherwise,
+the executive provides default handling of the exception, which is most
+cases causes the thread to be terminated.</p>
+<h2 id="exception-handling-and-unwind">3.3 Exception Handling and
+Unwind</h2>
+<p>During the dispatching of an exception, each frame-based handler is
+called specifying the associated exception and context records as
+parameters. The exception handler can handle the exception and continue
+execution, not handle the exception and continue the search for an
+exception handler, or handle the exception and initiate an unwind
+operation.</p>
+<p>Handling an exception may be as simple as noting an error and setting
+a flag that will be examined later, printing a warning or error message,
+or taking some other overt action. If execution can be continued, then
+it may be necessary to change the machine state by modifying the context
+record (e.g., advance the continuation instruction address).</p>
+<p>If execution can be continued, then the exception handler returns to
+the exception dispatcher with a status code that specifies that
+execution should be continued. Continuing execution causes the exception
+dispatcher to stop its search for an exception handler. The machine
+state from the context record is restored and execution is continued
+accordingly.</p>
+<p>If execution of the thread cannot be continued, then the exception
+handler usually initiates an unwind operation by calling a
+system-supplied function specifying a target call frame and a
+continuation address. The unwind function walks the stack backwards
+searching for the target call frame. As it walks the stack, the unwind
+function calls each exception handler that is encountered to allow it to
+perform any cleanup actions that may be necessary (e.g., release a
+semaphore, etc.). When the target call frame is reached, the machine
+state is restored and execution is continued at the specified
+address.</p>
+<h2 id="exception-record">3.4 Exception Record</h2>
+<p>An <em>exception record</em> describes an exception and its
+associated parameters. The same structure is used for both hardware-,
+and software-generated exceptions.</p>
+<p>An exception record has the following structure:</p>
+<p><strong><u>Exception Record Structure</u></strong></p>
+<p><strong>NTSTATUS</strong> <em>ExceptionCode</em> - The status code
+that specifies the reason for the exception.</p>
+<p><strong>ULONG</strong> <em>ExceptionFlags</em> - A set of flags that
+describes attributes of the exception.</p>
+<p>Exception Flags</p>
+<p><em>EXCEPTION_NONCONTINUABLE</em> - The exception is not continuable,
+and any attempt to continue will cause the exception
+<strong>STATUS_NONCONTINUABLE_EXCEPTION</strong> to be raised.</p>
+<p><em>EXCEPTION_UNWINDING</em> - The exception record describes an
+exception for which an unwind is in progress.</p>
+<p><em>EXCEPTION_EXIT_UNWIND</em> - The exception record describes an
+exception for which an exit unwind is in progress.</p>
+<p><em>EXCEPTION_STACK_INVALID</em> - The user stack was not within the
+limits specified by the Thread Environment Block (<strong>TEB</strong>)
+when the exception was raised in user mode. Alternately, during the
+trace backwards through the call frames on the user (or kernel) stack, a
+call frame was encountered that was not within the stack limits
+specified by the <strong>TEB</strong> (or within the kernel stack
+limits), or a call frame was encountered that was unaligned.</p>
+<p><em>EXCEPTION_NESTED_CALL</em> - The exception record describes an
+exception that was raised while the current exception handler was
+active, i.e., a nested exception is in progress and the current handler
+was also called to handle the previous exception.</p>
+<p><strong>PEXCEPTION_RECORD</strong> <em>ExceptionRecord</em> - An
+optional pointer to an associated exception record. Exception records
+can be chained together to provide additional information when nested
+exceptions are raised.</p>
+<p><strong>PVOID</strong> <em>ExceptionAddress</em> - The instruction
+address at which the hardware exception occurred or the address from
+which the software exception was raised.</p>
+<p><strong>ULONG</strong> <em>NumberParameters</em> - The number of
+additional parameters that further describe the exception and
+immediately follow this parameter in the exception record.</p>
+<p><strong>ULONG</strong>
+<em>ExceptionInformation[NumberParameters]</em> - Additional information
+that describes the exception.</p>
+<p>The <em>EXCEPTION_NONCONTINUABLE</em> bit in the exception flags
+field is the only flag that can be set by the user. The remaining flags
+are set by system supplied software as the result of dispatching an
+exception or the unwinding of call frames.</p>
+<h2 id="exception-context">3.5 Exception Context</h2>
+<p>A <em>context record</em> describes the machine state at the time an
+exception occurred. This record is hardware architecture dependent and
+is not portable. Therefore, in general, software should not use the
+information contained is this record. Hardware-architecture-dependent
+code such as math libraries, however, can make use of this information
+to optimize certain operations.</p>
+<p>For a hardware-initiated exception, the context record contains the
+complete machine state at the time of the exception. For a
+software-initiated exception, the context record contains the machine
+state at the time the exception was raised by software.</p>
+<p>The context record is constructed so that it has an identical format
+to the call frames generated by the <strong>Microsoft</strong> compilers
+for the <strong>Intel i860</strong>. The context record for the
+<strong>Intel</strong> <strong>i860</strong> has the following
+structure:</p>
+<p><strong><u>Context Record Structure</u></strong></p>
+<p><strong>ULONG</strong> <em>ContextFlags</em> - A set of flags that
+describes which sections of the context record contain valid
+information.</p>
+<p>Context Flags</p>
+<p><em>CONTEXT_CONTROL</em> - The <em>Psr</em>, <em>Epsr</em>,
+<em>Fir</em>, <em>IntR1</em>, <em>IntFp</em>, and <em>IntSp</em> fields
+of the context record are valid.</p>
+<p><em>CONTROL_FLOATING_POINT</em> - The <em>FltF2...FltF31</em> and
+<em>Fsr</em> fields of the context record are valid.</p>
+<p><em>CONTEXT_INTEGER</em> - The <em>IntR4...IntR31</em> fields of the
+context record are valid.</p>
+<p><em>CONTEXT_PIPELINE</em> - The <em>AddStageX</em>,
+<em>MulStageX</em>, <em>FldStageX</em>, <em>IntResult</em>, <em>Kr</em>,
+<em>Ki</em>, <em>Merge</em>, <em>T</em>, <em>Fsr1, Fsr2</em>, <em>and
+Fsr3</em> fields of the context record are valid.</p>
+<p><strong>ULONG</strong> <em>Fsr</em> - The contents of the floating
+point status register (FSR) at the time of the exception.</p>
+<p><strong>UQUAD</strong> <em>AddStage1</em>, <em>AddStage2</em>,
+<em>AddStage3</em> - Stages 1 - 3 of the floating point addition
+pipeline.</p>
+<p><strong>UQUAD</strong> <em>MulStage1</em>, <em>MulStage2</em>,
+<em>MulStage3</em> - Stages 1 - 3 of the floating point multiplication
+pipeline.</p>
+<p><strong>UQUAD</strong> <em>FldStage1</em>, <em>FldStage2</em>,
+<em>FldStage3</em> - Stages 1 - 3 of the floating point load
+pipeline.</p>
+<p><strong>UQUAD</strong> <em>IntResult</em> - The integer result of the
+graphics pipeline.</p>
+<p><strong>UQUAD</strong> <em>Kr</em> - The contents of the
+<strong>KR</strong> register.</p>
+<p><strong>UQUAD</strong> <em>Ki</em> - The contents of the
+<strong>KI</strong> register.</p>
+<p><strong>UQUAD</strong> <em>Merge</em> - The contents of the
+<strong>MERGE</strong> register.</p>
+<p><strong>UQUAD</strong> <em>T</em> - The contents of the
+<strong>T</strong> register.</p>
+<p><strong>ULONG</strong> <em>Fir</em> - The continuation instruction
+pointer.</p>
+<p><strong>ULONG</strong> <em>Fsr1</em>, <em>Fsr2</em>, <em>Fsr3</em> -
+The contents of the floating status register (FSR) for stages 1 - 3 of
+the pipeline.</p>
+<p><strong>ULONG</strong> <em>IntR4...IntR31</em> - The contents of the
+integer registers <strong>r4</strong> - <strong>r31</strong>.</p>
+<p><strong>UQUAD</strong> <em>FltF2...FltF31</em> - The contents of the
+floating point registers <strong>f2</strong> - <strong>f31</strong>.</p>
+<p><strong>ULONG</strong> <em>IntSp</em> - The contents of the stack
+pointer at the time of the exception.</p>
+<p><strong>ULONG</strong> <em>ExtendedSaveMask</em> - The extended
+register save mask that specifies that register <em>Int16...IntR31</em>
+are saved in the record.</p>
+<p><strong>ULONG</strong> <em>Handler</em> - The address of the
+associated exception handler.</p>
+<p><strong>ULONG</strong> <em>RegisterSaveMask</em> - The standard
+register save mask that specifies that registers <em>IntR4...IntR15</em>
+and <em>FltF2...FltF31</em> are saved in the record.</p>
+<p><strong>ULONG</strong> <em>IntFp</em> - The contents of the frame
+pointer at the time of the exception.</p>
+<p><strong>ULONG</strong> <em>IntR1</em> - The contents of the register
+<strong>R1</strong> (return address) at the time of the exception.</p>
+<p><strong>ULONG</strong> - <em>Psr</em> - The processor status (PSR) at
+the time of the exception.</p>
+<p><strong>ULONG</strong> - <em>Epsr</em> - The extended processor
+status (EPSR) at the time of the exception.</p>
+<h1 id="hardware-defined-exceptions">4. Hardware-Defined Exceptions</h1>
+<p>Hardware-defined exceptions are initiated by the executive when a
+particular kind of fault condition is encountered as the result of
+instruction execution, e.g., an integer overflow. System software
+collects the information necessary to initiate the exception and then
+calls a routine that routes the exception to the appropriate exception
+handler.</p>
+<p>The following sections describe the various hardware-defined
+exceptions in a machine-independent format. For each exception, the
+exception status code and any additional parameters are specified. These
+values are placed in the exception record when the particular type of
+exception is generated. In addition, any pertinent
+<strong>Intel</strong> <strong>i860</strong>-dependent information is
+also provided.</p>
+<p>Not all hardware architectures generate all the various exceptions
+that are defined. Each port of <strong>Windows NT</strong> to a new
+hardware architecture requires a mapping of the hardware-defined
+exceptions onto the machine-independent format given below.</p>
+<p>\ The following sections must be carefully examined to ensure that
+they represent a machine-independent description for x86, as well as
+<strong>i860</strong>, exceptions. \</p>
+<h2 id="access-violation">4.1 Access Violation</h2>
+<p>An access violation exception is generated when an attempt is made to
+load or store data from/to a location that is not accessible to the
+current process, or when an attempt is made to execute an instruction
+that is not accessibile to the current process.</p>
+<p>Exception Code: <strong>STATUS_ACCESS_VIOLATION</strong></p>
+<p>Additional Parameters: 2</p>
+<p>Read/Write - A value of zero signifies a read; a value of one
+signifies a write.</p>
+<p>Virtual Address - The virtual address of the data that is not
+accessible.</p>
+<h2 id="breakpoint">4.2 Breakpoint</h2>
+<p>A breakpoint exception occurs when a breakpoint instruction is
+executed, or a hardware-defined breakpoint is encountered (e.g. an
+address in a breakpoint register). This exception is intended for use by
+debuggers.</p>
+<p>Exception Code: <strong>STATUS_BREAKPOINT</strong></p>
+<p>Additional Parameters: 1</p>
+<p>Read/Write - A value of zero signifies a read; a value of one
+signifies a write.</p>
+<p><strong>i860</strong> Implementation: The execution of a <strong>TRAP
+r30,r29,r0</strong> instruction, or a match with the address in the
+breakpoint register causes a breakpoint exception on the
+<strong>Intel</strong> <strong>i860</strong>.</p>
+<h2 id="data-type-misalignment">4.3 Data-Type Misalignment</h2>
+<p>A data-type misalignment exception is generated when an attempt is
+made to load or store data from/to an address that is not naturally
+aligned, on a hardware architecture that does not provide alignment
+hardware. For example, 16-bit entities must be aligned on two-byte
+boundaries, 32-bit entities must be aligned on four-byte boundaries,
+etc.</p>
+<p>Exception Code: <strong>STATUS_DATATYPE_MISALIGNMENT</strong></p>
+<p>Additional Parameters: 3</p>
+<p>Read/Write - A value of zero signifies a read; a value of one
+signifies a write.</p>
+<p>Data-type Mask - A data-type mask that specifies how many low-address
+bits must be zero. For example, the data-type mask for a 16-bit entity
+is one, a 32-bit entity three, etc.</p>
+<p>Virtual Address - The virtual address of the misaligned data.</p>
+<h2 id="floating-divide-by-zero">4.4 Floating Divide By Zero</h2>
+<p>A floating divide by zero exception is generated when an attempt is
+made to divide a floating point dividend by a floating point divisor of
+zero.</p>
+<p>Exception Code: <strong>STATUS_FLOATING_DIVIDE_BY_ZERO</strong></p>
+<p>Additional Parameters: None</p>
+<h2 id="floating-overflow">4.5 Floating Overflow</h2>
+<p>A floating overflow exception is generated when the resulting
+exponent of a floating point operation is greater than the magnitude
+allowed for the respective floating point data type.</p>
+<p>Exception code: <strong>STATUS_FLOATING_OVERFLOW</strong></p>
+<p>Additional Parameters: None</p>
+<h2 id="floating-underflow">4.6 Floating Underflow</h2>
+<p>A floating underflow exception is generated when the resulting
+exponent of a floating point operation is less than the magnitude
+provided for the respective floating point data type.</p>
+<p>Exception Code: <strong>STATUS_FLOATING_UNDERFLOW</strong></p>
+<p>Additional Parameters: None</p>
+<h2 id="floating-reserved-operand">4.7 Floating Reserved Operand</h2>
+<p>A floating reserved operand exception is generated when one or more
+of the source operands in a floating point operation have a format that
+is reserved.</p>
+<p>Exception Code: <strong>STATUS_FLOATING_RESERVED_OPERAND</strong></p>
+<p>Additional Parameters: None</p>
+<h2 id="illegal-instruction">4.8 Illegal Instruction</h2>
+<p>An illegal instruction exception is generated when an attempt is made
+to execute an instruction whose operation is not defined for the host
+machine architecture.</p>
+<p>Exception Code: <strong>STATUS_ILLEGAL_INSTRUCTION</strong></p>
+<p>Additional Parameters: None</p>
+<p><strong>i860</strong> Implementation: The execution of a
+<strong>TRAP</strong> instruction other than <strong>TRAP
+r30,r29,r0</strong> or <strong>TRAP r30,r28,r0</strong> or <strong>TRAP
+r30,r27,r0</strong> causes an illegal instruction exception.</p>
+<h2 id="privileged-instruction">4.9 Privileged Instruction</h2>
+<p>A privileged instruction exception is generated when an attempt is
+made to execute an instruction whose operation is not allowed in current
+machine mode (e.g., an attempt to execute an instruction from user mode
+that is only allowed in kernel mode).</p>
+<p>Exception Code: <strong>STATUS_PRIVILEGED_INSTRUCTION</strong></p>
+<p>Additional Parameters: None</p>
+<h2 id="invalid-lock-sequence">4.10 Invalid Lock Sequence</h2>
+<p>An invalid lock sequence exception is generated when an attempt is
+made to execute an operation, within an interlocked section of code,
+such that the sequence is invalid for the host machine architecture.</p>
+<p>Exception Code: <strong>STATUS_INVALID_LOCK_SEQUENCE</strong></p>
+<p>Additional Parameters: None</p>
+<p><strong>i860</strong> Implementation: Exceeding the 32-instruction
+limit within a lock sequence, an attempt to execute a
+<strong>TRAP</strong> instruction within a lock sequence, or an attempt
+to execute an <strong>INTOVR</strong> instruction within a lock sequence
+causes an invalid lock sequence exception.</p>
+<h2 id="integer-divide-by-zero">4.11 Integer Divide By Zero</h2>
+<p>An integer divide-by-zero exception is generated when an attempt is
+made to divide an integer dividend by an integer divisor of zero.</p>
+<p>Exception Code: <strong>STATUS_INTEGER_DIVIDE_BY_ZERO</strong></p>
+<p>Additional Parameters: None</p>
+<h2 id="integer-overflow">4.12 Integer Overflow</h2>
+<p>An integer overflow exception is generated when the result of an
+integer operation causes a carry out of the the most significant bit of
+the result, which is not the same as the carry into of the most
+significant bit of the result. For example, the addition of two positive
+integers that produces a negative result.</p>
+<p>Exception Code: <strong>STATUS_INTEGER_OVERFLOW</strong></p>
+<p>Additional Parameters: None</p>
+<p><strong>i860</strong> Implementation: The execution of an
+<strong>INTOVR</strong> instruction when <strong>OF</strong> set in
+<strong>EPSR</strong> causes an integer overflow exception. The
+<strong>OF</strong> bit in EPSR is cleared prior to initiating this
+exception.</p>
+<h2 id="single-step">4.13 Single Step</h2>
+<p>A single step exception is generated when a trace trap or other
+single instruction execution mechanism signals that one instruction has
+been executed. This exception is intended for use by debuggers.</p>
+<p>Exception Code: <strong>STATUS_SINGLE_STEP</strong></p>
+<p>Additional Parameters: None</p>
+<p><strong>i860</strong> Implementation: The execution of a <strong>TRAP
+r30,r28,r0</strong> instruction causes a single step exception.</p>
+<h1 id="windows-nt-software-defined-exceptions">5. Windows NT
+Software-Defined Exceptions</h1>
+<p><strong>Windows NT</strong> software-defined exceptions are
+explicitly raised by system software when certain conditions are
+encountered, e.g., a page file read error. System software collects the
+information necessary to initiate the exception and then calls a routine
+that routes the exception to the appropriate exception handler.</p>
+<h2 id="guard-page-violation">5.1 Guard Page Violation</h2>
+<p>A guard page violation exception is generated when an attempt is made
+to load or store data from/to a location that is contained within a
+guard page. Memory management software immediately turns the guard page
+into a demand zero page and initiates a guard page violation
+exception.</p>
+<p>Exception Code: <strong>STATUS_GUARD_PAGE_VIOLATION</strong></p>
+<p>Additional Parameters: 2</p>
+<p>Read/Write - A value of zero signifies a read; a value of one
+signifies a write.</p>
+<p>Virtual Address - The virtual address of the data within a guard
+page.</p>
+<h2 id="page-read-error">5.2 Page Read Error</h2>
+<p>A page read error exception is generated when an attempt is made to
+read a page into memory and an I/O error is encountered.</p>
+<p>Exception Code: <strong>STATUS_IN_PAGE_ERROR</strong></p>
+<p>Additional Parameters: 1</p>
+<p>Virtual Address - A virtual address within the page that was being
+read.</p>
+<h2 id="paging-file-quota-exceeded">5.3 Paging File Quota Exceeded</h2>
+<p>A page file quota exceeded exception is generated when an attempt is
+made to commit backing store space for a page that is being removed from
+a process's working set.</p>
+<p>Exception Code: <strong>STATUS_PAGEFILE_QUOTA</strong></p>
+<p>Additional Parameters: 1</p>
+<p>Virtual Address - A virtual address within the page that was being
+read.</p>
+<h1 id="standard-exception-handling">6. Standard Exception Handling</h1>
+<p>Standard exception handling is provided for some exceptions in which
+it is most likely that the user will select the default handling as the
+first resort, rather than wait until all other handlers have been given
+an opportunity to handle the exception. This enables the fault to be
+handled in the most efficient manner.</p>
+<p>This capability is provided in <strong>Windows NT</strong> for
+alignment faults and IEEE floating point faults.</p>
+<h2 id="alignment-faults">6.1 Alignment Faults</h2>
+<p>Standard handling of alignment faults ... TBS</p>
+<h2 id="ieee-floating-faults">6.2 IEEE Floating Faults</h2>
+<p>Standard handling of IEEE faults ... TBS</p>
+<h1 id="exception-handling-interfaces">7. Exception Handling
+Interfaces</h1>
+<p>Several interfaces are supplied by the <strong>Windows NT</strong>
+system to implement the exception handling architecture described above.
+Some of these interfaces are intended for use only by the exception
+handling components themselves, while others are available to user-level
+software. The following subsections describe the exception handling APIs
+that are provided by <strong>Windows NT</strong>.</p>
+<h2 id="exception-dispatcher">7.1 Exception Dispatcher</h2>
+<p>The exception dispatcher is responsible for searching the stack for
+frame-based exception handlers. There is a single exception dispatcher
+and it is responsible for dispatching both hardware-, and
+software-generated exceptions.</p>
+<p>The exception dispatcher can be invoked with the
+<strong>RtlpDispatchException</strong> function:</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>RtlDispatchException</strong> (</p>
+<p><strong>IN PEXCEPTION_RECORD</strong> <em>ExceptionRecord</em>,</p>
+<p><strong>IN PCONTEXT</strong> <em>ContextRecord</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ExceptionRecord</em> - A pointer to an exception record that
+describes the exception, and the parameters of the exception, that has
+been raised.</p>
+<p><em>ContextRecord</em> - A pointer to a context record that describes
+the machine state at the time the exception occurred.</p>
+<p>The exception dispatcher walks backward through the call frame
+hierarchy attempting to find an exception handler that will handle the
+exception. As each handler is encountered, it is called specifying the
+exception record, the context record, the address of the call frame of
+the establisher of the handler, and whether the handler is being called
+recursively or not, as parameters.</p>
+<p>The exception handler may handle the exception or request that the
+scan of call frames be continued. As each step backwards is made in the
+call hierarchy, a check is made to ensure that the previous call frame
+address is within the current thread's stack limits and is aligned. If
+the stack is not within limits or is unaligned, then the
+<em>EXCEPTION_STACK_INVALID</em> flag is set in the exception flags
+field and the <strong>NtLastChance</strong> system service is called to
+finish processing of the exception. Otherwise, the previous frame is
+examined to determine if it specifies an exception handler.</p>
+<p>The exception dispatcher is called by
+<strong>RtlRaiseException</strong> and by the executive code that
+processes hardware-generated exceptions.</p>
+<h2 id="exception-handler">7.2 Exception Handler</h2>
+<p>An exception handler is usually called by the exception dispatcher,
+specifying parameters that describe the exception and the environment in
+which the exception handler was established. Exception handlers,
+however, are also called during an unwind operation and are given a
+chance to clean up data structures, deallocate resources, or do any
+other operations that are necessary to unwind the establisher's call
+frame.</p>
+<p>The <em>EXCEPTION_UNWINDING</em>, <em>EXCEPTION_EXIT_UNWIND</em>, and
+<em>EXCEPTION_NESTED_CALL</em> flags in the exception record determine
+how an exception handler is being called. These flags are set by the
+exception dispatcher and the unwind function. If both the
+<em>EXCEPTION_UNWINDING</em> and <em>EXCEPTION_EXIT_UNWIND</em> flags
+are clear, then the exception handler is being called to handle an
+exception. Otherwise, an unwind operation is in progress, and the
+exception handler is being called to perform any necessary cleanup
+operations. If the exception handler is being called to handle an
+exception, then the <em>EXCEPTION_NESTED_CALL</em> flag determines
+whether a nested exception is in progress (i.e., another exception was
+raised in the containing scope before the previous exception was
+disposed of).</p>
+<p>An exception handler has the following type definition:</p>
+<p><strong>typedef</strong></p>
+<p><strong>EXCEPTION_DISPOSITION</strong></p>
+<p>(<strong>*PEXCEPTION_ROUTINE</strong>) (</p>
+<p><strong>IN</strong> <strong>PEXCEPTION_RECORD</strong>
+<em>ExceptionRecord</em>,</p>
+<p><strong>IN</strong> <strong>PVOID</strong>
+<em>EstablisherFrame</em>,</p>
+<p><strong>IN</strong> <strong>OUT PCONTEXT</strong>
+<em>ContextRecord</em>,</p>
+<p><strong>IN OUT</strong> <strong>PVOID</strong>
+<em>DispatcherContext</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ExceptionRecord</em> - A pointer to an exception record that
+describes the exception and the parameters of the exception.</p>
+<p><em>EstablisherFrame</em> - A pointer to the call frame of the
+establisher of the exception handler.</p>
+<p><em>ContextRecord</em> - A pointer to a context record that describes
+the machine state at the time the exception occurred.</p>
+<p><em>DispatcherContext</em> - A pointer to a record that receives
+state information on nested exceptions and collided unwinds.</p>
+<p>When an exception handler is called to handle an exception, it has
+several options for how it processes an exception:</p>
+<p>1. It can handle the exception, provide any fixup that is necessary
+by modifying the context record, and then continue execution of the
+program at the point of the exception by returning a disposition value
+of <em>ExceptionContinueExecution</em>.</p>
+<p>2. It can handle the exception, determine that execution cannot be
+continued, and initiate an unwind operation.</p>
+<p>3. It can decide that it cannot handle the exception and return a
+disposition value of <em>ExceptionContinueSearch</em>, which causes the
+exception dispatcher to continue the search for an exception
+handler.</p>
+<p>When an exception handler is called during an unwind operation, it
+also has several options for how it processes the call:</p>
+<p>1. It can perform any necessary cleanup operations and return a
+disposition value of <em>ExceptionContinueSearch</em>.</p>
+<p>2. It can perform any necessary cleanup operations and initiate
+another unwind operation to a different target.</p>
+<p>3. It can restore the machine state from the context record and
+continue execution directly.</p>
+<p>If the exception handler belongs to the exception dispatcher itself,
+then it can also return a disposition value of
+<em>ExceptionNestedException</em> when it is called to handle an
+exception. Likewise, if the exception handler belongs to the unwind
+function, then it can also return a disposition value of
+<em>ExceptionCollidedUnwind</em> when it is called to perform any
+necessary cleanup operations (i.e., an unwind is in progress). For both
+of these cases, the <em>DispatcherContext</em> parameter is used to
+return information to either the exception dispatcher or the unwind
+function. No other exception handler can place information in this
+output parameter.</p>
+<p>If an invalid disposition value is returned by an exception handler,
+then the exception <strong>STATUS_INVALID_DISPOSITION</strong> is raised
+by the exception dispatcher.</p>
+<p>The <em>ContextRecord</em> parameter is intended for use by
+machine-specific code that either restores the machine state during an
+unwind operation, or manipulates the machine state in such a way as to
+fix up an exception. An example of such an exception handler is the
+default IEEE floating point exception handler, which uses the machine
+state information to determine how a floating point exception should
+actually be handled. Another example is the fixup necessary for
+unaligned data references. This type of exception handler is machine
+specific and will generally be supplied by
+<strong>Microsoft</strong>.</p>
+<p>When an exception handler is called to handle an exception, the
+context record contains the machine state at the time of the exception.
+However, when an exception handler is called during an unwind operation,
+the context record contains the machine state of the exception handler's
+establisher.</p>
+<p>When a disposition value of <em>ExceptionContinueExecution</em> is
+returned, the exception dispatcher checks to determine if the exception
+is continuable. If it is not continuable (i.e., the
+<em>EXCEPTION_NONCONTINUABLE</em> flag is set in the exception flags
+field of the exception record), then the exception dispatcher raises the
+exception <strong>STATUS_NONCONTINUABLE_EXCEPTION</strong>. Otherwise,
+the machine state is restored and execution resumes at the point of the
+exception.</p>
+<p>A disposition value of <em>ExceptionContinueSearch</em> causes the
+exception dispatcher or unwind function to continue its scan of call
+frames.</p>
+<p>If the exception handler of the exception dispatcher is encountered
+during the scan for an exception handler, then it returns a disposition
+value of <em>ExceptionNestedException</em> and the address of the call
+frame that established the exception handler most recently called by the
+exception dispatcher. The <em>EXCEPTION_NESTED_CALL</em> flag is set in
+the exception flags field of the exception record for each exception
+handler that is called between the exception dispatcher handler and the
+establisher of the most recently called exception handler. It is the
+responsibility of the individual exception handlers themselves to
+determine if they can be recursively called.</p>
+<p>The exception handler of the unwind function returns a disposition
+value of <em>ExceptionCollidedUnwind</em> and the target frame of the
+current unwind. This information is used to determine the new scope of
+the unwind.</p>
+<h2 id="raise-exception">7.3 Raise Exception</h2>
+<p>A software exception can be raised with the
+<strong>RtlRaiseException</strong> function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>RtlRaiseException</strong> (</p>
+<p><strong>IN</strong> <strong>PEXCEPTION_RECORD</strong>
+<em>ExceptionRecord</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ExceptionRecord</em> - A pointer to an exception record that
+describes the exception, and the parameters of the exception, that is
+raised.</p>
+<p>Raising a software exception captures the machine state of the
+current thread in a context record. The <em>ExceptionAddress</em> field
+of the exception record is set to the caller's return address, and the
+exception dispatcher is then called in an attempt to locate a
+frame-based exception handler to handle the exception. Note that the
+associated debugger, if any, is not given a first chance to handle
+software exceptions.</p>
+<p>If an exception handler returns a disposition value of
+<em>ExceptionContinueExecution</em>, then execution will return to the
+caller of <strong>RtlRaiseException</strong>. If no frame-based
+exception handler disposes of the exception, then
+<strong>NtLastChance</strong> is called to enable the appropriate system
+service emulation subsystem to perform any subsystem-specific
+processing.</p>
+<h2 id="continuing-from-an-exception">7.4 Continuing From An
+Exception</h2>
+<p>Execution of a thread can be continued from the point of an exception
+with the <strong>NtContinue</strong> function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>NtContinue</strong> (</p>
+<p><strong>IN</strong> <strong>PCONTEXT</strong>
+<em>ContextRecord</em>,</p>
+<p><strong>IN BOOLEAN</strong> <em>TestAlert</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ContextRecord</em> - A pointer to a context record that describes
+the machine state that is to be restored.</p>
+<p><em>TestAlert</em> - A boolean value that specifies whether an alert
+should be tested for the previous processor mode. This parameter is used
+for APC processing.</p>
+<p>This function restores the machine state from the specified context
+record and resumes execution of the thread.</p>
+<p>\ Note that such a service would not normally be required. The
+<strong>Intel</strong> <strong>i860</strong> architecture, however, does
+not allow the entire machine state to be completely restored in user
+mode, and therefore, a system service must be called in kernel mode to
+perform this operation. \</p>
+<p>This function is called by the exception dispatcher to continue the
+execution of a thread when an exception handler returns a dispostion
+value of <em>ExecptionContinueExecution</em>.</p>
+<h2 id="unwinding-from-an-exception">7.5 Unwinding From An
+Exception</h2>
+<p>An exception can be unwound with the <strong>RtlUnwind</strong>
+function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>RtlUnwind</strong> (</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>TargetFrame</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>TargetIp</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>PEXCEPTION_RECORD</strong>
+<em>ExceptionRecord</em> <strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>TargetFrame</em> - An optional pointer to the call frame that is
+the target of the unwind. If this parameter is not specified, then the
+<em>EXCEPTION_EXIT_UNWIND</em> flag is set in the exception flags field
+of the exception record.</p>
+<p><em>TargetIp</em> - An optional instruction address that specifies
+the continuation address. This parameter is ignored if the
+<em>TargetFrame</em> parameter is not specified.</p>
+<p><em>ExceptionRecord</em> - An optional pointer to an exception record
+that is used when each exception handler is called during the unwind
+operation.</p>
+<p>This function initiates an unwind of procedure call frames. The
+machine state at the time of the call to <strong>RtlUnwind</strong> is
+captured in a context record, the <em>EXCEPTION_UNWINDING</em> flag is
+set in the exception flags field of the exception record, and the
+<em>EXCEPTION_EXIT_UNWIND</em> flag is also set if the
+<em>TargetFrame</em> parameter is not specified. A backward walk through
+the procedure call frames is then performed to find the target of the
+unwind operation.</p>
+<p>As each call frame is unwound, the machine state of the previous
+frame is computed by restoring any registers stored by the procedure.
+The previous frame is then examined to determine if it has an associated
+exception handler. If the call frame has an exception handler, then it
+is called specifying the exception record, the establisher's frame
+pointer, and the context record that contains the machine state of the
+handler's establisher. The exception handler should perform any cleanup
+operations that are necessary, and continue the unwind operation by
+returning a disposition value of <em>ExceptionContinueSearch</em>,
+initiating another unwind operation, or directly restoring the machine
+state from the context record.</p>
+<p>Note that languages that support a termination model for exception
+handling (e.g., Ada, Modula-3, and the proposed extensions to
+<strong>Microsoft</strong> C) can implement this capability by unwinding
+to the frame of the establisher when a language-specific exception
+handler is invoked during either an unwind operation or during the
+dispatching of an exception.</p>
+<p>There is no return from a call to <strong>RtlUnwind</strong>. Control
+is either transferred to the specified instruction pointer address, or
+<strong>NtLastChance</strong> is called to perform secondary debugger
+processing and/or subsystem-specific default processing at the
+completion of the unwind operation. If <strong>RtlUnwind</strong>
+encounters an error during its processing, it raises another exception
+rather than return control to the caller.</p>
+<p>If the target call frame is reached and an exit unwind is not being
+performed (i.e. the <em>TargetFrame</em> parameter is specified), then
+the computed machine state is restored from the context record and
+control is transfered to the address specified by the <em>TargetIp</em>
+parameter. Note that the stack pointer is not restored making it
+possible to transfer information on the stack. It is the responsibility
+of the code at the target address to reset the stack pointer as
+necessary.</p>
+<p>If an exit unwind is being performed (i.e. the <em>TargetFrame</em>
+parameter is not specified), then all call frames are unwound until the
+base of the stack is reached. <strong>NtLastChance</strong> is then
+called to perform secondary debugger processing and/or
+subsystem-specific processing.</p>
+<p>If the <em>ExceptionRecord</em> parameter is specified, then each
+exception handler encountered during the unwind operation is called
+using the specified record. If this parameter is not specified, then
+<strong>RtlUnwind</strong> constructs an exception record that specifies
+the exception <strong>STATUS_UNWIND</strong>.</p>
+<p>During an unwind operation, it is possible for one unwind to
+<em>collide</em> with a previous unwind. This occurs when the scope of
+the second unwind overlaps the scope of the first unwind.</p>
+<p>There are two cases to consider:</p>
+<p>1. The target frame of the second unwind is a frame that has already
+been unwound by the first unwind.</p>
+<p>2. The target frame of the second unwind occurs earlier in the call
+hierarchy than the target of the first unwind.</p>
+<p>The first case is processed by unwinding call frames for the second
+unwind until the first call frame unwound by the first unwind is
+encountered. The second unwind is then terminated and processing of the
+first unwind is continued at the point where the first unwind was
+interrupted by the second unwind.</p>
+<p>The second case is processed by changing the target of the first
+unwind to that of the second unwind, and then applying the handling that
+is provided for case one.</p>
+<h2 id="last-chance-exception-handling">7.6 Last Chance Exception
+Handling</h2>
+<p>Last chance exception handling can be invoked with the
+<strong>NtLastChance</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtLastChance</strong> (</p>
+<p><strong>IN PEXCEPTION_RECORD</strong> <em>ExceptionRecord</em>,</p>
+<p><strong>IN PCONTEXT</strong> <em>ContextRecord</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ExceptionRecord</em> - A pointer to an exception record that
+describes the exception, and the parameters of the exception, that has
+been raised.</p>
+<p><em>ContextRecord</em> - A pointer to a context record that describes
+the machine state at the time the exception occurred.</p>
+<p>Last chance handling copies the exception and context records onto
+the kernel stack and checks to determine if a system service emulation
+subsystem port is associated with the thread's process. If a subsystem
+port is associated with the thread's process, then a message is sent to
+the port specifying the exception record and the identification of the
+client thread. Otherwise, default handling is provided for the
+exception.</p>
+<p>This function is called by the exception dispatcher to perform
+subsystem and/or default handling for an exception that is not handled
+by any of the frame-based exception handlers. It is not called by any
+other component of the system.</p>
+<p>Normally there is no return from the call to
+<strong>NtLastChance</strong>. However, if the context or exception
+record is not accessible to the calling process, then an access
+violation status is returned.</p>
+<h1 id="os2-2.0-compatibility">8. OS/2 2.0 Compatibility</h1>
+<p>The OS/2 Cruiser project is currently designing a new exception
+handling capability for OS/2 that replaces the current
+<strong>DosSetVec</strong> interface, and which can provide the basis
+for frame-based exception handling.</p>
+<p>It is desirable to be able to directly emulate the proposed exception
+capabilities of OS/2 with the native frame-based exception handling
+provided by <strong>Windows NT</strong>. Furthermore, it is desirable to
+be able to use both the OS/2 style of exception handlers in the same
+program as the <strong>Windows NT</strong> frame-based handlers without
+a conflict arising. Currently this is not possible without further
+refinement of the OS/2 proposal and the introduction of certain
+constraints concerning the establishment and disestablishment of OS/2
+exception handlers. Other problems with the current OS/2 design include
+the visibility of x86 architectural features, which makes the user
+interface nonportable.</p>
+<p>The following changes and restrictions need to be specified:</p>
+<p>1. The machine-dependent state must be separated from the exception
+state in the OS/2 proposal so that portable software can be written that
+makes use of the exception handling capabilities of OS/2 on
+architectures other than the x86.</p>
+<p>2. The exception information included in an exception record for OS/2
+must be specified in such a way as to be portable to architectures other
+than the x86 (i.e., a higher level of abstraction is needed for the
+parameter values).</p>
+<p>3. A restriction must be placed on the establishment and
+disestablishment of OS/2 exception handlers such that they are strictly
+frame based (i.e., an exception handler that is established in a frame
+must be disestablished before leaving the frame).</p>
+<p>4. A restriction must be placed on the use of OS/2 style exception
+handlers in the same frame as <strong>Windows NT</strong> frame-based
+exception handlers.</p>
+<p>5. The semantics of <strong>DosRaiseException</strong> must be
+corrected to return to the call site if a continuation status is
+returned by an exception handler.</p>
+<p>If these changes and restrictions are implemented, then the
+<strong>Windows NT</strong> exception handling capabilities, with slight
+modification, can directly emulate the OS/2 exception handling
+capabilities.</p>
+<h2 id="windows-nt-intel-i860-implementation">8.1 Windows NT Intel i860
+Implementation</h2>
+<p>The <strong>Intel i860 Windows NT</strong> implementation of
+exception handling is frame based. Each call frame has a pointer that is
+dedicated to holding the address of an exception handler for the frame.
+Usually this is a language-supplied handler that provides whatever
+semantics are required to provide exception handling for the language.
+If there is no handler associated with the frame, then a flag is clear
+in the frame to signify that there is no exception handler and the
+dedicated pointer does not contain meaningful information. If the
+handler address is specified as VOID, then there is also no exception
+handler associated with the frame.</p>
+<p>When an exception occurs, or an unwind operation is initiated, a
+backward walk through the call frames is conducted. If a call frame
+contains an exception handler, then it is called with the appropriate
+arguments.</p>
+<p>Establishing an exception handler does not require the allocation of
+any heap storage, or the initialization of any data structure on the
+part of the user. Exception handlers are automatically disestablished
+upon leaving a procedure and deleting its call frame from the stack.</p>
+<p>Unwind does not return to its caller. Rather it unwinds call frames,
+calling exception handlers as appropriate until the target of the unwind
+is reached, and then restores the machine state and transfers control to
+a specified destination instruction address.</p>
+<h2 id="os2-2.0-intel-x86-implementation">8.2 OS/2 2.0 Intel x86
+Implementation</h2>
+<p>The OS/2 implementation of exception handling on the <strong>Intel
+x86</strong> is list based. The head of the list is anchored in the
+Thread Information Block (TIB) of a thread. When an exception handler is
+established, a structure called an exception-handler-structure is
+supplied by the user, and linked into the last in, first out (LIFO) list
+of exception handlers. Disestablishing an exception handler removes the
+appropriate exception-handler-structure from the list.</p>
+<p>The exception-handler-structure contains a link pointer and a pointer
+to the exception handler associated with the structure. The fields of
+the structure are exported to the user who is free to change the address
+of the exception handler while the structure is in the exception
+list.</p>
+<p>When an exception occurs, or an unwind operation is initiated, a
+forward walk through the exception handler list is performed. Each
+handler is called with the appropriate arguments.</p>
+<p>After completing an unwind operation (no unwind is actually done),
+the OS/2 function returns control to the caller, which must perform a
+longjmp() if necessary.</p>
+<p>OS/2 defines the following APIs for exception handling:</p>
+<p>1. <strong>DosSetExceptionHandler</strong>
+(<em>*exception-handler-structure</em>) - This function establishes an
+exception handler by placing the specified exception-handler-structure
+at the front of the exception handler list.</p>
+<p>2. <strong>DosUnsetExceptionHandler</strong>
+(<em>*exception-handler-structure</em>) - This function disestablishes
+an exception handler by removing the specified
+exception-handler-structure from the exception handler list.</p>
+<p>3. <strong>DosRaiseException</strong> (<em>*exception-structure</em>)
+- This function raises a software exception.</p>
+<p>4. <strong>DosUnwindException</strong>
+(<em>*exception-handler-structure</em>) - This function causes exception
+handlers to be called up, including the exception handler specified by
+the exception-handler-structure.</p>
+<h2 id="windows-nt-implementation-of-os2-capabilities">8.3 Windows NT
+Implementation of OS/2 Capabilities</h2>
+<p>In order to directly emulate OS/2 exception handling in
+<strong>Windows NT</strong>, the restrictions and changes described
+above for OS/2 must be made. Assuming these changes are made, the
+following paragraphs describe how <strong>Windows NT</strong> can
+directly emulate the OS/2 capabilities.</p>
+<p>The meaning of the handler address in a call frame is expanded to be
+either a handler address (low-order bit is clear), or a pointer to a
+LIFO list of exception-handler-structures (low-order bit is set). A call
+frame can contain either a list head for OS/2 style exception handlers
+or a pointer to a single exception handler for <strong>Windows
+NT</strong> exceptions.</p>
+<p>The function <strong>DosSetExceptionHandler</strong> inserts an
+exception-handler-structure in the LIFO list of exception handlers
+defined for the current call frame. If there is a Windows
+<strong>NT</strong> exception handler already established for the frame,
+then an attempt to insert an OS/2 style handler causes the exception
+<strong>STATUS_INCOMPATIBLE_EXCEPTION_HANDLER</strong> to be raised.
+Otherwise, the specified exception-handler-structure is inserted at the
+front of the exception handler list and the low-order bit of the
+exception handler address is set.</p>
+<p>The function <strong>DosUnsetExceptionHandler</strong> removes an
+exception-handler-structure from the exception list associated with the
+current frame. If the current frame contains a Windows
+<strong>NT</strong> exception handler, or the specified
+exception-handler-structure is not in the current frame's exception
+handler list, then the exception
+<strong>STATUS_HANDLER_NOT_FOUND</strong> is raised. Otherwise, the
+specified exception-handler-structure is removed from the exception
+handler list of the currrent frame.</p>
+<p>The function <strong>DosRaiseException</strong> reformats the
+exception record that it is passed into the exception record expected by
+<strong>RtlRaiseException</strong>. No other processing is required. If
+an exception handler returns a continuation status, then control returns
+to the caller of <strong>DosRaiseException</strong>.</p>
+<p>The function <strong>DosUnwindException</strong> performs a prescan
+of call frames in an attempt to locate the specified
+exception-handler-structure. The prescan is performed by walking
+backwards through the call frame and examining the exception handler
+list for each frame that contains such a list. If the specified
+exception-handler-structure is not found, then the exception
+<strong>STATUS_HANDLER_NOT_FOUND</strong> is raised. Otherwise,
+<strong>RtlUnwind</strong> is called specifying the address of the
+target frame to unwind to and the address of the
+exception-handler-structure as the continuation instruction address.</p>
+<p>The <strong>Windows NT</strong> exception dispatcher performs a walk
+backwards through the call frames when an exception is raised. If it
+encounters a frame with a handler that has the low-order bit set, it
+knows that this is not really the address of a handler, but rather the
+address of an exception handler list for the frame. It calls each
+handler in the list, one after the other, exactly in the same manner as
+OS/2, thus implementating exactly the exception dispatching semantics of
+OS/2.</p>
+<p>The function <strong>RtlUnwind</strong> also performs a walk
+backwards through the call frames when an unwind operation is initiated.
+This function also recognizes that frames containing a handler with the
+low-order bit set really point to a list of OS/2 style exception
+handlers. If the target of the unwind is a frame that contains an
+exception handler list, then it is known that the continuation address
+is really the address of an exception-handler-structure that is the
+target of the unwind and that control is to be returned to the caller of
+unwind. This implements exactly the same unwind semantics as OS/2.</p>
+<p><strong>Revision History:</strong></p>
+<p>Original Draft 1.0, May 22, 1989</p>
+<p>Revision 1.1, June 2, 1989</p>
+<p>1. Major update to include first draft comments.</p>
+<p>2. Added section on the implementation of OS/2 exception handling on
+top of the <strong>Windows NT</strong> capabilities.</p>
+<p>Revision 1.2, June 6, 1989</p>
+<p>1. Minor corrections of typos.</p>
+<p>2. Deleted parameter to illegal instruction, privileged instruction,
+and invalid lock sequence exceptions to make them more portable.</p>
+<p>3. Changed the type name of the context record to match the
+definition of thread context in the process structure.</p>
+<p>Revision 1.3, August 4, 1989</p>
+<p>1. Changed the exception dispatch sequence to include a second call
+to the debugger just before calling the system service emulation
+subsystem.</p>
+<p>2. Changed the name of the <em>RECURSIVE_CALL</em> flag to
+<em>NESTED_CALL</em>.</p>
+<p>3. Changed the definition of <strong>NtLastChance</strong> so that
+the function returns an access violation status if the exception or
+context record are not accessible to the calling process.</p>
+<p>Revision 1.4, August 15, 1989</p>
+<p>1. Changed names of exception flags to include a leading "EXCEPTION_"
+tag.</p>
+<p>2. Changed field names in the context record to reflect the actual
+implementation which uses the context record as a call frame.</p>
+<p>3. Changed the name of the exception dispatcher to a private internal
+name and added stack limit parameters.</p>
+<p>4. Changed the exception disposition values from manifest constants
+to an enumerated type.</p>
+<p>5. The exception STATUS_INVALID_DISPOSITION is raised if an invalid
+disposition value.</p>
+<p>6. Change name of NtContinueExecution to NtContinue and add a boolean
+parameter to specify whether a test alert should be executed.</p>
+<p>7. The registers f0, f1, and r0 are no longer saved in the context
+record.</p>
+<p>Revision 1.5, November 6, 1989</p>
+<p>1. Delete stack limit arguments from exception dispatcher
+routine.</p>
+<p>2. Change name of collided unwind status code from
+ExceptionNestedUnwind to ExceptionCollidedUnwind.</p>
+<p>3. Change name of exception dispatcher from RtlpDispatchException to
+RtlDispatchException.</p>
+<p>4. Change name of unwind routine from NtUnwind to RtlUnwind.</p>

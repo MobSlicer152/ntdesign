@@ -1,0 +1,1125 @@
+<p><strong>Portable Systems Group</strong><br />
+<br />
+<strong>NT OS/2 Debug Architecture</strong><br />
+<br />
+<strong>Author:</strong> <em>Mark Lucovsky</em><br />
+<br />
+<em>Revision 1.1, May 8, 1990</em><br />
+<em>Original Draft February 15, 1990</em></p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>1.1 Debug Event Flow 1</p>
+<p>2. Debug Architecture Partitioning 2</p>
+<p>2.1 Debug Event Generation 3</p>
+<p>2.1.1 Event Generation Message Formats 3</p>
+<p>2.1.1.1 Exception 4</p>
+<p>2.1.1.2 CreateThread 4</p>
+<p>2.1.1.3 CreateProcess 5</p>
+<p>2.1.1.4 ExitThread 5</p>
+<p>2.1.1.5 ExitProcess 5</p>
+<p>2.1.1.6 MapSection 6</p>
+<p>2.1.1.7 UnMapSection 6</p>
+<p>2.2 Event Propagation 6</p>
+<p>2.2.1 Emulation Subsystem APIs for Event Propagation 7</p>
+<p>2.2.1.1 DbgSsInitialize 7</p>
+<p>2.2.1.2 UiLookupRoutine 8</p>
+<p>2.2.1.3 SubsystemKeyLookupRoutine 8</p>
+<p>2.2.1.4 KmApiMsgFilter 9</p>
+<p>2.2.1.5 DbgSsHandleKmApiMsg 10</p>
+<p>2.2.2 Event Propagation Message Formats 10</p>
+<p>2.2.2.1 Exception 11</p>
+<p>2.2.2.2 CreateThread 11</p>
+<p>2.2.2.3 CreateProcess 11</p>
+<p>2.2.2.4 ExitThread 11</p>
+<p>2.2.2.5 ExitProcess 12</p>
+<p>2.2.2.6 MapSection 12</p>
+<p>2.2.2.7 UnMapSection 12</p>
+<p>2.3 Coordinate Debugger and Debuggee 12</p>
+<p>2.3.1 Dbg Server Data Structures 12</p>
+<p>2.3.1.1 Subsystem Structure 12</p>
+<p>2.3.1.2 User Interface Structure 13</p>
+<p>2.3.1.3 Application Process Structure 14</p>
+<p>2.3.1.4 Application Thread Structure 15</p>
+<p>2.3.2 Dbg Server Responses to Debug Event Propagation 16</p>
+<p>2.3.2.1 Exception 16</p>
+<p>2.3.2.2 CreateThread 16</p>
+<p>2.3.2.3 CreateProcess 17</p>
+<p>2.3.2.4 ExitThread 17</p>
+<p>2.3.2.5 ExitProcess 18</p>
+<p>2.3.2.6 MapSection 18</p>
+<p>2.3.2.7 UnMapSection 18</p>
+<p>2.4 User Interface Interactions with the Dbg Server 18</p>
+<p>2.4.1 DbgUiConnectToDbg 19</p>
+<p>2.4.2 DbgUiWaitStateChange 19</p>
+<p>2.4.2.1 State Change Record 20</p>
+<p>2.4.2.1.1 DbgCreateThreadStateChange 20</p>
+<p>2.4.2.1.2 DbgCreateProcessStateChange 21</p>
+<p>2.4.2.1.3 DbgExitThreadStateChange 22</p>
+<p>2.4.2.1.4 DbgExitProcessStateChange 22</p>
+<p>2.4.2.1.5 DbgExceptionStateChange 22</p>
+<p>2.4.2.1.6 DbgBreakpointStateChange 22</p>
+<p>2.4.2.1.7 DbgSingleStepStateChange 22</p>
+<p>2.4.2.1.8 DbgMapSectionStateChange 23</p>
+<p>2.4.2.1.9 DbgUnMapSectionStateChange 23</p>
+<p>2.4.3 DbgUiContinue 23</p>
+<p>2.4.3.1 DbgExitThreadStateChange 24</p>
+<p>2.4.3.2 DbgExitProcessStateChange 24</p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This specification describes the Debug Architecture found in NT OS/2.
+The Debug Architecture consists of the following:</p>
+<p>o Dbgk executive component. This component is responsible for
+generating debug events and sending a message through a processes debug
+port when a debug event for the process occurs.</p>
+<p>o The debugger user interface (DebugUi) is an application that
+provides the human interface for a debugger. An instance of DebugUi
+exists for each application being debugged.</p>
+<p>o Dbg user-mode subsystem (Dbg server). This component acts as a
+debug event coordinator, ensuring that debug events occuring in a
+process are made available to its controlling DebugUi.</p>
+<p>o DbgSs APIs. This set of APIs allows an Emulation Subsystem to
+participate in the NT OS/2 Debug Architecture. While not required, It is
+expected that Emulation Subsystems pick up debug events coming from the
+Dbgk component, add information to these events, and then forward the
+event to the Dbg subsystem.</p>
+<p>o DbgUi APIs. This set of APIs allow a DebugUi to communicate with
+the Dbg server so that it may receive notification of outstanding debug
+events, and respond to received debug events.</p>
+<h2 id="debug-event-flow">1.1 Debug Event Flow</h2>
+<p>Before going any further, the following example of a debug event
+illustrates the typical interaction between the components listed
+above.</p>
+<p>o The OS/2 subsystem (OS2SS) is controlling an application process.
+The process was started as a debugged process through the
+<strong>SbCreateForeignSession</strong> API. Upon reciept of the process
+by OS2SS, a debug port was assigned to the process using
+<strong>NtSetInformationProcess</strong>. OS2SS owns the processes debug
+port and receives all messages arriving at this port. The application
+process contians a single thread. At some point in the thread's
+lifetime, a reference to inaccessible memory is made. This generates an
+access violation exception triggering a potential debug event.</p>
+<p>o The exception dispatcher in the NT OS/2 executive calls into the
+Dbgk component (at its <strong>DbgkForwardException</strong> entrypoint)
+to report the access violation. Dbgk determines whether or not the
+process has an associated DebugPort. In this case, the process does have
+a DebugPort, so a DBGKM_EXCEPTION message is formatted. All threads
+(except for the current thread) in the process are frozen using
+<strong>KeFreezeThread</strong>. The current thread sends the exception
+message through its DebugPort and awaits a reply.</p>
+<p>o OS2SS receives the exception message. Since the message type stored
+in the message header is LPC_DEBUG_EVENT, OS2SS calls
+<strong>DbgSsHandleKmApiMsg</strong> passing the address of the message.
+<strong>Exception</strong> messages requires no additional information
+from the OS2SS, so the message is forwarded to the Dbg server for
+processing. The message is sent as a datagram so that OS2SS does not
+have to burn a thread while waiting for a reply.</p>
+<p>o The Dbg server receives the exception message. Using the Client Id
+from the the original exception message, Dbg locates an internal
+per-thread data structure. The exception message is captured into this
+data structure. A state change database entry for the application is
+recorded. The DebugUi for the thread is located, and its debug state
+change semaphore is signaled (this semaphore is shared between a DebugUi
+and the Dbg server).</p>
+<p>o At this point in time it is important to note that while three
+threads have participated so far, only one thread remains blocked. The
+blocked thread is the application thread that caused the access
+violation. This thread is waiting for a reply to its original exception
+message.</p>
+<p>o At some point in time, the thread's DebugUi will call the
+<strong>DbgUiWaitStateChange</strong> API. This API waits on the debug
+state change semaphore. When the semaphore becomes signaled, the DebugUi
+formats a DBGUI_WAIT_STATE_CHANGE message and sends the message to the
+Dbg server.</p>
+<p>o Upon receipt of the DBGUI_WAIT_STATE_CHANGE message, the Dbg server
+scans the state change database for the DebugUi. Finding a state change
+record, the Dbg server populates the DBGUI_WAIT_STATE_CHANGE message and
+replies to the DebugUi.</p>
+<p>o The DebugUi returns from its call to
+<strong>DbgUiWaitStateChange</strong>. A state change type of
+<strong>DbgExceptionStateChange</strong> is is returned, along with the
+Client Id of the thread that originally caused the access violation.
+Using this information, the DebugUi can take appropriate action. This
+may include reading and writing the threads registers using
+<strong>NtGetContextThread</strong>/NtSetContextThread or reading and
+writing the processes virtual memory using
+<strong>NtReadVirtualMemory</strong>/NtWriteVirtualMemory.</p>
+<p>o Once the DebugUi is done servicing the access violation, it can
+continue the thread's execution by calling
+<strong>DbgUiContinue</strong>. This API simply formats a DBGUI_CONTINUE
+message and sends it to the Dbg server.</p>
+<p>o Upon receipt of the continue message, the Dbg server locates the
+target thread, assures that it is waiting to be continued, and that an
+appropriate continue status was passed. Dbg server then sends a continue
+datagram to the OS2SS. After this is complete, a reply is generated to
+the DebugUi which is then free to wait for further debug events.</p>
+<p>o Upon receipt of the continue datagram by DbgSs DLL code runing in
+the OS2SS, the continue status is examined and appropriate callouts are
+made. The DLL code then generates a reply to the original
+DBGKM_EXCEPTION message.</p>
+<p>o Upon receipt of this reply, the thread begins executing in the
+DbgKm component. All of the threads in its process are unfrozen and the
+thread returns to the exception dispatcher</p>
+<h1 id="debug-architecture-partitioning">2. Debug Architecture
+Partitioning</h1>
+<p>The NT OS/2 Debug Architecture partitions the work involved in
+debugging into a number of stages.</p>
+<h2 id="debug-event-generation">2.1 Debug Event Generation</h2>
+<p>Debug event generation is done in the Dbgk component of the NT OS/2
+executive. For each debug event, the following occurs:</p>
+<p>o The process in which the debug event is occuring in is located.</p>
+<p>o If the process has a DebugPort, then all threads in the process are
+frozen.</p>
+<p>o A DBGKM_APIMSG is formated to indicate the type of debug event.
+This message is sent through the processes DebugPort using
+<strong>LpcRequestWaitReplyPort</strong>.</p>
+<p>o Upon receipt of the reply, all threads in the process are
+unfrozen.</p>
+<p>Debug events are generated for a number of reasons:</p>
+<p>o <strong>Exception</strong>. When a thread whose process has a
+DebugPort encounters an exception, a debug event is generated.</p>
+<p>o <strong>CreateThread</strong>. When a thread begins executing in a
+process being debugged, a debug event is generated before the thread
+gets a chance to execute in kernel mode.</p>
+<p>o <strong>CreateProcess</strong>. When the first thread in a process
+being debugged begins executing, a debug event is generated before the
+thread gets a chance to execute in kernel mode.</p>
+<p>o <strong>ExitThread</strong>. When a thread exits in a process being
+debugged, a debug event is generated. This occurs as soon as the system
+detects that the thread is exiting and has updated the exit status for
+the thread.</p>
+<p>o <strong>ExitProcess</strong>. When the last thread in a process
+being debugged exits, a debug event is generated. This occurs as soon as
+the the status of the process has been updated. Note that when the last
+thread in a process exits, an exit thread debug event is not
+generated.</p>
+<p>o <strong>MapSection</strong>. When a process being debugged maps a
+view of a section backed by an image file, a debug event is
+generated.</p>
+<p>o <strong>UnMapSection</strong>. When a process being debugged
+un-maps a view of a section backed by an image file, a debug event is
+generated.</p>
+<h3 id="event-generation-message-formats">2.1.1 Event Generation Message
+Formats</h3>
+<p>Event generation messages are always sent in the context of the
+thread reporting the event; therefore, the client id stored in the
+message header can be used to determine the thread reporting the event.
+Event generation messages consist of the following standard header:</p>
+<p>typedef struct <strong>_DBGKM_APIMSG</strong> {</p>
+<p><strong>PORT_MESSAGE</strong> <em>h</em>;</p>
+<p><strong>DBGKM_APINUMBER</strong> <em>ApiNumber</em>;</p>
+<p><strong>NTSTATUS</strong> <em>ReturnedStatus</em>;</p>
+<p><strong>union</strong> <em>u</em>;</p>
+<p>} <strong>DBGKM_APIMSG</strong>, <strong>*PDBGKM_APIMSG</strong>;</p>
+<p><u>DBGKM_APIMSG Structure:</u></p>
+<p><em>h</em> ——Supplies the standard LPC port message. The ClientId
+field of this structure supplies the client id of the thread reporting
+the debug event. The message type field (h.u2.s2.Type) is
+LPC_DEBUG_EVENT.</p>
+<p><em>ApiNumber</em> ——Supplies the <em>ApiNumber</em> for this
+message. The <em>ApiNumber</em> is used to indicate the type of event
+being generated.</p>
+<p><em>ReturnedStatus</em> ——Returns the continuation status for the
+debug event.</p>
+<p><em>u</em> ——Supplies the type specific event information.</p>
+<h4 id="exception">2.1.1.1 Exception</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgKmExceptionApi</strong>, then
+<em>u</em>.Exception supplies a DBGKM_EXCEPTION message. The format of
+this message follows:</p>
+<p>typedef struct <strong>_DBGKM_EXCEPTION</strong> {</p>
+<p><strong>EXCEPTION_RECORD</strong> <em>ExceptionRecord</em>;</p>
+<p><strong>BOOLEAN</strong> <em>FirstChance</em>;</p>
+<p>} <strong>DBGKM_EXCEPTION</strong>,
+<strong>*PDBGKM_EXCEPTION</strong>;</p>
+<p><u>DBGKM_EXCEPTION Structure:</u></p>
+<p><em>ExceptionRecord</em> ——Supplies the exception record describing
+this exception.</p>
+<p><em>FirstChance</em> ——Supplies a variable that if TRUE, indicates
+that this is the first time this debug event is being reported for this
+thread.</p>
+<h4 id="createthread">2.1.1.2 CreateThread</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgKmCreateThreadApi</strong>,
+then <em>u</em>.CreateThread supplies a DBGKM_CREATE_THREAD message. The
+format of this message follows:</p>
+<p>typedef struct <strong>_DBGKM_CREATE_THREAD</strong> {</p>
+<p><strong>ULONG</strong> <em>SubSystemKey</em>;</p>
+<p><strong>PVOID</strong> <em>StartAddress</em>;</p>
+<p>} <strong>DBGKM_CREATE_THREAD</strong>,
+<strong>*PDBGKM_CREATE_THREAD</strong>;</p>
+<p><u>DBGKM_CREATE_THREAD Structure:</u></p>
+<p><em>SubSystemKey</em> ——This field is initialized to 0.</p>
+<p><em>StartAddress</em> ——Supplies the initial starting address for the
+thread. This is really advisory, since anyone with THREAD_SET_CONTEXT
+access to the thread may change this and superseed the value of this
+field.</p>
+<h4 id="createprocess">2.1.1.3 CreateProcess</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgKmCreateProcessApi</strong>,
+then <em>u</em>.CreateProcess supplies a DBGKM_CREATE_PROCESS message.
+The format of this message follows:</p>
+<p>typedef struct <strong>_DBGKM_CREATE_PROCESS</strong> {</p>
+<p><strong>ULONG</strong> <em>SubSystemKey</em>;</p>
+<p><strong>HANDLE</strong> <em>Section</em>;</p>
+<p><strong>DBGKM_CREATE_THREAD</strong> <em>InitialThread</em>;</p>
+<p>} <strong>DBGKM_CREATE_PROCESS</strong>,
+<strong>*PDBGKM_CREATE_PROCESS</strong>;</p>
+<p><u>DBGKM_CREATE_PROCESS Structure:</u></p>
+<p><em>SubSystemKey</em> ——This field is initialized to 0.</p>
+<p><em>Section</em> ——Supplies a handle to the section object that
+describes the initial address space of the process. If this field is
+NULL, then no handle exists. The handle is valid in the sending
+processes handle table.</p>
+<p><em>InitialThread</em> ——Supplies a description of the first thread
+to execute in the process.</p>
+<h4 id="exitthread">2.1.1.4 ExitThread</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgKmExitThreadApi</strong>,
+then <em>u</em>.ExitThread supplies a DBGKM_EXIT_THREAD message. The
+format of this message follows:</p>
+<p>typedef struct <strong>_DBGKM_EXIT_THREAD</strong> {</p>
+<p><strong>NTSTATUS</strong> <em>ExitStatus</em>;</p>
+<p>} <strong>DBGKM_EXIT_THREAD</strong>,
+<strong>*PDBGKM_EXIT_THREAD</strong>;</p>
+<p><u>DBGKM_EXIT_THREAD Structure:</u></p>
+<p><em>ExitStatus</em> ——Supplies the exit status of the exiting
+thread.</p>
+<h4 id="exitprocess">2.1.1.5 ExitProcess</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgKmExitProcessApi</strong>,
+then <em>u</em>.ExitProcess supplies a DBGKM_EXIT_PROCESS message. The
+format of this message follows:</p>
+<p>typedef struct <strong>_DBGKM_EXIT_PROCESS</strong> {</p>
+<p><strong>NTSTATUS</strong> <em>ExitStatus</em>;</p>
+<p>} <strong>DBGKM_EXIT_PROCESS</strong>,
+<strong>*PDBGKM_EXIT_PROCESS</strong>;</p>
+<p><u>DBGKM_EXIT_PROCESS Structure:</u></p>
+<p><em>ExitStatus</em> ——Supplies the exit status of the exiting
+process.</p>
+<h4 id="mapsection">2.1.1.6 MapSection</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgKmMapSectionApi</strong>,
+then <em>u</em>.MapSection supplies a DBGKM_MAP_SECTION message. The
+format of this message follows:</p>
+<p>typedef struct <strong>_DBGKM_MAP_SECTION</strong> {</p>
+<p><strong>HANDLE</strong> <em>SectionHandle</em>;</p>
+<p><strong>PVOID</strong> <em>BaseAddress</em>;</p>
+<p><strong>ULONG</strong> <em>SectionOffset</em>;</p>
+<p><strong>ULONG</strong> <em>ViewSize</em>;</p>
+<p>} <strong>DBGKM_MAP_SECTION</strong>,
+<strong>*PDBGKM_MAP_SECTION</strong>;</p>
+<p><u>DBGKM_MAP_SECTION Structure:</u></p>
+<p><em>SectionHandle</em> ——Supplies a handle to the section mapped by
+the process. The handle is valid in the context of the sending
+process.</p>
+<p><em>BaseAddress</em> ——Supplies the base address of where the section
+is mapped in the processes address space.</p>
+<p><em>SectionOffset</em> ——Supplies the offset in the section where the
+processes mapped view begins.</p>
+<p><em>ViewSize</em> ——Supplies the size of the mapped view.</p>
+<h4 id="unmapsection">2.1.1.7 UnMapSection</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgKmUnMapSectionApi</strong>,
+then <em>u</em>.UnMapSection supplies a DBGKM_UNMAP_SECTION message. The
+format of this message follows:</p>
+<p>typedef struct <strong>_DBGKM_UNMAP_SECTION</strong> {</p>
+<p><strong>PVOID</strong> <em>BaseAddress</em>;</p>
+<p>} <strong>DBGKM_UNMAP_SECTION</strong>,
+<strong>*PDBGKM_UNMAP_SECTION</strong>;</p>
+<p><u>DBGKM_UNMAP_SECTION Structure:</u></p>
+<p><em>BaseAddress</em> ——Supplies the base address of where the section
+being un-mapped is in the processes address space.</p>
+<h2 id="event-propagation">2.2 Event Propagation</h2>
+<p>Event propagation occurs after a a thread receives a debug event
+message on a processes DebugPort. Upon receipt of the message, the
+thread adds any necessary information, and forwards the message to the
+Dbg server.</p>
+<p>Event propagation occurs within an Emulation Subsystem. In order to
+minimize thread blocking in the subsystems, an asynchronous protocol is
+used to propagate debug events. The event propagation protocol occurs as
+follows:</p>
+<p>o The event is generated. The thread generating the event reports the
+event using <strong>LpcRequestWaitReplyPort</strong> against its
+processes DebugPort. The thread remains blocked until a reply is
+received.</p>
+<p>o The subsystem receives the debug event message. After processing
+the message, it determines whether or not to propagate the message to
+the Dbg server. If it does not propagate the message, then it must reply
+to the thread reporting the event.</p>
+<p>o To propagate the message, a copy of the message is made, and is
+sent as a datagram to the Dbg server. After receiving the message, and
+receiving a "continue" from the controlling debugger user interface, the
+Dbg server sends a continue datagram back to the subsystem.</p>
+<p>o A dedicated thread in the subsystem receives the continue datagram,
+locates the associated saved debug event message, and replies to the
+thread reporting the event.</p>
+<h3 id="emulation-subsystem-apis-for-event-propagation">2.2.1 Emulation
+Subsystem APIs for Event Propagation</h3>
+<h4 id="dbgssinitialize">2.2.1.1 DbgSsInitialize</h4>
+<p>An Emulation Subsystem initializes itself so that it can participate
+in the NT OS/2 debug architecture using the following API:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>DbgSsInitialize</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>KmReplyPort</em>,</p>
+<p><strong>IN</strong> <strong>PDBGSS_UI_LOOKUP</strong>
+<em>UiLookUpRoutine</em>,</p>
+<p><strong>IN</strong> <strong>PDBGSS_SUBSYSTEMKEY_LOOKUP</strong>
+<em>SubsystemKeyLookupRoutine</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>PDBGSS_DBGKM_APIMSG_FILTER</strong>
+<em>KmApiMsgFilter</em> <strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>KmReplyPort</em> ——Supplies a handle to the port that the
+subsystem receives DbgKm API messages on.</p>
+<p><em>UiLookupRoutine</em> ——Supplies the address of a function that
+will be called upon receipt of a process creation message. The purpose
+of this function is to identify the client id of the debug user
+interface controlling the process.</p>
+<p><em>SubsystemKeyLookupRoutine</em> ——Supplies the address of a
+function that will be called upon receipt of process creation and thread
+creation messages. The purpose of this function is to allow a subsystem
+to correlate a key value with a given process or thread.</p>
+<p><em>KmApiMsgFilter</em> ——Supplies the address of a function that
+will be called upon receipt of a DbgKm Api message. This function can
+take any action. If it returns any value other than DBG_CONTINUE,
+<strong>DbgSsHandleKmApiMsg</strong> will not process the message. This
+function is called before any other call outs occur.</p>
+<p><u>Return Value:</u></p>
+<p>SUCCESS() ——Initialization complete.</p>
+<p>!SUCCESS() ——Failure occured while connecting to the Dbg server</p>
+<p>This function is called by a subsystem to initialize portions of the
+debug subsystem dll. The main purpose of this function is to set up
+callouts that are needed in order to use
+<strong>DbgSsHandleKmApiMsg</strong>, and to connect to the Dbg
+server.</p>
+<h4 id="uilookuproutine">2.2.1.2 UiLookupRoutine</h4>
+<p>The <em>UiLookupRoutine</em> is called during the propagation of
+create process debug events. Its function is to locate the client id of
+the debugger user interface that controls the process whose creation is
+being reported.</p>
+<p><strong>NTSTATUS</strong></p>
+<p>(<strong>*PDBGSS_UI_LOOKUP</strong>)(</p>
+<p><strong>IN</strong> <strong>PCLIENT_ID</strong>
+<em>AppClientId</em>,</p>
+<p><strong>OUT</strong> <strong>PCLIENT_ID</strong>
+<em>DebugUiClientId</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>AppClientId</em> ——Supplies the client id of the application
+thread reporting the create process debug event.</p>
+<p><em>DebugUiClientId</em> ——Returns the client id of the debugger user
+interface that controls the application process.</p>
+<p><u>Return Value:</u></p>
+<p>STATUS_SUCCESS ——The application is being debugged, and the client id
+of its debugger user interface has been returned.</p>
+<p>!SUCCESS() ——The application is not known as being debugged. The
+create process debug event will not be propagated to the debug server. A
+reply is generated and sent to the thread reporting the debug event.</p>
+<h4 id="subsystemkeylookuproutine">2.2.1.3
+SubsystemKeyLookupRoutine</h4>
+<p>The <em>SubsystemKeyLookupRoutine</em> is called during the
+propagation of create process and create thread debug events. Its
+function is to allow a subsystem to associate a key value with the
+process or thread whose creation is being reported. Examples of this are
+OS/2 might want to associate a TID with each thread, and a PID with each
+process. The subsystem key value is informational only.</p>
+<p><strong>NTSTATUS</strong></p>
+<p>(<strong>*PDBGSS_SUBSYSTEMKEY_LOOKUP</strong>)(</p>
+<p><strong>IN</strong> <strong>PCLIENT_ID</strong>
+<em>AppClientId</em>,</p>
+<p><strong>OUT</strong> <strong>PULONG</strong>
+<em>SubsystemKey</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong> <em>ProcessKey</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>AppClientId</em> ——Supplies the client id of the application
+thread reporting the create process or create thread debug event.</p>
+<p><em>SubsystemKey</em> ——Returns the subsystem key value to associate
+with the new process or thread.</p>
+<p><em>ProcessKey</em> ——Supplies a flag which if TRUE indicates that a
+subsystem key for the process is needed; otherwise, a subsystem key for
+the thread is needed. Note that during the propagation of a create
+process debug event, this function is called twice. It is called once
+with <em>ProcessKey</em> set to TRUE, and once with <em>ProcessKey</em>
+set to FALSE.</p>
+<p><u>Return Value:</u></p>
+<p>STATUS_SUCCESS ——A subsystem key was found and returned.</p>
+<p>!SUCCESS() ——A subsystem key was not located. This does not affect
+the propagation of the create process or create thread debug events. The
+<em>SubSystemKey</em> fields in the propagated messges will remain
+0.</p>
+<h4 id="kmapimsgfilter">2.2.1.4 KmApiMsgFilter</h4>
+<p>The <em>KmApiMsgFilter</em> routine is called prior to debug event
+message propagation. The main purpose of this API is to allow a
+subsystem an opportunity to monitor debug events and to cancel the
+propagation of events.</p>
+<p><strong>NTSTATUS</strong></p>
+<p>(<strong>*PDBGSS_DBGKM_APIMSG_FILTER</strong>)(</p>
+<p><strong>IN</strong> <strong>OUT</strong>
+<strong>PDBGKM_APIMSG</strong> <em>ApiMsg</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ApiMsg</em> ——Supplies the DBGKM_APIMSG that is about to be
+propagated.</p>
+<p><u>Return Value:</u></p>
+<p>DBG_CONTINUE ——Message propagation will continue. Note that since
+this callout occurs before the other callouts, event propagation can
+still be cancelled (by the <em>UiLookupRoutine</em>).</p>
+<p>Others ——The message will not be propagated. No reply is generated
+for the debug event.</p>
+<h4 id="dbgsshandlekmapimsg">2.2.1.5 DbgSsHandleKmApiMsg</h4>
+<p>The <strong>DbgSsHandleKmApiMsg</strong> is called by a subsystem
+whenever a debug event message arrives. This is typically done in the
+subsystem's main API loop whenever a message arrives whose type is
+LPC_DEBUG_EVENT.</p>
+<p><strong>VOID</strong></p>
+<p><strong>DbgSsHandleKmApiMsg</strong>(</p>
+<p><strong>IN</strong> <strong>PDBGKM_APIMSG</strong>
+<em>ApiMsg</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ApiMsg</em> ——Supplies the debug event message to propagate to
+the debug server.</p>
+<p>A number of callouts are performed prior to propagating the
+message:</p>
+<p>o For all messages, the <em>KmApiMsgFilter</em> is called (if it was
+supplied during <strong>DbgSsInitialize</strong>). If this returns
+anything other that DBG_CONTINUE, the message is not propagated by this
+function. The caller is responsible for event propagation, and for
+replying to the thread reporting the debug event.</p>
+<p>o For create process messages, the <em>UiLookupRoutine</em> is
+called. If a success code is returned than message is propagated.
+Otherwise, a reply is generated to the thread reporting the debug
+event.</p>
+<p>o For create process and create thread messages,
+<em>SubsystemKeyLookupRoutine</em> is called. Failure does not effect
+propagation. It simply inhibits the update of the messages
+<em>SubSystemKey</em> field.</p>
+<h3 id="event-propagation-message-formats">2.2.2 Event Propagation
+Message Formats</h3>
+<p>Event propagation messages are sent as datagrams to the Dbg server.
+Event propagation messages consist of the following standard header:</p>
+<p>typedef struct <strong>_DBGSS_APIMSG</strong> {</p>
+<p><strong>PORT_MESSAGE</strong> <em>h</em>;</p>
+<p><strong>DBGKM_APINUMBER</strong> <em>ApiNumber</em>;</p>
+<p><strong>NTSTATUS</strong> <em>ReturnedStatus</em>;</p>
+<p><strong>CLIENT_ID</strong> <em>AppClientId</em>;</p>
+<p><strong>PVOID</strong> <em>ContinueKey</em>;</p>
+<p><strong>union</strong> <em>u</em>.</p>
+<p>} <strong>DBGSS_APIMSG</strong>, <strong>*PDBGSS_APIMSG</strong>;</p>
+<p><u>DBGSS_APIMSG Structure:</u></p>
+<p><em>h</em> ——Supplies the standard LPC port message.</p>
+<p><em>ApiNumber</em> ——Supplies the <em>ApiNumber</em> for this
+message. The <em>ApiNumber</em> is used to indicate the type of event
+being propagated.</p>
+<p><em>ReturnedStatus</em> ——Used to store the continuation status for
+the event.</p>
+<p><em>AppClientId</em> ——Supplies the client id of the application
+thread reporting the debug event. This comes directly from the header of
+the associated DBGKM_APIMSG.</p>
+<p><em>ContinueKey</em> ——Supplies the continue key, that must be
+returned from the Dbg server in order to cause a reply to be generated
+for the thread that is reporting the debug event.</p>
+<p><em>u</em> ——Supplies the type specific event propagation
+information.</p>
+<h4 id="exception-1">2.2.2.1 Exception</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgSsExceptionApi</strong>, then
+<em>u</em>.Exception supplies a DBGKM_EXCEPTION message. The message
+contains the same information as it did at the time the event was
+generated.</p>
+<h4 id="createthread-1">2.2.2.2 CreateThread</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgSsCreateThreadApi</strong>,
+then <em>u</em>.CreateThread supplies a DBGKM_CREATE_THREAD message. The
+message contains the same information as it did at the time the event
+was generated. If a <em>SubsystemKeyLookupRoutine</em> was called and
+returned success, then the <em>SubSystemKey</em> field is modified
+appropriately.</p>
+<h4 id="createprocess-1">2.2.2.3 CreateProcess</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgSsCreateProcessApi</strong>,
+then <em>u</em>.CreateProcess supplies a DBGSS_CREATE_PROCESS message.
+The format of this message follows:</p>
+<p>typedef struct <strong>_DBGSS_CREATE_PROCESS</strong> {</p>
+<p><strong>CLIENT_ID</strong> <em>DebugUiClientId</em>;</p>
+<p><strong>DBGKM_CREATE_PROCESS</strong> <em>NewProcess</em>;</p>
+<p>} <strong>DBGSS_CREATE_PROCESS</strong>,
+<strong>*PDBGSS_CREATE_PROCESS</strong>;</p>
+<p><u>DBGSS_CREATE_PROCESS Structure:</u></p>
+<p><em>DebugUiClientId</em> ——Supplies the client id of the processes
+debugger user interface.</p>
+<p><em>NewProcess</em> ——Supplies the original contents of the
+DBGKM_CREATE_PROCESS message at the time the event was generated. If a
+<em>SubsystemKeyLookupRoutine</em> was called and returned success, then
+the <em>SubSystemKey</em> field is modified appropriately.</p>
+<h4 id="exitthread-1">2.2.2.4 ExitThread</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgSsExitThreadApi</strong>,
+then <em>u</em>.ExitThread supplies a DBGKM_EXIT_THREAD message. The
+message contains the same information as it did at the time the event
+was generated.</p>
+<h4 id="exitprocess-1">2.2.2.5 ExitProcess</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgSsExitProcessApi</strong>,
+then <em>u</em>.ExitProcess supplies a DBGKM_EXIT_PROCESS message. The
+message contains the same information as it did at the time the event
+was generated.</p>
+<h4 id="mapsection-1">2.2.2.6 MapSection</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgSsMapSectionApi</strong>,
+then <em>u</em>.MapSection supplies a DBGKM_MAP_SECTION message. The
+message contains the same information as it did at the time the event
+was generated.</p>
+<h4 id="unmapsection-1">2.2.2.7 UnMapSection</h4>
+<p>If the <em>ApiNumber</em> is <strong>DbgSsUnMapSectionApi</strong>,
+then <em>u</em>.UnMapSection supplies a DBGKM_UNMAP_SECTION message. The
+message contains the same information as it did at the time the event
+was generated.</p>
+<h2 id="coordinate-debugger-and-debuggee">2.3 Coordinate Debugger and
+Debuggee</h2>
+<p>The purpose of the Dbg server is to coordinate debug events occuring
+in the applications being debugged (debugee) with the requests for event
+notification coming from the applications debug user interface. In order
+to facilitate this type of coordination, the Dbg server maintains a set
+of data structures that bind a debugger with its debuggess, and that
+bind debuggees with their controlling subsystem.</p>
+<p>The data structures used to do the bindings are created and modified
+based on the receipt of propagated debug event messages, connections to
+the Dbg server, and the receipt of wait and continue messages from
+debuggers.</p>
+<p>The following sections describe the data structures maintained by the
+Dbg server, and the actions that causes the data structures to be
+created and modified.</p>
+<h3 id="dbg-server-data-structures">2.3.1 Dbg Server Data
+Structures</h3>
+<h4 id="subsystem-structure">2.3.1.1 Subsystem Structure</h4>
+<p>A subsystem structure exists for each subsystem connected to the Dbg
+server. A subsystem connects to the Dbg server as part of
+<strong>DbgSsInitialize</strong>. The connection port used during the
+connection has a security descriptor that limits access to only those
+processes that form part of the NT OS/2 TCB.</p>
+<p>typedef struct <strong>_DBGP_SUBSYSTEM</strong> {</p>
+<p><strong>CLIENT_ID</strong> <em>SubsystemClientId</em>;</p>
+<p><strong>HANDLE</strong> <em>CommunicationPort</em>;</p>
+<p><strong>HANDLE</strong> <em>SubsystemProcessHandle</em>;</p>
+<p>} <strong>DBGP_SUBSYSTEM</strong>,
+<strong>*PDBGP_SUBSYSTEM</strong>;</p>
+<p><u>DBGP_SUBSYSTEM Structure:</u></p>
+<p><em>SubsystemClientId</em> ——Contains the client id of the subsystem
+thread that initially connects to the Dbg server.</p>
+<p><em>CommunicationPort</em> ——Contains a handle to the communication
+port used to send continue datagrams back to the subsystem.</p>
+<p><em>SubsystemProcessHandle</em> ——Contains a handle to the subsystem
+process. This handle has PROCESS_DUP_HANDLE access to the process.</p>
+<h4 id="user-interface-structure">2.3.1.2 User Interface Structure</h4>
+<p>A user interface structure is maintained for each debugger user
+interface (DebugUi) connected to the Dbg server. Debugger user
+interface's connect to the Dbg server as part of their initialization
+process. The connection must be made before the user interface starts
+any applications that need to be debugged.</p>
+<p>The user interface structure is the key coordination data structure.
+All of the application processes and threads controlled by a user
+interface are linked off of the data structure.</p>
+<p>typedef struct <strong>_DBGP_USER_INTERFACE</strong> {</p>
+<p><strong>CLIENT_ID</strong> <em>DebugUiClientId</em>;</p>
+<p><strong>HANDLE</strong> <em>CommunicationPort</em>;</p>
+<p><strong>HANDLE</strong> <em>DebugUiProcess</em>;</p>
+<p><strong>HANDLE</strong> <em>StateChangeSemaphore</em>;</p>
+<p><strong>RTL_CRITICAL_SECTION</strong> <em>UserInterfaceLock</em>;</p>
+<p><strong>LIST_ENTRY</strong> <em>AppProcessListHead</em>;</p>
+<p><strong>LIST_ENTRY</strong> <em>HashTableLinks</em>;</p>
+<p>} <strong>DBGP_USER_INTERFACE</strong>,
+<strong>*PDBGP_USER_INTERFACE</strong>;</p>
+<p><u>DBGP_USER_INTERFACE Structure:</u></p>
+<p><em>DebugUiClientId</em> ——Contains the client id of the thread that
+connects to the Dbg server. During the processing of a propagated create
+process debug event, the <em>DebugUiClientId</em> field of a
+DBGSS_CREATE_PROCESS structure is matched against this field. Once a
+match is found, the process is bound to the user interface.</p>
+<p><em>CommunicationPort</em> ——Contains a handle to the communication
+port used to reply back to requests from the user interface.</p>
+<p><em>DebugUiProcess</em> ——Contains a handle to the user interface
+process. The handle has PROCESS_DUP_HANDLE access to the process. This
+handle is used to duplicate object handles into and out of the user
+interace.</p>
+<p><em>StateChangeSemaphore</em> ——Contains a handle to a semaphore
+shared between the Dbg server and the user interface. The semaphore is
+signaled each time a propagated debug event is available to be picked up
+by the user interface. The user interface waits on this semaphore. When
+a wait is satisfied, the user interface can call into the Dbg server to
+receive notification of debug events.</p>
+<p><em>UserInterfaceLock</em> ——Contains a critical section lock to
+gaurd the user interface and associated structures.</p>
+<p><em>AppProcessListHead</em> ——Contains a list head where processes
+being debugged by the user interface are linked.</p>
+<p><em>HashTableLinks</em> ——Contains a set of link words use to quickly
+locate a user interface by client id.</p>
+<h4 id="application-process-structure">2.3.1.3 Application Process
+Structure</h4>
+<p>An application process structure is maintained for each process
+accepted by the Dbg server. For a process to be accepted, a process
+creation debug event must propagated to the Dbg server, and the
+<em>DebugUiClientId</em> field of the DBGSS_APIMSG must match the client
+id of a user interface connected to Dbg. Once this occurs, an
+application process structure is</p>
+<p>typedef struct <strong>_DBGP_APP_PROCESS</strong> {</p>
+<p><strong>LIST_ENTRY</strong> <em>AppThreadListHead</em>;</p>
+<p><strong>LIST_ENTRY</strong> <em>AppLinks</em>;</p>
+<p><strong>LIST_ENTRY</strong> <em>HashTableLinks</em>;</p>
+<p><strong>CLIENT_ID</strong> <em>AppClientId</em>;</p>
+<p><strong>PDBGP_USER_INTERFACE</strong> <em>UserInterface</em>;</p>
+<p><strong>HANDLE</strong> <em>HandleToProcess</em>;</p>
+<p>} <strong>DBGP_APP_PROCESS</strong>,
+<strong>*PDBGP_APP_PROCESS</strong>;</p>
+<p><u>DBGP_APP_PROCESS Structure:</u></p>
+<p><em>AppThreadListHead</em> ——Contains the list head for all
+application threads that form this process.</p>
+<p><em>AppLinks</em> ——Contains the link words that are used to link the
+process to its user interface.</p>
+<p><em>HashTableLinks</em> ——Contain a set of link words to quickly
+locate an application process by its UniqueProcess portion of its client
+id.</p>
+<p><em>AppClientId</em> ——Contains the client id of the processes
+initial thread. Only the UniqueProcess portion of the client id is
+used.</p>
+<p><em>UserInterface</em> ——Contains a pointer to the processes user
+interface.</p>
+<p><em>HandleToProcess</em> ——Contains a handle to the application
+process. When the application process structure is initially created, a
+handle is created in the context of the Dbg server. The handle has
+PROCESS_VM_READ and PROCESS_VM_WRITE access. When the user interface
+waits for and receives notification of the new process debug event, the
+handle is duplicated into the user interface and closed in the Dbg
+server. This field is then modified so that the handle value is a handle
+in the context of the user interface. When the user interface issues a
+continue after an exit process debug event, the handle to the process is
+closed and is no longer available to the user interface.</p>
+<h4 id="application-thread-structure">2.3.1.4 Application Thread
+Structure</h4>
+<p>An application thread structure is maintained for each thread
+accepted by the Dbg server. For a thread to be accepted, a thread
+creation debug event must propagated to the Dbg server, and the process
+that the thread is part of must have been previously accepted by
+Dbg.</p>
+<p>typedef struct <strong>_DBGP_APP_THREAD</strong> {</p>
+<p><strong>LIST_ENTRY</strong> <em>AppLinks</em>;</p>
+<p><strong>LIST_ENTRY</strong> <em>HashTableLinks</em>;</p>
+<p><strong>CLIENT_ID</strong> <em>AppClientId</em>;</p>
+<p><strong>DBG_STATE</strong> <em>CurrentState</em>;</p>
+<p><strong>DBG_STATE</strong> <em>ContinueState</em>;</p>
+<p><strong>PDBGP_APP_PROCESS</strong> <em>AppProcess</em>;</p>
+<p><strong>PDBGP_USER_INTERFACE</strong> <em>UserInterface</em>;</p>
+<p><strong>HANDLE</strong> <em>HandleToThread</em>;</p>
+<p><strong>PDBGP_SUBSYSTEM</strong> <em>Subsystem</em>;</p>
+<p><strong>DBGSS_APIMSG</strong> <em>LastSsApiMsg</em>;</p>
+<p>} <strong>DBGP_APP_THREAD</strong>,
+<strong>*PDBGP_APP_THREAD</strong>;</p>
+<p><u>DBGP_APP_THREAD Structure:</u></p>
+<p><em>AppLinks</em> ——Contains link words that link an application
+thread to its process.</p>
+<p><em>HashTableLinks</em> ——Contain a set of link words to quickly
+locate an application thread by its client id.</p>
+<p><em>AppClientId</em> ——Contains the client id of the thread.</p>
+<p><em>CurrentState</em> ——Contains the Dbg server maintained state for
+the thread. The thread can be in three state clasess. If a debug event
+has been propagated to and has been accepted by the Dbg server, the
+state class is "state change available". Once a user interface has
+received notification of the state change, the class becomes "continue
+pending". When a user interface issues a continue to a thread whose
+state class is "continue pending", the threads state class returns to
+"idle".</p>
+<p><em>ContinueState</em> ——Contains the saved Dbg server state for the
+thread at the time the thread transitions from "state change available"
+to "continue pending".</p>
+<p><em>AppProcess</em> ——Contains a pointer to the threads process.</p>
+<p><em>UserInterface</em> ——Contains a pointer to the threads user
+interface.</p>
+<p><em>HandleToThread</em> ——Contains a handle to the application
+thread. When the application thread structure is initially created, a
+handle is created in the context of the Dbg server. The handle has
+THREAD_GET_CONTEXT and THREAD_SET_CONTEXT access. When the user
+interface waits for and receives notification of the new thread debug
+event, the handle is duplicated into the user interface and closed in
+the Dbg server. This field is then modified so that the handle value is
+a handle in the context of the user interface. When the user interface
+issues a continue after an exit thread debug event, or after an exit
+process debug event, the handle to the thread is closed and is no longer
+available to the user interface.</p>
+<p><em>Subsystem</em> ——Contains a pointer to the thread's subsystem.
+This is used to locate the subsystem to send a continue datagram to when
+the thread's user interface issues a continue.</p>
+<p><em>LastSsApiMsg</em> ——This field contains the last DBGSS_APIMSG for
+the thread. This message is valid while a thread is in the "state change
+available" state class. Portions of this message are made available to
+the user interface when it receives notification of the occurance of a
+debug event.</p>
+<h3 id="dbg-server-responses-to-debug-event-propagation">2.3.2 Dbg
+Server Responses to Debug Event Propagation</h3>
+<p>The Dbg server responds to propagated debug events by creating or
+modifying its user interface, application process, or application thread
+data structures.</p>
+<p>Debug events are are propagated to the Dbg server by a subsystem that
+is connected to Dbg and is identified by its subsystem structure. Upon
+receipt of a propagated debug event message, Dbg determines whether or
+not to accept the message. If the message is accepted, then the message
+is captured into the appropriate application thread structure, the
+thread's state is changed to the "state change available" class, and the
+appropriate user interface's <em>StateChangeSemaphore</em> is
+signaled.</p>
+<p>The following sections describe the actions taken by the Dbg server
+upon receipt of a propagated debug event message:</p>
+<h4 id="exception-2">2.3.2.1 Exception</h4>
+<p>The application thread structure for the specified thread is located.
+If the thread can not be found, or if the thread is not known to the Dbg
+server, or if the thread is not "idle", the message is not accepted and
+an appropriate continue datagram is sent to the appropriate subsystem;
+otherwise, the exception message is accepted and the following
+occurs:</p>
+<p>o The <em>CurrentState</em> and <em>ContinueState</em> fields of
+thread are modified to either <strong>DbgBreakpointStateChange</strong>,
+<strong>DbgSingleStepStateChange</strong>, or DbgExceptionState change
+base on the <strong>ExceptionCode</strong> field of the
+<em>ExceptionRecord</em>.</p>
+<h4 id="createthread-2">2.3.2.2 CreateThread</h4>
+<p>The application process structure that the thread is part of is
+located. If the process can not be found , the message is not accepted
+and an appropriate continue datagram is sent to the appropriate
+subsystem; otherwise, the create thread message is accepted and the
+following occurs:</p>
+<p>o An application thread structure for the thread is allocated.</p>
+<p>o The <em>CurrentState</em> and <em>ContinueState</em> fields are
+initialized to <strong>DbgCreateThreadStateChange</strong>.</p>
+<p>o The <em>AppProcess</em> field is set to point to the thread's
+process, the <em>UserInterface</em> field is initialized to point to the
+thread's user interface, the <em>AppClientId</em> field is initialized,
+and the thread is linked to its process.</p>
+<p>o A handle to the thread is created in the context of the Dbg server.
+If this operation succeeds, then the <em>HandleToThread</em> field is
+initialized to the value of the handle; otherwise, it is initialized to
+NULL.</p>
+<h4 id="createprocess-2">2.3.2.3 CreateProcess</h4>
+<p>The user interface whose client id is specified in the message is
+located. If the user interface can not be located (the user interface
+has not connected to Dbg), the message is not accepted and an
+appropriate continue datagram is sent to the appropriate subsystem;
+otherwise, the create process message is accepted and the following
+occurs:</p>
+<p>o An application process structure for the process is allocated.</p>
+<p>o The <em>UserInterface</em> field is initialized to point to the
+process' user interface, the <em>AppClientId</em>.UniqueProcess field is
+initialized.</p>
+<p>o The process is linked to its user interface.</p>
+<p>o A handle to the process is created in the context of the Dbg
+server. If this operation succeeds, then the <em>HandleToProcess</em>
+field is initialized to the value of the handle; otherwise, it is
+initialized to NULL.</p>
+<p>o An application thread structure for the thread described in the
+create process message is allocated.</p>
+<p>o The <em>CurrentState</em> and <em>ContinueState</em> fields are
+initialized to <strong>DbgCreateProcessStateChange</strong>.</p>
+<p>o The <em>AppProcess</em> field is set to point to the thread's
+process, the <em>UserInterface</em> field is initialized to point to the
+thread's user interface, the <em>AppClientId</em> field is initialized,
+and the thread is linked to its process.</p>
+<p>o A handle to the thread is created in the context of the Dbg server.
+If this operation succeeds, then the <em>HandleToThread</em> field is
+initialized to the value of the handle; otherwise, it is initialized to
+NULL.</p>
+<h4 id="exitthread-2">2.3.2.4 ExitThread</h4>
+<p>The application thread structure for the specified thread is located.
+If the thread can not be found, or if the thread is not known to the Dbg
+server, or if the thread is not "idle", the message is not accepted and
+an appropriate continue datagram is sent to the appropriate subsystem;
+otherwise, the exit thread message is accepted and the following
+occurs:</p>
+<p>o The <em>CurrentState</em> and <em>ContinueState</em> fields of
+thread are set to <strong>DbgExitThreadStateChange</strong>.</p>
+<h4 id="exitprocess-2">2.3.2.5 ExitProcess</h4>
+<p>The application thread structure for the specified thread is located.
+If the thread can not be found, or if the thread is not known to the Dbg
+server, or if the thread is not "idle", the message is not accepted and
+an appropriate continue datagram is sent to the appropriate subsystem;
+otherwise, the exit process message is accepted and the following
+occurs:</p>
+<p>o The <em>CurrentState</em> and <em>ContinueState</em> fields of
+thread are set to <strong>DbgExitProcessStateChange</strong>.</p>
+<h4 id="mapsection-2">2.3.2.6 MapSection</h4>
+<p>The application thread structure for the specified thread is located.
+If the thread can not be found, or if the thread is not known to the Dbg
+server, or if the thread is not "idle", the message is not accepted and
+an appropriate continue datagram is sent to the appropriate subsystem;
+otherwise, the map section message is accepted and the following
+occurs:</p>
+<p>o The <em>CurrentState</em> and <em>ContinueState</em> fields of
+thread are set to <strong>DbgMapSectionStateChange</strong>.</p>
+<h4 id="unmapsection-2">2.3.2.7 UnMapSection</h4>
+<p>The application thread structure for the specified thread is located.
+If the thread can not be found, or if the thread is not known to the Dbg
+server, or if the thread is not "idle", the message is not accepted and
+an appropriate continue datagram is sent to the appropriate subsystem;
+otherwise, the un-map section message is accepted and the following
+occurs:</p>
+<p>o The <em>CurrentState</em> and <em>ContinueState</em> fields of
+thread are set to <strong>DbgUnMapSectionStateChange</strong>.</p>
+<h2 id="user-interface-interactions-with-the-dbg-server">2.4 User
+Interface Interactions with the Dbg Server</h2>
+<p>A debug user interface has three main interactions with the Dbg
+server.</p>
+<p>o Connecting to the Dbg server</p>
+<p>o Waiting for debug event state changes to occur</p>
+<p>o Continuing an application thread</p>
+<h3 id="dbguiconnecttodbg">2.4.1 DbgUiConnectToDbg</h3>
+<p>A user interface can connect to the Dbg server using
+<strong>DbgUiConnectToDbg</strong>.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>DbgUiConnectToDbg</strong>( <strong>VOID</strong> )</p>
+<p><u>Return Value:</u></p>
+<p>SUCCESS() ——A connection between the user interface and the Dbg
+server has been made. The DbgUi dll has been initialized.</p>
+<p>!SUCCESS() ——The connection to Dbg did not occur. The user interface
+can not use services provided by the Dbg server.</p>
+<p>This routine makes a connection between the calling user interface
+and the Dbg server. If the routine is successful, a communications port
+is created to link the user interface with the Dbg server. A user
+interface data structure is created and initialized in the Dbg server. A
+shared state change semaphore is created between the Dbg server and the
+user interface. The Dbg server is granted SEMAPHORE_ALL_ACCESS to the
+semaphore. This allows it to signal the semaphore at the appropriate
+times. A handle to the semaphore is duplicated to the user interface.
+The handle is granted SYNCHRONIZE access to the semaphore. This allows
+the user interface an opportunity to wait on the semaphore. The
+semaphore becomes signaled when a propagated debug event is available
+which transitions one of the user interface's threads into the "state
+change available" state.</p>
+<h3 id="dbguiwaitstatechange">2.4.2 DbgUiWaitStateChange</h3>
+<p>A user interface can wait for a state change to occur in one of its
+threads using <strong>DbgUiWaitStateChange</strong>.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>DbgUiWaitStateChange</strong>(</p>
+<p><strong>OUT</strong> <strong>PDBGUI_WAIT_STATE_CHANGE</strong>
+<em>StateChange</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>StateChange</em> ——Supplies the address of state change record
+that will contain the state change information.</p>
+<p><u>Return Value:</u></p>
+<p>STATUS_USER_APC ——A user mode APC occured which caused this call to
+abort without retreiving state change information.</p>
+<p>STATUS_ALERTED ——The thread was alerted while waiting for a state
+change to occur. No state change information was retreived.</p>
+<p>DBG_NO_STATE_CHANGE ——The state change semaphore was signaled, but
+the Dbg server has no state change information to return. This error can
+only happen if a user interface bypasses the DbgUi APIs and attempts to
+communicate directly with the Dbg server.</p>
+<p>DBG_UNABLE_TO_PROVIDE_HANDLE ——A state change occurred that required
+a handle to be duplicated into the user interface. For some reason, a
+handle could not be provided. All other portions of the state change
+reporting were successful.</p>
+<p>STATUS_SUCCESS ——A state change occured. Valid state change
+information was returned.</p>
+<p>OTHERS ——Refer to object management error codes.</p>
+<p>This function causes the calling user interface to wait for a state
+change to occur in one of it's application threads. The wait is
+ALERTABLE. A state change occurs when an application thread changes its
+state to the "state change available" class. If a user interface makes a
+successful call to this function while one of its threads is in the
+"state change available" class, then the threads state is set to
+"continue pending", and a state change record is formatted and returned
+to the caller. Once a state change has been reported for a thread, its
+user interface is responsible for continuing the thread at the
+appropriate time.</p>
+<h4 id="state-change-record">2.4.2.1 State Change Record</h4>
+<p>A state change record has the following format:</p>
+<p>typedef struct <strong>_DBGUI_WAIT_STATE_CHANGE</strong> {</p>
+<p><strong>DBG_STATE</strong> <em>NewState</em>;</p>
+<p><strong>CLIENT_ID</strong> <em>AppClientId</em>;</p>
+<p><strong>union</strong> <em>StateInfo</em>;</p>
+<p>} <strong>DBGUI_WAIT_STATE_CHANGE</strong>,
+<strong>*PDBGUI_WAIT_STATE_CHANGE</strong>;</p>
+<p><u>DBGUI_WAIT_STATE_CHANGE Structure:</u></p>
+<p><em>NewState</em> ——Supplies the new state of the thread reporting
+the state change.</p>
+<p><em>AppClientId</em> ——Supplies the client id of the thread reporting
+the state change.</p>
+<p><em>StateInfo</em> ——Supplies the per-state change type description
+that describes the state change.</p>
+<h5 id="dbgcreatethreadstatechange">2.4.2.1.1
+DbgCreateThreadStateChange</h5>
+<p>The state change of <strong>DbgCreateThreadStateChange</strong> is
+reported whenever a state change is reported due to the propagation of a
+create thread debug event. The major side effect of this state change is
+that the user interface is given a handle to the thread reporting the
+state change. The handle is granted THREAD_GET_CONTEXT and
+THREAD_SET_CONTEXT access to the thread. This allows the user interface
+to use NtReadContextThread and NtWriteContextThread to read and write
+the thread's registers.</p>
+<p><em>StateInfo</em> for this type of state change is as follows:</p>
+<p>typedef struct <strong>_DBGUI_CREATE_THREAD</strong> {</p>
+<p><strong>HANDLE</strong> <em>HandleToThread</em>;</p>
+<p><strong>DBGKM_CREATE_THREAD</strong> <em>NewThread</em>;</p>
+<p>} <strong>DBGUI_CREATE_THREAD</strong>,
+<strong>*PDBGUI_CREATE_THREAD</strong>;</p>
+<p><u>DBGUI_CREATE_THREAD Structure:</u></p>
+<p><em>HandleToThread</em> ——Supplies a handle to the thread identified
+by this state change. A value of NULL indicates that the handle is not
+valid and that an informational status code of
+DBG_UNABLE_TO_PROVIDE_HANDLE was returned.</p>
+<p><em>NewThread</em> ——Supplies the description of the new thread as
+formatted by the subsystem during debug event propagation.</p>
+<h5 id="dbgcreateprocessstatechange">2.4.2.1.2
+DbgCreateProcessStateChange</h5>
+<p>The state change of <strong>DbgCreateProcessStateChange</strong> is
+reported whenever a state change is reported due to the propagation of a
+create process debug event. The major side effects of this state change
+are:</p>
+<p>o The user interface is given a handle to the process of the thread
+reporting the state change. The handle is granted PROCESS_VM_READ and
+PROCESS_VM_WRITE access to the process. This allows the user interface
+to use <strong>NtReadVirtualMemory</strong> and
+<strong>NtWriteVirtualMemory</strong> to read and write the processes
+virtual memory.</p>
+<p>o The user interface is given a handle to the section that forms the
+initial address space for the process reporting the state change. The
+handle is granted SECTION_ALL_ACCESS access to the section. This allows
+the user interface to map a view of the section to locate the symbol
+table and other section information.</p>
+<p>o The user interface is given a handle to the thread reporting the
+state change. The handle is granted THREAD_GET_CONTEXT and
+THREAD_SET_CONTEXT access to the thread. This allows the user interface
+to use NtReadContextThread and NtWriteContextThread to read and write
+the thread's registers.</p>
+<p>typedef struct <strong>_DBGUI_CREATE_PROCESS</strong> {</p>
+<p><strong>HANDLE</strong> <em>HandleToProcess</em>;</p>
+<p><strong>HANDLE</strong> <em>HandleToThread</em>;</p>
+<p><strong>DBGKM_CREATE_PROCESS</strong> <em>NewProcess</em>;</p>
+<p>} <strong>DBGUI_CREATE_PROCESS</strong>,
+<strong>*PDBGUI_CREATE_PROCESS</strong>;</p>
+<p><u>DBGUI_CREATE_PROCESS Structure:</u></p>
+<p><em>HandleToProcess</em> ——Supplies a handle to the process
+identified by this state change. A value of NULL indicates that the
+handle is not valid and that an informational status code of
+DBG_UNABLE_TO_PROVIDE_HANDLE was returned.</p>
+<p><em>HandleToThread</em> ——Supplies a handle to the thread identified
+by this state change. A value of NULL indicates that the handle is not
+valid and that an informational status code of
+DBG_UNABLE_TO_PROVIDE_HANDLE was returned.</p>
+<p><em>NewProcess</em> ——Supplies the description of the new process as
+formatted by the subsystem during debug event propagation. The
+<strong>Section</strong> field of this structure is modified to contain
+a handle that is valid in the user interfaces context. A value of NULL
+indicates that the handle is not valid and that an informational status
+code of DBG_UNABLE_TO_PROVIDE_HANDLE was returned.</p>
+<h5 id="dbgexitthreadstatechange">2.4.2.1.3
+DbgExitThreadStateChange</h5>
+<p>The state change of <strong>DbgExitThreadStateChange</strong> is
+reported whenever a state change is reported due to the propagation of
+an exit thread debug event. There are no side effects of this state
+change.</p>
+<p><em>StateInfo</em> for this type of state change is the same as that
+originally formatted by Dbgk during debug event generation.</p>
+<h5 id="dbgexitprocessstatechange">2.4.2.1.4
+DbgExitProcessStateChange</h5>
+<p>The state change of <strong>DbgExitProcessStateChange</strong> is
+reported whenever a state change is reported due to the propagation of
+an exit process debug event. There are no side effects of this state
+change.</p>
+<p><em>StateInfo</em> for this type of state change is the same as that
+originally formatted by Dbgk during debug event generation.</p>
+<h5 id="dbgexceptionstatechange">2.4.2.1.5 DbgExceptionStateChange</h5>
+<p>The state change of <strong>DbgExceptionStateChange</strong> is
+reported whenever a state change is reported due to the propagation of
+an exception debug event where the exception code is anything other than
+STATUS_BREAKPOINT or STATUS_SINGLE_STEP. There are no side effects of
+this state change.</p>
+<p><em>StateInfo</em> for this type of state change is the same as that
+originally formatted by Dbgk during debug event generation.</p>
+<h5 id="dbgbreakpointstatechange">2.4.2.1.6
+DbgBreakpointStateChange</h5>
+<p>The state change of <strong>DbgBreakpointStateChange</strong> is
+reported whenever a state change is reported due to the propagation of
+an exception debug event where the exception code is STATUS_BREAKPOINT .
+There are no side effects of this state change.</p>
+<p><em>StateInfo</em> for this type of state change is the same as that
+originally formatted by Dbgk during debug event generation.</p>
+<h5 id="dbgsinglestepstatechange">2.4.2.1.7
+DbgSingleStepStateChange</h5>
+<p>The state change of <strong>DbgSingleStepStateChange</strong> is
+reported whenever a state change is reported due to the propagation of
+an exception debug event where the exception code is STATUS_SINGLE_STEP
+. There are no side effects of this state change.</p>
+<p><em>StateInfo</em> for this type of state change is as that same as
+that originally formatted by Dbgk during debug event generation.</p>
+<h5 id="dbgmapsectionstatechange">2.4.2.1.8
+DbgMapSectionStateChange</h5>
+<p>The state change of <strong>DbgMapSectionStateChange</strong> is
+reported whenever a state change is reported due to the propagation of a
+map section debug event. The major side effects of this state change
+are:</p>
+<p>o The user interface is given a handle to the section being mapped by
+reporting the state change. The handle is granted SECTION_ALL_ACCESS
+access to the section. This allows the user interface to map a view of
+the section to locate the symbol table and other section
+information.</p>
+<h5 id="dbgunmapsectionstatechange">2.4.2.1.9
+DbgUnMapSectionStateChange</h5>
+<p>The state change of <strong>DbgUnMapSectionStateChange</strong> is
+reported whenever a state change is reported due to the propagation of
+an un-map section debug event. There are no side effects of this state
+change.</p>
+<p><em>StateInfo</em> for this type of state change is the same as that
+originally formatted by Dbgk during debug event generation.</p>
+<h3 id="dbguicontinue">2.4.3 DbgUiContinue</h3>
+<p>A user interface can continue a thread that previously reported a
+state change using <strong>DbgUiContinue</strong>.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>DbgUiContinue</strong>(</p>
+<p><strong>IN</strong> <strong>PCLIENT_ID</strong>
+<em>AppClientId</em>,</p>
+<p><strong>IN</strong> <strong>NTSTATUS</strong>
+<em>ContinueStatus</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>AppClientId</em> ——Supplies the address of the ClientId of the
+application thread being continued. This must be an application thread
+that previously notified the caller through
+<strong>DbgUiWaitStateChange</strong> but has not yet been
+continued.</p>
+<p><em>ContinueStatus</em> ——Supplies the continuation status to the
+thread being continued. Valid values for this are DBG_EXCEPTION_HANDLED,
+DBG_EXCEPTION_NOT_HANDLED, DBG_TERMINATE_THREAD, DBG_TERMINATE_PROCESS,
+or DBG_CONTINUE.</p>
+<p><u>Return Value:</u></p>
+<p>STATUS_SUCCESS ——Successful call to
+<strong>DbgUiContinue</strong></p>
+<p>STATUS_INVALID_CID ——An invalid ClientId was specified for the
+<em>AppClientId</em>, or the specified Application was not waiting for a
+continue.</p>
+<p>STATUS_INVALID_PARAMETER ——An invalid continue status was
+specified.</p>
+<p>Continuing an application thread has a number of side effects. In
+some cases data structures inside of the Dbg server are modified or
+event deallocated. This is all dependent upon the <em>ContinueState</em>
+of the thread being continued. A number of standard actions occur during
+a continue regardless of the thread's <em>ContinueState</em>:</p>
+<p>o A check is made to ensure that the <em>ContinueStatus</em> is
+valid, that the thread is known to Dbg, and that the thread is in the
+"continue pending" state.</p>
+<p>o Perform and <em>ContinueState</em> dependent side effects.</p>
+<p>o Format a continue datagram and send it to the thread's subsystem.
+This is then picked up by the subsystem which uses the continue key to
+reply to the original DBGKM_APIMSG which generated the debug event. Once
+the reply is received the thread which genrated the original debug even
+can continue execution.</p>
+<p>The following sections describe the <em>ContinueState</em> dependent
+side effects of <strong>DbgExitThreadStateChange</strong> and
+<strong>DbgExitProcessStateChange</strong> state changes. No other state
+change types have side effects.</p>
+<h4 id="dbgexitthreadstatechange-1">2.4.3.1
+DbgExitThreadStateChange</h4>
+<p>Continuing a thread whose continue state is
+<strong>DbgExitThreadStateChange</strong>, causes the Dbg server to
+deallocate its application thread structure. If a handle to the thread
+was successfully duplicated into the user interface, the handle is
+closed. Once a user interface continues a thread in this state, it can
+no longer read and write the thread's registers.</p>
+<h4 id="dbgexitprocessstatechange-1">2.4.3.2
+DbgExitProcessStateChange</h4>
+<p>Continuing a thread whose continue state is
+<strong>DbgExitProcessStateChange</strong>, causes the Dbg server to
+deallocate its application process structure. If a handle to the process
+was successfully duplicated into the user interface, the handle is
+closed. Since this also implies that an application thread has exited,
+the thread's application thread structure is deallocated. If a handle to
+the thread was successfully duplicated into the user interface, the
+handle is closed.</p>
+<p>Once a user interface continues a thread in this state, it can no
+longer read and write the thread's registers, or read and write the
+processes virtual memory.</p>

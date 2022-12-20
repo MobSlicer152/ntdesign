@@ -1,0 +1,2045 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Process Structure</p>
+<p><strong>Author:</strong> Mark Lucovsky</p>
+<p>Revision 1.27, January 14, 1992</p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>2. Process Structure Objects 1</p>
+<p>3. Process Object APIs 1</p>
+<p>3.1 Access Type And Privilege Information 2</p>
+<p>3.2 NtCreateProcess 4</p>
+<p>3.3 NtTerminateProcess 5</p>
+<p>3.4 NtCurrentProcess 6</p>
+<p>3.5 NtCurrentPeb 7</p>
+<p>3.6 NtOpenProcess 8</p>
+<p>3.7 NtQueryInformationProcess 8</p>
+<p>3.8 NtSetInformationProcess 12</p>
+<p>4. Thread Object APIs 14</p>
+<p>4.1 Access Type And Privilege Information 14</p>
+<p>4.2 NtCreateThread 16</p>
+<p>4.3 NtTerminateThread 19</p>
+<p>4.4 NtCurrentThread 20</p>
+<p>4.5 NtCurrentTeb 20</p>
+<p>4.6 NtSuspendThread 21</p>
+<p>4.7 NtResumeThread 22</p>
+<p>4.8 NtGetContextThread 22</p>
+<p>4.9 NtSetContextThread 23</p>
+<p>4.10 NtOpenThread 24</p>
+<p>4.11 NtQueryInformationThread 25</p>
+<p>4.12 NtSetInformationThread 27</p>
+<p>4.13 NtImpersonateThread 28</p>
+<p>4.14 NtAlertThread 29</p>
+<p>4.15 NtTestAlert 29</p>
+<p>4.16 NtAlertResumeThread 30</p>
+<p>4.17 NtRegisterThreadTerminationPort 30</p>
+<p>4.18 NtImpersonateThread 32</p>
+<p>5. System Information API 33</p>
+<p>5.1 NtQuerySystemInformation 33</p>
+<p>6. Executive APIs 35</p>
+<p>6.1 PsCreateSystemProcess 36</p>
+<p>6.2 PsCreateSystemThread 37</p>
+<p>6.3 PsLookupProcessThreadByCid 37</p>
+<p>6.4 PsChargePoolQuota 38</p>
+<p>6.5 PsReturnPoolQuota 38</p>
+<p>6.6 PsGetCurrentThread 39</p>
+<p>6.7 PsGetCurrentProcess 39</p>
+<p>6.8 KeGetPreviousMode 39</p>
+<p>6.9 PsRevertToSelf 39</p>
+<p>6.10 PsReferencePrimaryToken 40</p>
+<p>6.11 PsDereferencePrimaryToken 40</p>
+<p>6.12 PsReferenceImpersonationToken 41</p>
+<p>6.13 PsDereferenceImpersonationToken 41</p>
+<p>6.14 PsOpenTokenOfProcess 42</p>
+<p>6.15 PsOpenTokenOfThread 43</p>
+<p>6.16 PsImpersonateClient 44</p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This specification describes the <strong>Windows NT</strong> process
+structure.</p>
+<p>The <strong>Windows NT</strong> system is designed to support both an
+<strong>OS/2</strong> and a <strong>POSIX</strong> operating system
+environment. Rather than packaging all of the capabilities of these
+operating system environments into the <strong>Windows NT</strong>
+kernel and executive, the system has been designed so that robust,
+protected subsystems can be built to provide the necessary API
+emulation.</p>
+<p>The <strong>Windows NT</strong> approach is very similar to the
+approach taken in Carnegie Mellon's MACH operating system. The MACH
+system design is based on a simple process structure, IPC mechanism, and
+virtual memory system. Using these primitives, MACH is able to implement
+both <strong>POSIX</strong> and <strong>Unix 4.3BSD</strong> operating
+system environments as protected subsystems.</p>
+<p>Like MACH, the <strong>Windows NT</strong> process structure provides
+a very basic set of services. The system does not provide a hierarchical
+process tree structure, global process names (PIDs), process grouping,
+job control, complex process or thread termination semantics, or other
+more traditional process structures. It does provide a complete set of
+services that subsystems can use to provide the set of semantics that
+are required by a particular operating system environment.</p>
+<p>Using this set of services, vendors and users can develop
+applications based on either the <strong>OS/2</strong> or
+<strong>POSIX</strong> APIs (implemented as protected subsystems by
+Microsoft). An alternative to this is to develop applications using the
+native <strong>Windows NT</strong> system services or to develop custom
+subsystems and have the applications use these subsystems.</p>
+<h1 id="process-structure-objects">2. Process Structure Objects</h1>
+<p>The process structure is based on two types of objects. A <em>process
+object</em> represents an address space, a set of objects (resources)
+visible to the process, and a set of threads that executes in the
+context of the process. A <em>thread object</em> represents the basic
+schedulable entity in the system. It contains its own set of machine
+registers, its own kernel stack, a thread environment block (TEB), and
+user stack in the address space of its process.</p>
+<p>The <strong>Windows NT</strong> process structure works with the
+overall <strong>Windows NT</strong> security architecture. Each process
+is assigned an access token, called the <em>primary token</em> of the
+process. The primary token is used by default by the process's threads
+when referencing a <strong>Windows NT</strong> object.</p>
+<p>In addition to the primary token, each thread may have an
+<em>impersonation token</em> associated with it. When this is done, the
+impersonation token, rather than the process's primary token, is used
+for access validation purposes. This is done to allow efficient
+impersonation of clients in a client-server model.</p>
+<h1 id="process-object-apis">3. Process Object APIs</h1>
+<p>The following programming interfaces support the process object:</p>
+<p><strong>NtCreateProcess</strong> - Creates a process object.</p>
+<p><strong>NtTerminateProcess</strong> - Terminates a process
+object.</p>
+<p><strong>NtCurrentProcess</strong> - Identifies the currently
+executing process.</p>
+<p><strong>NtCurrentPeb</strong> - Returns the address of the current
+processes Process Environment Block (PEB).</p>
+<p><strong>NtOpenProcess</strong> - Creates a handle to a process
+object.</p>
+<p><strong>NtQueryInformationProcess</strong> - Returns information
+about the process.</p>
+<p><strong>NtSetInformationProcess</strong> - Sets information about the
+process.</p>
+<h2 id="access-type-and-privilege-information">3.1 Access Type And
+Privilege Information</h2>
+<p><u>Object type-specific access types:</u></p>
+<p>The object type-specific access types are defined below.</p>
+<p><strong>PROCESS_TERMINATE</strong> - Required to terminate a
+process.</p>
+<p><strong>PROCESS_CREATE_THREAD</strong> - Required to create a thread
+in a process.</p>
+<p><strong>PROCESS_VM_OPERATION</strong> - Required to manipulate the
+address space of a process. This does not include reading and writing
+the memory of a process.</p>
+<p><strong>PROCESS_VM_READ</strong> - Required to read the virtual
+memory of a process (through <strong>Windows NT</strong>
+<strong>APIs</strong> ).</p>
+<p><strong>PROCESS_VM_WRITE</strong> - Required to write the virtual
+memory of a process (through <strong>Windows NT</strong>
+<strong>APIs</strong> ).</p>
+<p><strong>PROCESS_DUP_HANDLE</strong> - Required to duplicate an object
+handle visible to a process.</p>
+<p><strong>PROCESS_CREATE_PROCESS</strong> - Required to create a
+process.</p>
+<p><strong>PROCESS_SET_QUOTA</strong> - Required to modify the quota
+limits of a process.</p>
+<p><strong>PROCESS_SET_INFORMATION</strong> - Required to modify certain
+attributes of a process.</p>
+<p><strong>PROCESS_QUERY_INFORMATION</strong> - Required to read certain
+attributes of a process. This access type is also needed to open the
+primary token of a process (using <strong>NtOpenProcessToken()</strong>
+).</p>
+<p><strong>PROCESS_SET_PORT</strong> - Required to set the debug or
+exception port of a process.</p>
+<p><u>Generic Access Masks:</u></p>
+<p>The object type-specific mapping of generic access types to
+non-generic access types for this object type are:</p>
+<blockquote>
+<p><strong>GENERIC_READ STANDARD_READ |<br />
+PROCESS_VM_READ |<br />
+PROCESS_QUERY_INFORMATION<br />
+<br />
+GENERIC_WRITE STANDARD_WRITE |<br />
+PROCESS_TERMINATE |<br />
+PROCESS_CREATE_THREAD |<br />
+PROCESS_VM_OPERATION |<br />
+PROCESS_VM_WRITE |<br />
+PROCESS_DUP_HANDLE |<br />
+PROCESS_CREATE_PROCESS |<br />
+PROCESS_SET_QUOTA |<br />
+PROCESS_SET_INFORMATION |<br />
+PROCESS_SET_PORT<br />
+<br />
+<br />
+GENERIC_EXECUTE STANDARD_EXECUTE |<br />
+SYNCHRONIZE<br />
+</strong></p>
+</blockquote>
+<p><u>Standard Access Types:</u></p>
+<p>This object type supports the optional SYNCHRONIZE standard access
+type. All required access types are supported by the object manager.</p>
+<p>The mask of all supported access types for this object is:</p>
+<blockquote>
+<p><strong>PROCESS_ALL_ACCESS STANDARD_RIGHTS_REQUIRED |<br />
+SYNCHRONIZE |<br />
+PROCESS_TERMINATE |<br />
+PROCESS_CREATE_THREAD |<br />
+PROCESS_VM_OPERATION |<br />
+PROCESS_VM_READ |<br />
+PROCESS_VM_WRITE |<br />
+PROCESS_DUP_HANDLE |<br />
+PROCESS_CREATE_PROCESS |<br />
+PROCESS_SET_QUOTA |<br />
+PROCESS_SET_INFORMATION |<br />
+PROCESS_QUERY_INFORMATION |<br />
+PROCESS_SET_PORT<br />
+</strong></p>
+</blockquote>
+<p><u>Privileges Defined Or Used:</u></p>
+<p>This object type defines or uses the following privileges:</p>
+<p><strong>SeAssignPrimaryTokenPrivilege</strong> - This privilege is
+needed to assign a new primary token for a process.</p>
+<h2 id="ntcreateprocess">3.2 NtCreateProcess</h2>
+<p>A process object can be created and a handle opened for access to the
+process with the <strong>NtCreateProcess</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateProcess</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN ACCESS_MASK</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>ParentProcess,</em></p>
+<p><strong>IN BOOLEAN</strong> <em>InheritObjectTable,</em></p>
+<p><strong>IN HANDLE</strong> <em>SectionHandle</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>DebugPort</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>ExceptionPort</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong>;</p>
+<p><u>Parameters:</u></p>
+<p><em>ProcessHandle</em> - A pointer to a variable that will receive
+the process object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the created
+process.</p>
+<p><em>ObjectAttributes</em> - An optional pointer to a structure that
+specifies the object's attributes. Refer to the <em>Object Management
+Specification</em> for details. Note that <em>OBJ_PERMANENT</em>,
+<em>OBJ_EXCLUSIVE</em>, <em>OBJ_OPEN_IF</em>, and <em>OBJ_OPEN_LINK</em>
+are not valid attributes for a process object.</p>
+<p><em>ParentProcess</em> - An open handle to a process object. The new
+process is created using some of the attributes of the specified parent
+process. <em>PROCESS_CREATE_PROCESS</em> access to this process is
+required.</p>
+<p><em>InheritObjectTable</em> - A flag which determines whether or not
+the new process will be created with an object table whose initial
+contents come from the specified parent process. A value of false causes
+the new process to be created with an empty object table. A value of
+true causes the new process to be created by cloning the parent
+process's object table. All objects in the parent process's object table
+marked with the <em>OBJ_INHERIT</em> attribute appear in the new
+process's object table with exactly the same handle values, attributes,
+and granted access.</p>
+<p><em>SectionHandle</em> - An optional open handle to a section object.
+If the value of the argument is not null, then it specifies a handle to
+a section object backed by an image file the process is being created to
+run. <em>SECTION_MAP_EXECUTE</em> access to the section object is
+required.</p>
+<p><em>DebugPort</em> - An optional open handle to a port object. If
+specified, the port is assigned as the process's debugger port;
+otherwise, the process is created without a debugger port.
+<em>PORT_WRITE</em> and <em>PORT_READ</em> access to the port object are
+required.</p>
+<p><em>ExceptionPort</em> - An optional open handle to a port object. If
+specified, the port is assigned as the process's exception port;
+otherwise, the process is created without an exception port.
+<em>PORT_WRITE</em> and <em>PORT_READ</em> access to the port object are
+required.</p>
+<p>Creating a process object causes a new process to be created. The new
+process shares some of its initial attributes with the specified parent
+process.</p>
+<p>o The new process is created with an object table. The table is
+either an empty table, or a clone of the parent process's object table.
+This is a function of the <em>InheritObjectTable</em> parameter.</p>
+<p>o The access token of the new process is identical to the access
+token of the parent process.</p>
+<p>o The quota limits of the new process are identical to the quota
+limits of the parent process.</p>
+<p>o The base priority of the new process is identical to the base
+priority of the parent process.</p>
+<p>The address space of the new process is defined by the specified
+section handle or the address space of the specified parent process. If
+the section handle is not null, the section object must be backed by an
+image file. The address space of the new process is created by mapping a
+view of the entire section object. Otherwise, the address space of the
+process is created by copying or sharing those pieces of the parent
+process's address space marked as <strong>PAG_COPY/PAG_SHARE</strong>
+into the address space of the new process.</p>
+<p>The new process is created without any threads.</p>
+<p>Each process is created with a Process Environment Block (PEB). The
+PEB is readable and writeable by the application, but can only be
+deleted by the system. The PEB is partially initialized by the system
+and is placed in the address space of the. If the process is created
+without a section handle, then the new processes PEB is shared "copy on
+write" with the parent process PEB.</p>
+<p>The PEB contains process global context such as startup parameters,
+image base address, a Mutant object handle for process wide
+synchronization, and loader data structures.</p>
+<p>The function <strong>NtCurrentPeb</strong> returns the address of the
+current processes PEB. Access to PEB locations must be made through this
+API.</p>
+<p>The process object is a waitable object. A wait performed on a
+process object is satisfied when the process becomes signaled. A process
+becomes signaled when its last thread terminates, or if a process
+without a thread is terminated with
+<strong>NtTerminateProcess</strong>.</p>
+<p>Both the debugger and exception ports are used by the exception
+handling system within <strong>Windows NT</strong>. The role that these
+ports play in exception handling is described in another document.</p>
+<h2 id="ntterminateprocess">3.3 NtTerminateProcess</h2>
+<p>A process can be terminated with the
+<strong>NtTerminateProcess</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtTerminateProcess</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle OPTIONAL,</em></p>
+<p><strong>IN NTSTATUS</strong> <em>ExitStatus</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ProcessHandle</em> - An optional parameter, that if specified,
+supplies an open handle with <strong>PROCESS_TERMINATE</strong> access
+to the process to terminate. If this parameter is not supplied, then
+<strong>PROCESS_TERMINATE</strong> access is required to the current
+process and the API terminates all threads in the process except for the
+calling thread.</p>
+<p><em>ExitStatus</em> - A value that specifies the exit status of the
+process to be terminated.</p>
+<p>Terminating a process causes the specified process and all of its
+threads to terminate. Any threads in the process that are suspended are
+resumed by this service so that they can begin termination. The handles
+of the process's threads are not explicitly closed by this service. The
+handle to the process being terminated is also not closed by this
+service. If any thread in the process was suspended and resumed by this
+API and informational status code of
+<em>STATUS_THREAD_WAS_SUSPENDED</em> is returned.</p>
+<p>In order to terminate a process, the calling thread must have
+<em>PROCESS_TERMINATE</em> access to the specified process.</p>
+<p>After all of the process's threads are terminated (and set to the
+signaled state), the process's object table is processed by closing all
+open handles.</p>
+<p>The process object is signaled upon termination, and its exit status
+is updated to reflect the value of the exit status argument. Once a
+process object becomes signaled, no more threads can be created in the
+process.</p>
+<p>The process's address space remains valid until the process object
+itself is deleted (the last handle to the process object is closed).</p>
+<h2 id="ntcurrentprocess">3.4 NtCurrentProcess</h2>
+<p>An object handle to the current process can be fabricated with the
+<strong>NtCurrentProcess</strong> function:</p>
+<p><strong>HANDLE</strong></p>
+<p><strong>NtCurrentProcess</strong>();</p>
+<p>The <strong>NtCurrentProcess</strong> function returns a pseudo
+handle to the currently executing process. The handle can be used
+whenever a handle to a process object is required (e.g.
+<strong>NtTerminateProcess</strong>).</p>
+<p>When the system is asked to translate an object handle into an object
+pointer, the object type is a process object, and the object handle is
+the pseudo handle returned by <strong>NtCurrentProcess</strong>, the
+following occurs.</p>
+<p>o The <strong>SECURITY_DESCRIPTOR</strong> of the current process is
+checked against the desired access specified in the object translation
+call. If access is denied a failure status is returned to the
+caller.</p>
+<p>o If access is allowed, the appropriate reference count in the
+current process object is adjusted and a pointer to the current process
+object is returned.</p>
+<p>This function is designed mainly for the use of native applications
+so that they can refer to their own process in process termination
+calls, thread creation calls, and address space modification calls
+without having to explicitly open their process by name or otherwise
+obtain a handle to their own process. A similar function exists to
+reference the currently executing thread.</p>
+<h2 id="ntcurrentpeb">3.5 NtCurrentPeb</h2>
+<p>The address of the current processes <strong>PEB</strong> can be
+located with the <strong>NtCurrentPeb</strong> function:</p>
+<p><strong>PPEB</strong></p>
+<p><strong>NtCurrentPeb()</strong></p>
+<p>The <strong>NtCurrentPeb</strong> function returns the address of the
+current processes <strong>PEB</strong>. The <strong>PEB</strong>
+consists of a single page in the address space of the process. The page
+is allocated and deallocated by the system at process creation/process
+termination. Only the system may delete a processes
+<strong>PEB</strong>. The <strong>PEB</strong> contains the
+following:</p>
+<p>Peb Structure</p>
+<p><strong>BOOLEAN</strong> <em>InheritedAddressSpace</em> - A flag set
+by the system to indicate that the processes initial address space was
+from inheritance rather than from a mapping a section.</p>
+<p><strong>HANDLE</strong> <em>Mutant</em> - Contains a handle to a
+mutant object. Various portions of the system use this mutant to
+synchronize within the process. The functions
+<strong>RtlAcquirePebLock</strong> and
+<strong>RtlReleasePebLock</strong> may be used to access this field.</p>
+<p><strong>PCOFF_HEADERS</strong> <em>ImageBaseAddress</em> - Contains
+the address of the image header of the processes initial image.</p>
+<p><strong>PPEB_LDR_DATA</strong> <em>Ldr</em> - Contains the address of
+the loaders per-process data. The value of this pointer is null until
+the first thread of a process initialzes the loader.</p>
+<p><strong>PEB_SM_DATA</strong> <em>Sm</em> - Contains Session Manager
+specific information.</p>
+<p><strong>PRTL_USER_PROCESS_PARAMETERS</strong>
+<em>ProcessParameters</em> - Contains the address of the processes
+startup parameters.</p>
+<p><strong>PVOID</strong> <em>SubsystemData</em> - Contains the address
+of subsystem specific data.</p>
+<p><strong>PPEB_FREE_BLOCK</strong> <em>FreeList</em> - Contains the
+address of a dynamic area in the PEB. Calls to
+<strong>RtlAllocateFromPeb</strong> and <strong>RtlFreeToPeb</strong>
+are satisfied from this area.</p>
+<h2 id="ntopenprocess">3.6 NtOpenProcess</h2>
+<p>A handle to a process object can be created with the
+<strong>NtOpenProcess</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtOpenProcess</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN ACCESS_MASK</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes,</em></p>
+<p><strong>IN PCLIENT_ID</strong> <em>ClientId</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong>;</p>
+<p><u>Parameters:</u></p>
+<p><em>ProcessHandle</em> - A pointer to a variable that will receive
+the process object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the opened
+process. For a complete description of desired access flags, refer to
+the <strong>NtCreateProcess API</strong> description.</p>
+<p><em>ObjectAttributes</em> - An pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object Management
+Specification</em> for details. Note that <em>OBJ_PERMANENT,
+OBJ_EXCLUSIVE, OBJ_OPEN_IF</em>, and <em>OBJ_OPEN_LINK</em> are not
+valid attributes for a process object.</p>
+<p><em>ClientId</em> - An optional parameter that if specified, supplies
+the client ID of a thread whose process is to be opened. It is an error
+to specify this parameter along with the an <em>ObjectAttributes</em>
+variable that contains a process name.</p>
+<p>Opening a process object causes a new handle to be created. The
+access that the new handle has to the process object is a function of
+the desired access and any <em>SECURITY_DESCRIPTOR</em> on the process
+object</p>
+<h2 id="ntqueryinformationprocess">3.7 NtQueryInformationProcess</h2>
+<p>Selected information about a process can be retrieved using the
+<strong>NtQueryInformationProcess</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQueryInformationProcess</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN PROCESSINFOCLASS</strong>
+<em>ProcessInformationClass</em></p>
+<p><strong>OUT PVOID</strong> <em>ProcessInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>ProcessInformationLength,</em></p>
+<p><strong>OUT</strong> <strong>PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ProcessHandle</em> - A variable that specifies the handle to a
+process from which to retrieve information.</p>
+<p><em>ProcessInformationClass</em> - A variable that specifies the type
+of information to retrieve from the specified process object.</p>
+<p>ProcessInformationClass Values</p>
+<p><em>ProcessBasicInformation -</em> Returns the basic information
+about the specified process. This information class value requires
+<em>PROCESS_QUERY_INFORMATION</em> access to the process.</p>
+<p><em>ProcessQuotaLimits</em> - Returns the quota limits of the
+specified process. This information class requires
+<em>PROCESS_QUERY_INFORMATION</em> access to the process.</p>
+<p><em>ProcessIoCounters</em> - Returns the input/output counters of the
+specified process. This information class requires
+<em>PROCESS_QUERY_INFORMATION</em> access to the process.</p>
+<p><em>ProcessVmCounters</em> - Returns the virtual memory counters of
+the specified process. This information class requires
+<em>PROCESS_QUERY_INFORMATION</em> access to the process.</p>
+<p><em>ProcessTimes</em> - Returns the cpu time usage of the specified
+process. This information class requires
+<em>PROCESS_QUERY_INFORMATION</em> access to the process.</p>
+<p><em>ProcessLdtInformation</em> - Returns the contents of the Ldt for
+the process. Requires <em>PROCESS_VM_READ</em> access to the process.
+Returns <em>STATUS_NOT_SUPPORTED</em> on non i386 (and compatible)
+processors.</p>
+<p><em>ProcessInformation</em> - A pointer to a buffer that will receive
+information about the specified process. The format and contents of the
+buffer depend on the specified information class being queried.</p>
+<p>ProcessInformation Format by Information Class</p>
+<p><em>ProcessBasicInformation -</em> Data type is
+<em>PPROCESS_BASIC_INFORMATION</em>.</p>
+<p>PROCESS_BASIC_INFORMATION Structure</p>
+<p><strong>NTSTATUS</strong> <em>ExitStatus</em> - Specifies the exit
+status of the process. This field only contains meaningful information
+if the process is in the signaled state; otherwise, it contains a value
+of "exit status pending".</p>
+<p><strong>PPEB</strong> <em>PebBaseAddress</em> - Specifies the base
+address of the processes PEB.</p>
+<p><strong>KPRIORITY</strong> <em>BasePriority</em> - Specifies the base
+priority of the process.</p>
+<p><strong>KAFFINITY</strong> <em>AffinityMask</em> - Specifies the
+default affinity mask assigned to each thread in the process during
+thread creation.</p>
+<p><em>ProcessQuotaLimits</em> - Data type is
+<em>PQUOTA_LIMITS</em>.</p>
+<p>QUOTA_LIMITS Structure</p>
+<p><strong>ULONG</strong> <em>PagedPoolLimit</em> - Specifies the
+maximum amount of paged pool (in bytes) that can be used by the
+process.</p>
+<p><strong>ULONG</strong> <em>NonPagedPoolLimit</em> - Specifies the
+maximum amount of nonpaged pool (in bytes) that can be used by the
+process.</p>
+<p><strong>ULONG</strong> <em>MinimumWorkingSetSize</em> - Specifies the
+minimum working set size (in bytes) for the process.</p>
+<p><strong>ULONG</strong> <em>MaximumWorkingSetSize</em> - Specifies the
+maximum working set size (in bytes) for the process.</p>
+<p><strong>ULONG</strong> <em>PagefileLimit</em> - Specifies the maximum
+amount of pagefile space (in bytes) that can be used by the process.</p>
+<p><strong>TIME</strong> <em>TimeLimit</em> - Specifies the maximum
+number of 100ns units that the process can execute for.</p>
+<p><em>ProcessIoCounters</em> - Data type is <em>PIO_COUNTERS</em>.</p>
+<p>IO_COUNTERS Structure</p>
+<p><strong>ULONG</strong> <em>ReadOperationCount</em> - Specifies the
+number of read I/O operations performed by the process.</p>
+<p><strong>ULONG</strong> <em>WriteOperationCount</em> - Specifies the
+number of write I/O operations performed by the process.</p>
+<p><strong>ULONG</strong> <em>OtherOperationCount</em> - Specifies the
+number of other I/O operations (not read or write) performed by the
+process.</p>
+<p><strong>LARGE_INTEGER</strong> <em>ReadTransferCount</em> - Specifies
+the number of bytes transferred through read I/O operations.</p>
+<p><strong>LARGE_INTEGER</strong> <em>WriteTransferCount</em> -
+Specifies the number of bytes transferred through write I/O
+operations.</p>
+<p><strong>LARGE_INTEGER</strong> <em>OtherTransferCount</em> -
+Specifies the number of bytes transferred through other I/O
+operations.</p>
+<p><em>ProcessVmCounters</em> - Data type is <em>PVM_COUNTERS</em>.</p>
+<p>VM_COUNTERS Structure</p>
+<p><strong>ULONG</strong> <em>PeakVirtualSize</em> - Specifies the
+largest virtual address space size (in bytes) that the process has
+reached.</p>
+<p><strong>ULONG</strong> <em>VirtualSize</em> - Specifies the current
+virtual address space size (in bytes) of the process.</p>
+<p><strong>ULONG</strong> <em>PageFaultCount</em> - Specifies the number
+of pagefaults incurred by the process.</p>
+<p><strong>ULONG</strong> <em>PeakWorkingSetSize</em> - Specifies the
+largest working set size (in bytes) that the process has reached.</p>
+<p><strong>ULONG</strong> <em>WorkingSetSize</em> - Specifies the
+current working set size (in bytes) of the process.</p>
+<p><strong>ULONG</strong> <em>QuotaPeakPagedPoolSize</em> - Specifies
+the largest amount of paged pool (in bytes) that the process has used
+and has been charged quota for.</p>
+<p><strong>ULONG</strong> <em>QuotaPagedPoolSize</em> - Specifies the
+current amount of paged pool (in bytes) in use by the process and being
+charged to the process.</p>
+<p><strong>ULONG</strong> <em>QuotaNonPeakPagedPoolSize</em> - Specifies
+the largest amount of nonpaged pool (in bytes) that the process has used
+and has been charged quota for.</p>
+<p><strong>ULONG</strong> <em>QuotaNonPagedPoolSize</em> - Specifies the
+current amount of nonpaged pool (in bytes) in use by the process and
+being charged to the process.</p>
+<p><strong>ULONG</strong> <em>PagefileUsage</em> - Specifies the current
+amount of pagefile space (in bytes) in use by the process.</p>
+<p><em>ProcessTimes</em> - Data type is <em>PKERNEL_USER_TIMES</em>.</p>
+<p>KERNEL_USER_TIMES Structure</p>
+<p><strong>TIME</strong> <em>UserTime</em> - Specifies the number of
+100ns units that the process has spent executing in user mode.</p>
+<p><strong>TIME</strong> <em>KernelTime</em> - Specifies the number of
+100ns units that the process has spent executing in kernel mode.</p>
+<p><strong>TIME</strong> <em>CreateTime</em> - Specifies the time that
+the process was created.</p>
+<p><strong>TIME</strong> <em>ExitTime</em> - Specifies the time that the
+process terminated.</p>
+<p><em>ProcessLdtInformation</em> - Data type is
+<em>PPROCESS_LDT_INFORMATION</em>.</p>
+<p>PROCESS_LDT_INFORMATION Structure</p>
+<p><strong>ULONG</strong> <em>Start</em> - Specifies the starting offset
+in the LDT to return descriptors from. It must be 0 mod 8. If this value
+is larger than the current size of the LDT, no information will be put
+into the LdtEntries field.</p>
+<p><strong>ULONG</strong> <em>Length</em> - Supplies the length of the
+section of the LDT to return. Must be 0 mod 8. Returns the length of the
+Ldt. Will always be set.</p>
+<p><strong>LDT_ENTRY</strong> <em>LdtEntries[1]</em> - Variable size
+array of LDT_ENTRYs, is the actual Ldt data in hardware format.</p>
+<p><em>ProcessInformationLength</em> - Specifies the length in bytes of
+the process information buffer (i.e. size of the information
+structure).</p>
+<p><em>ReturnLength</em> - An optional parameter that if specified,
+receives the number of bytes placed in process information buffer.</p>
+<h2 id="ntsetinformationprocess">3.8 NtSetInformationProcess</h2>
+<p>Selected information can be set in a process using the
+<strong>NtSetInformationProcess</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtSetInformationProcess</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN PROCESSINFOCLASS</strong>
+<em>ProcessInformationClass,</em></p>
+<p><strong>IN PVOID</strong> <em>ProcessInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>ProcessInformationLength</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ProcessHandle</em> - A variable that specifies the handle to a
+process to set information into.</p>
+<p><em>ProcessInformationClass</em> - A variable that specifies the type
+of information to set into the specified process object.</p>
+<p>ProcessInformationClass Values</p>
+<p><em>ProcessBasePriority -</em> Sets the base priority of the
+specified process. This information class value requires
+<em>PROCESS_SET_INFORMATION</em> access to the process.</p>
+<p><em>ProcessQuotaLimits -</em> Sets the quota limits associated with
+the process. This information class value requires
+<em>PROCESS_SET_QUOTA</em> access to the process. If an attempt is made
+to increase quota, a privilege check is done to ensure that the calling
+process has <em><strong>TBD</strong></em> privilege.</p>
+<p><em>ProcessAccessToken</em> - Sets the primary access token of the
+specified process. This information class requires
+<em>PROCESS_SET_INFORMATION</em> access to the process. Furthermore, the
+caller must have <strong>SeAssignPrimaryTokenPrivilege</strong>
+privilege.<br />
+<br />
+Since the process access token is inherited during process creation,
+this operation only needs to be performed when a process is being
+created for a new user or for a privileged application.</p>
+<p><em>ProcessDebugPort</em> - Sets the debug port of the specified
+process. If the process already has a debug port either through process
+creation, or a previous call to <strong>NtSetInformationProcess</strong>
+then an error is returned. This information class requires
+<em>PROCESS_SET_PORT</em> access to the process.</p>
+<p><em>ProcessExceptionPort</em> - Sets the exception port of the
+specified process. If the process already has an exception port either
+through process creation, or a previous call to
+<strong>NtSetInformationProcess</strong> then an error is returned. This
+information class requires <em>PROCESS_SET_PORT</em> access to the
+process.</p>
+<p><em>ProcessLdtInformation</em> - Returns the contents of the Ldt for
+the process. Requires <em>PROCESS_VM_WRITE</em> access to the process.
+Returns <em>STATUS_NOT_SUPPORTED</em> on non i386 (and compatible)
+processors.</p>
+<p><em>ProcessLdtSize</em> - Returns the size of the Ldt for the
+process. <em>PROCESS_VM_WRITE</em> access required. Returns
+<em>STATUS_NOT_SUPPORTED</em> on non i386 (and compatible)
+processors.</p>
+<p><em>ProcessInformation</em> - A pointer to a buffer that contains the
+information to set in the specified process. The format and contents of
+the buffer depend on the specified information class being queried.</p>
+<p>ProcessInformation Format by Information Class</p>
+<p><em>ProcessBasePriority -</em> Data type is <em>KPRIORITY</em>.</p>
+<p><strong>KPRIORITY</strong> <em>BasePriority</em> - Specifies the base
+priority of the process.</p>
+<p><em>ProcessQuotaLimits</em> - Data type is
+<em>PQUOTA_LIMITS</em>.</p>
+<p>QUOTA_LIMITS Structure</p>
+<p><strong>ULONG</strong> <em>PagedPoolLimit</em> - Specifies the
+maximum amount of paged pool (in bytes) that can be used by the
+process.</p>
+<p><strong>ULONG</strong> <em>NonPagedPoolLimit</em> - Specifies the
+maximum amount of nonpaged pool (in bytes) that can be used by the
+process.</p>
+<p><strong>ULONG</strong> <em>MinimumWorkingSetSize</em> - Specifies the
+minimum working set size (in bytes) for the process.</p>
+<p><strong>ULONG</strong> <em>MaximumWorkingSetSize</em> - Specifies the
+maximum working set size (in bytes) for the process.</p>
+<p><strong>ULONG</strong> <em>PagefileLimit</em> - Specifies the maximum
+amount of pagefile space (in bytes) that can be used by the process.</p>
+<p><strong>TIME</strong> <em>TimeLimit</em> - Specifies the maximum
+number of 100ns units that the process can execute for.</p>
+<p><em>ProcessAccessToken</em> - Data type is <em>PHANDLE</em>. The
+handle is expected to be to a Token object. The handle must have been
+opened to provide <strong>TOKEN_ASSIGN_PRIMARY</strong> access.</p>
+<p><em>ProcessDebugPort</em> - Data type is <em>PHANDLE</em>.</p>
+<p><em>ProcessExceptionPort</em> - Data type is <em>PHANDLE</em>.</p>
+<p><em>ProcessLdtInformation</em> - Data type is
+<em>PPROCESS_LDT_INFORMATION</em>.</p>
+<p>PROCESS_LDT_INFORMATION Structure</p>
+<p><strong>ULONG</strong> <em>Start</em> - Offset in Ldt of first entry
+to set. Must be 0 mod 8.</p>
+<p><strong>ULONG</strong> <em>Length</em> - Length of section of Ldt to
+set. Must be 0 mod 8.</p>
+<p><strong>LDT_ENTRY</strong> <em>LdtEntries[1]</em> - Variable size
+array of LDT_ENTRYs, is the actual Ldt data in hardware format.</p>
+<p><em>ProcessLdtSize</em> - Data type is
+<em>PPROCESS_LDT_SIZE</em>.</p>
+<p>PROCESS_LDT_SIZE Structure</p>
+<p><strong>ULONG</strong> <em>Length</em> - Size to set Ldt to. Setting
+0 sets a null Ldt. Can be used to truncate the Ldt. Must be 0 mod 8.</p>
+<p><em>ProcessInformationLength</em> - Specifies the length in bytes of
+the process information buffer.</p>
+<h1 id="thread-object-apis">4. Thread Object APIs</h1>
+<p>The following programming interfaces support the thread object:</p>
+<p><strong>NtCreateThread</strong> - Creates a thread object.</p>
+<p><strong>NtTerminateThread</strong> - Terminates a thread object.</p>
+<p><strong>NtCurrentThread</strong> - Identifies the currently executing
+thread.</p>
+<p><strong>NtCurrentTeb</strong> - Returns the address of the current
+thread's Thread Environment Block (TEB).</p>
+<p><strong>NtSuspendThread</strong> - Suspends user-mode execution of a
+thread.</p>
+<p><strong>NtResumeThread</strong> - Resumes user-mode execution of a
+thread.</p>
+<p><strong>NtGetContextThread</strong> - Returns the user-mode context
+of a thread.</p>
+<p><strong>NtSetContextThread</strong> - Sets the user-mode context of a
+thread.</p>
+<p><strong>NtOpenThread</strong> - Returns a handle to a thread
+object.</p>
+<p><strong>NtQueryInformationThread</strong> - Returns information about
+the thread.</p>
+<p><strong>NtSetInformationThread</strong> - Sets information about the
+thread.</p>
+<p><strong>NtImpersonateThread</strong> - Set one thread to be
+impersonating another thread.</p>
+<p><strong>NtAlertThread</strong> - Alerts the specified thread.</p>
+<p><strong>NtTestAlert</strong> - Tests for an alert condition.</p>
+<p><strong>NtAlertResumeThread</strong> - Alerts and resumes the
+specified thread.</p>
+<p><strong>NtRegisterThreadTerminationPort</strong> - Adds a port
+notification descriptor to the specified thread.</p>
+<h2 id="access-type-and-privilege-information-1">4.1 Access Type And
+Privilege Information</h2>
+<p><u>Object type-specific access types:</u></p>
+<p>The object type-specific access types are defined below.</p>
+<p><strong>THREAD_TERMINATE</strong> - Required to terminate a
+thread.</p>
+<p><strong>THREAD_SUSPEND_RESUME</strong> - Required to suspend or
+resume a thread.</p>
+<p><strong>THREAD_ALERT</strong> - Required to alert a thread using
+either <strong>NtAlertThread</strong> or
+<strong>NtAlertResumeThread</strong>.</p>
+<p><strong>THREAD_GET_CONTEXT</strong> - Required to read a thread's
+context (using <strong>NtGetContextThread</strong> ).</p>
+<p><strong>THREAD_SET_CONTEXT</strong> - Required to modify a thread's
+context (using <strong>NtSetContextThread</strong> ).</p>
+<p><strong>THREAD_SET_INFORMATION</strong> - Required to modify certain
+attributes of a thread.</p>
+<p><strong>THREAD_QUERY_INFORMATION</strong> - Required to read certain
+attributes of a thread. This access type is also needed to open the
+impersonation token of a thread (using
+<strong>NtOpenThreadToken()</strong> ).</p>
+<p><strong>THREAD_SET_THREAD_TOKEN</strong> - Required to explicitly
+assign an impersonation token to the thread. In some cases,
+impersonation will happen automatically (e.g., as a result of a call
+from a client via LPC). However, to explicitly assign an impersonation
+token (via a handle) to a thread (also via a handle), requires this
+access to the thread.</p>
+<p><strong>THREAD_IMPERSONATE</strong> - Required to directly
+impersonate a thread. In some instances this access is not required to
+impersonate a thread. In particular, when a thread calls a server using
+an communication session layer that supports security quality of
+service(<a href="#fn1" class="footnote-ref" id="fnref1"
+role="doc-noteref"><sup>1</sup></a>), then the server does not need to
+directly access the thread to impersonate. However, in some cases it is
+desireable to allow a server to impersonate a thread without using a
+communication session layer to impersonate a client. In that case, the
+target client thread may be opened for this access, and then a call made
+to <strong>NtImpersonateThread()</strong>.</p>
+<p><u>Generic Access Masks:</u></p>
+<p>The object type-specific mapping of generic access types to
+non-generic access types for this object type are:</p>
+<blockquote>
+<p><strong>GENERIC_READ STANDARD_READ |<br />
+THREAD_GET_CONTEXT |<br />
+THREAD_QUERY_INFORMATION<br />
+<br />
+GENERIC_WRITE STANDARD_WRITE |<br />
+THREAD_TERMINATE |<br />
+THREAD_SUSPEND_RESUME |<br />
+THREAD_THREAD_ALERT |<br />
+THREAD_SET_CONTEXT |<br />
+THREAD_SET_INFORMATION<br />
+<br />
+<br />
+GENERIC_EXECUTE STANDARD_EXECUTE |<br />
+THREAD_SET_THREAD_TOKEN |<br />
+SYNCHRONIZE<br />
+</strong></p>
+</blockquote>
+<p><u>Standard Access Types:</u></p>
+<p>This object type supports the optional SYNCHRONIZE standard access
+type. All required access types are supported by the object manager.</p>
+<p>The mask of all supported access types for this object is:</p>
+<blockquote>
+<p><strong>THREAD_ALL_ACCESS STANDARD_RIGHTS_REQUIRED |<br />
+SYNCHRONIZE |<br />
+THREAD_GET_CONTEXT |<br />
+THREAD_QUERY_INFORMATION |<br />
+THREAD_TERMINATE |<br />
+THREAD_SUSPEND_RESUME |<br />
+THREAD_THREAD_ALERT |<br />
+THREAD_SET_CONTEXT |<br />
+THREAD_SET_INFORMATION |<br />
+THREAD_SET_THREAD_TOKEN |<br />
+THREAD_IMPERSONATE |<br />
+THREAD_DIRECT_IMPERSONATION<br />
+</strong></p>
+</blockquote>
+<h2 id="ntcreatethread">4.2 NtCreateThread</h2>
+<p>A thread object can be created and a handle opened for access to the
+thread with the <strong>NtCreateThread</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateThread</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>IN ACCESS_MASK</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>OUT PCLIENT_ID</strong> <em>ClientId,</em></p>
+<p><strong>IN PCONTEXT</strong> <em>ThreadContext,</em></p>
+<p><strong>IN PINITIAL_TEB</strong> <em>InitialTeb,</em></p>
+<p><strong>IN BOOLEAN</strong> <em>CreateSuspended</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - A pointer to a variable that will receive the
+thread object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the created
+thread.</p>
+<p><em>ObjectAttributes</em> - An optional pointer to a structure that
+specifies the object's attributes. Refer to the <em>Object Management
+Specification</em> for details. Note that <em>OBJ_PERMANENT,
+OBJ_EXCLUSIVE, OBJ_OPEN_IF</em>, and <em>OBJ_OPEN_LINK</em> are not
+valid attributes for a thread object.</p>
+<p><em>ProcessHandle</em> - An open handle to the process object that
+the thread is to run in. The subject thread must have
+<em>PROCESS_CREATE_THREAD</em> access to this process. The value of this
+argument may be the value returned by <strong>NtCurrentProcess</strong>
+to specify that the new thread is to be created in the context of the
+current process.</p>
+<p><em>ClientId</em> - A pointer to a structure that will receive the
+client identifier of the new thread. Each thread in the system is
+assigned a client identifier value. A client identifier remains valid
+from the time the thread is created until it is terminated. The value of
+the client identifier is unique for each thread in the system. The
+client identifier contains two fields. One field is unique for each
+process in the system, and one field is unique for each thread in the
+system.</p>
+<p>ClientId Structure</p>
+<p><strong>ULONG</strong> <em>UniqueProcess</em> - Unique value for each
+process in the system.</p>
+<p><strong>ULONG</strong> <em>UniqueThread</em> - Unique value for each
+thread in the system.</p>
+<p><em>ThreadContext</em> - A pointer to the structure that contains the
+new thread's initial user mode context.</p>
+<p><em>InitialTeb</em> - A pointer to a structure that specifies initial
+values for portions of the thread's TEB.</p>
+<p>InitialTeb Structure</p>
+<p><strong>PVOID</strong> <em>StackBase</em> - Contains the base address
+of the thread's stack.</p>
+<p><strong>PVOID</strong> <em>StackLimit</em> - Contains the stack limit
+for the thread.</p>
+<p><strong>PVOID</strong> <em>EnvironmentPointer</em> - Unspecified.</p>
+<p><em>CreateSuspended</em> - A parameter that specifies whether or not
+the thread is to be created suspended. If the value of this parameter is
+<strong>TRUE</strong>, then the thread is created in a suspended state.
+The thread will not begin executing until it is explicitly resumed using
+<strong>NtResumeThread</strong>. If the value of this parameter is
+<strong>FALSE</strong>, then the thread begins execution in user-mode
+using the specified context.</p>
+<p>Creating a thread object causes a new thread to be created. The new
+thread is assigned some of its initial attributes from the process
+object it is being created to run in.</p>
+<p>o The new thread's priority is the same as its process's base
+priority.</p>
+<p>o The new thread's processor affinity mask is the same as its
+process's default processor affinity mask.</p>
+<p>o The new thread's access token is the same as its process's.</p>
+<p>All threads begin execution with a user-mode APC to system code that
+is part of each processes address space. This code optionally
+initializes the loaders data structures and resolves dynamic link
+library references. When the APC routine returns, the thread's context
+is restored. Normally, this context is the same as that specified during
+thread creation.</p>
+<p>The thread object is a waitable object. A wait performed on a thread
+object is satisfied when the thread becomes signaled. A thread becomes
+signaled when it terminates.</p>
+<p>Each thread is created with a Thread Environment Block (TEB). The TEB
+is readable and writeable by the application, but can only be deleted by
+the system. The TEB is partially initialized by the system and is placed
+in the address space of the specified process.</p>
+<p>The TEB contains thread local context such as stack base and bounds,
+environment pointer (used by subsystems/dll's), thread local storage
+descriptors, and the thread's client id. The thread's creator is
+responsible for initializing the TEB's stack base and bounds since it is
+also responsible for creating the thread's stack.</p>
+<p>The function <strong>NtCurrentTeb</strong> returns the address of the
+current thread's TEB. Access to TEB locations must be made through this
+API. The TEB of each thread is located at a different address. The
+system will guarantee that TEB access of the form:</p>
+<p><em>foo = NtCurrentTeb()-&gt;StackBase;</em></p>
+<p><em>NtCurrentTeb()-&gt;EnvironmentPointer =
+&amp;PsxEnvironment;</em></p>
+<p>will cause locations in the current thread's TEB to be
+referenced.</p>
+<h2 id="ntterminatethread">4.3 NtTerminateThread</h2>
+<p>A thread can be terminated with the
+<strong>NtTerminateThread</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtTerminateThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN NTSTATUS</strong> <em>ExitStatus</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - An optional parameter, that if specified,
+supplies an open handle with <strong>THREAD_TERMINATE</strong> access to
+the thread to terminate. If this parameter is not supplied, then
+<strong>THREAD_TERMINATE</strong> access is required to the current
+thread and the API terminates the current thread in the process except
+for the case where the current thread is the last thread in the current
+process. In this case, a status code of
+<em>STATUS_CANT_TERMINATE_SELF</em> is returned.</p>
+<p><em>ExitStatus</em> - A value that specifies the exit status of the
+thread to be terminated.</p>
+<p>Terminating a thread causes the specified thread to terminate its
+execution. If the target thread is currently suspended, it will be
+resumed so that it can begin termination. Once termination begins, the
+thread will no longer execute in either user mode or kernel mode. The
+handle to the thread being terminated is not closed by this service. If
+the thread was suspended and resumed by this API an informational status
+code of <em>STATUS_THREAD_WAS_SUSPENDED</em> is returned.</p>
+<p>In order to terminate a thread, the calling thread must have
+<em>THREAD_TERMINATE</em> access to the specified thread.</p>
+<p>Once a thread has become the target thread in a valid call to
+<strong>NtTerminateThread</strong> (i.e. the calling thread has
+<em>THREAD_TERMINATE</em> access to the target thread), the target
+thread will terminate without executing another instruction in
+user-mode. This is accomplished by queueing a special kernel-mode APC to
+the thread which queues a user-mode APC to the target thread and
+user-mode alerts the thread. The kernel routine associated with the
+user-mode APC will cause the thread to terminate itself. To guarantee
+the delivery of the user-mode APC (i.e. to bypass the alert mechanism),
+the user APC pending bit in the target thread is set during the
+execution of the special kernel-mode APC.</p>
+<p>During thread termination, the terminating thread's port notification
+list is processed. For each entry in the list, a thread termination
+datagram is sent to the port. The system blindly ignores any errors
+sending this datagram (e.g. port disconnect...).</p>
+<p>After the thread is terminated (and set to the signaled state), the
+thread's TEB is deallocated from the address space of the thread's
+process and its exit status is updated to reflect the value of the exit
+status argument. The system does not delete the thread's user-mode
+stack.</p>
+<p>Once terminated, the thread's client identifier is available for
+re-use.</p>
+<p>If the terminating thread is the last thread in its process, its
+process is terminated (via an internal call to
+<strong>NtTerminateProcess(NtCurrentProcess(), ExitStatus);</strong>).
+There is no mechanism that a subsystem can use to prevent this from
+happening.</p>
+<h2 id="ntcurrentthread">4.4 NtCurrentThread</h2>
+<p>An object handle to the current thread can be fabricated with the
+<strong>NtCurrentThread</strong> function:</p>
+<p><strong>HANDLE</strong></p>
+<p><strong>NtCurrentThread</strong>();</p>
+<p>The <strong>NtCurrentThread</strong> function returns a pseudo handle
+to the currently executing thread. The handle can be used whenever a
+handle to a thread object is required (e.g.
+<strong>NtTerminateThread</strong>).</p>
+<p>When the system is asked to translate an object handle into an object
+pointer, the object type is a thread object, and the object handle is
+the pseudo handle returned by <strong>NtCurrentThread</strong>, the
+following occurs.</p>
+<p>o The <strong>SECURITY_DESCRIPTOR</strong> of the current thread is
+checked against the desired access specified in the object translation
+call. If access is denied, a failure status is returned to the
+caller.</p>
+<p>o If access is allowed, the appropriate reference count in the
+current thread object is adjusted and a pointer to the current thread
+object is returned.</p>
+<p>This function is designed mainly for the use of native applications
+so that they can refer to their own thread in thread termination calls,
+thread creation calls, and thread control calls without having to
+explicitly open their thread by name or otherwise obtain a handle to
+their own thread.</p>
+<h2 id="ntcurrentteb">4.5 NtCurrentTeb</h2>
+<p>The address of the current thread's <strong>TEB</strong> can be
+located with the <strong>NtCurrentTeb</strong> function:</p>
+<p><strong>PTEB</strong></p>
+<p><strong>NtCurrentTeb()</strong></p>
+<p>The <strong>NtCurrentTeb</strong> function returns the address of the
+current thread's <strong>TEB</strong>. The <strong>TEB</strong> consists
+of a single page in the address space of the thread's process. The page
+is allocated and deallocated by the system at thread creation/thread
+termination. Only the system may delete a thread's <strong>TEB</strong>.
+The <strong>TEB</strong> contains the following:</p>
+<p>Teb Structure</p>
+<p><strong>PEXCEPTION_REGISTRATION_RECORD</strong>
+<em>ExceptionRegistrationRecord</em> - Contains the base address of the
+thread's exception handler chain. This field is only used on
+implementations that require this sort of exception handler
+registration.</p>
+<p><strong>PVOID</strong> <em>StackBase</em> - Contains the base address
+of the thread's stack.</p>
+<p><strong>PVOID</strong> <em>StackLimit</em> - Contains the stack limit
+for the thread.</p>
+<p><strong>PVOID</strong> <em>EnvironmentPointer</em> - Unspecified.</p>
+<p><strong>ULONG</strong> <em>Version</em> - Unspecified.</p>
+<p><strong>PVOID</strong> <em>ArbitraryUserPointer</em> -
+Unspecified.</p>
+<p><strong>CLIENT_ID</strong> <em>ClientId</em> - Contains the client
+identifier of the thread.</p>
+<p><strong>PVOID</strong> <em>ActiveRpcHandle</em> - Reserved for use by
+the <em>Microsoft Remote Procedure Call</em> <em>Runtime
+Package</em>.</p>
+<p><strong>PVOID</strong> <em>ThreadLocalStoragePointer</em> - Reserved
+for runtime support.</p>
+<p><strong>PPEB</strong> <em>ProcessEnvironmentBlock</em> - Contains the
+base address of the thread's PEB.</p>
+<p><strong>PVOID</strong> <em>UserReserved[USER_RESERVED_TEB]</em> - TEB
+locations reserved for applications.</p>
+<p><strong>PVOID</strong> <em>SystemReserved[SYSTEM_RESERVED_TEB]</em> -
+TEB locations reserved for Microsoft system software.</p>
+<h2 id="ntsuspendthread">4.6 NtSuspendThread</h2>
+<p>A thread can be suspended with the <strong>NtSuspendThread</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtSuspendThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>OUT PULONG</strong> <em>PreviousSuspendCount</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - A handle to the thread to be suspended.</p>
+<p><em>PreviousSuspendCount</em> - A pointer to the variable that
+receives the thread's previous suspend count.</p>
+<p>Suspending a thread causes the thread to stop executing in user-mode.
+If the thread is resumed without altering its context and its previous
+suspend count is one, then the thread resumes execution at the point
+that it was suspended. If the specified thread is either terminated or
+is currently terminating, an error status of
+<em>STATUS_THREAD_IS_TERMINATING</em> is returned.</p>
+<p>The suspension of a thread is controlled by a suspend count. This
+count has a maximum value. If an attempt is made to suspend a thread
+whose suspend count is at its maximum, an error is returned When an
+attempt is made to suspend a thread, the thread's suspend count is
+incremented. If the previous value of the suspend count was zero, then a
+kernel mode APC is queued to the thread. When the APC executes, it
+causes the thread to wait on its built-in suspend semaphore ( the wait
+is not alertable ). The previous value of the thread's suspend count is
+returned to the caller. A non-zero value indicates that the thread was
+previously suspended. The value plus 1 specifies the number of calls to
+<strong>NtResumeThread</strong> that must be made in order to bring the
+thread out of the suspend state.</p>
+<p>This service requires <em>THREAD_SUSPEND_RESUME</em> access to the
+specified thread.</p>
+<h2 id="ntresumethread">4.7 NtResumeThread</h2>
+<p>A thread can be resumed with the <strong>NtResumeThread</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtResumeThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>OUT PULONG</strong> <em>PreviousSuspendCount</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - A handle to the thread to be resumed.</p>
+<p><em>PreviousSuspendCount</em> - A pointer to the variable that
+receives the thread's previous suspend count.</p>
+<p>Resuming a thread reverses the effects of a previous call to
+<strong>NtSuspendThread</strong>.</p>
+<p>When an attempt is made to resume a thread, the thread's suspend
+count is examined. If the count is zero, then the service returns the
+suspend count. Otherwise, the count is decremented and if the count
+reaches zero, the thread resumes. In either case, the previous value of
+the thread's suspend count is returned. A non-zero value indicates that
+the thread was previously suspended. The value minus 1 specifies the
+number of calls to <strong>NtResumeThread</strong> that must be made in
+order to bring the thread out of the suspend state.</p>
+<p>This service requires <em>THREAD_SUSPEND_RESUME</em> access to the
+specified thread.</p>
+<h2 id="ntgetcontextthread">4.8 NtGetContextThread</h2>
+<p>A thread's user-mode machine context can be read using the
+<strong>NtGetContextThread</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtGetContextThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>IN OUT PCONTEXT</strong> <em>ThreadContext</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - An open handle to the thread object from
+which to retrieve context information.</p>
+<p><em>ThreadContext</em> - A pointer to the structure that will receive
+the user mode context of the specified thread. The initial value of the
+context flags field indicates the type and amount of context returned by
+this function.</p>
+<p>The <strong>NtGetContextThread</strong> function is designed to
+facilitate the implementation of debuggers, and to allow subsystems to
+control the execution flow of their threads (e.g.; emulate signal
+delivery or APC delivery).</p>
+<p>The <strong>NtGetContextThread</strong> function is absolutely NOT
+PORTABLE! The layout, contents, and length of the <em>PCONTEXT</em>
+structure depend on the processor and system architecture of the system
+servicing the <strong>NtGetContextThread</strong> function.</p>
+<p>This service requires <em>THREAD_GET_CONTEXT</em> access to the
+specified thread.</p>
+<p>The <strong>NtGetContextThread</strong> function is implemented
+by:</p>
+<p>o Validating its arguments and translating the thread handle.</p>
+<p>o Assuming everything is valid, it allocates a buffer for the
+thread's user-mode context. It then queues a special kernel-mode APC to
+the thread, and waits on an event located in the allocated buffer.</p>
+<p>o When the APC executes, the thread dumps its user-mode context into
+the buffer and sets an event (located in the allocated buffer)
+indicating that the context dump is complete.</p>
+<p>\ The APC is actually a special kernel mode APC, so that it can work
+even on a thread that is stuck in a suspend. \</p>
+<p>o The target thread returns to whatever it was doing, and the thread
+calling <strong>NtGetContextThread</strong> copies the user-mode context
+from the allocated buffer into the thread context buffer passed in the
+system service. The allocated buffer is freed and the
+<strong>NtGetContextThread</strong> service completes.</p>
+<p>The specified thread does not need to be in a suspend state in order
+to call <strong>NtGetContextThread</strong> (subsystems and debuggers
+must explicitly do this if that is what is required). There is nothing
+to prevent a thread from calling <strong>NtGetContextThread</strong> on
+itself.</p>
+<h2 id="ntsetcontextthread">4.9 NtSetContextThread</h2>
+<p>A thread's user-mode machine context can be altered using the
+<strong>NtSetContextThread</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtSetContextThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>IN OUT PCONTEXT</strong> <em>ThreadContext</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - An open handle to the thread whose context is
+to be set.</p>
+<p><em>ThreadContext</em> - A pointer to the structure that contains the
+user-mode context to be restored into the specified thread. The initial
+value of the context flags field indicates the type and amount of
+context that will be restored by this function.</p>
+<p>The <strong>NtSetContextThread</strong> function is designed to
+facilitate the implementation of debuggers, and to allow subsystems to
+control the execution flow of their threads (e.g.; emulate signal
+delivery).</p>
+<p>The <strong>NtSetContextThread</strong> function is absolutely NOT
+PORTABLE! The layout, contents, and length of the <em>PCONTEXT</em>
+structure depend on the processor and system architecture of the system
+servicing the <strong>NtSetContextThread</strong> function. Some fields
+of the <em>PCONTEXT</em> structure contain registers that contain both
+user-mode and kernel-mode context. Setting kernel-mode portions of these
+registers is not an error, but is ignored.</p>
+<p>This service requires <em>THREAD_SET_CONTEXT</em> access to the
+specified thread.</p>
+<p>The <strong>NtSetContextThread</strong> function is implemented
+by:</p>
+<p>o Validating its arguments and translating the thread handle.</p>
+<p>o Any kernel-mode only portions of fields in the <em>PCONTEXT</em>
+structure are set to a benign value.</p>
+<p>o Assuming everything is valid, it allocates a buffer for the
+thread's user-mode context and copies the contents of the
+<em>ThreadContext</em> parameter into this buffer. It then queues a
+kernel-mode APC to the thread, and waits on an event located in the
+allocated buffer.</p>
+<p>o When the APC executes, it writes the thread's user-mode context
+using the contents of the buffer and sets an event (located in the
+allocated buffer) indicating it is done with the buffer.</p>
+<p>\ The APC is actually a special kernel mode APC, so that it can work
+even on a thread that is stuck in a suspend. \</p>
+<p>o The target thread returns to whatever it was doing. When the target
+thread transitions into user-mode, its user-mode context will be
+restored using the context passed in during the call.</p>
+<p>o The thread calling <strong>NtSetContextThread</strong> frees the
+allocated buffer and completes the service.</p>
+<p>The specified thread does not need to be in a suspend state in order
+to call <strong>NtSetContextThread</strong> (subsystems and debuggers
+must explicitly do this if that is what is required). There is also
+nothing that prevents the thread making the call to
+<strong>NtSetContextThread</strong> from being the target thread in the
+call.</p>
+<h2 id="ntopenthread">4.10 NtOpenThread</h2>
+<p>A handle to a thread object can be created with the
+<strong>NtOpenThread</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtOpenThread</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>IN ACCESS_MASK</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes,</em></p>
+<p><strong>IN PCLIENT_ID</strong> <em>ClientId</em>
+<strong>OPTIONAL</strong></p>
+<p><strong>)</strong>;</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - A pointer to a variable that will receive the
+thread object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the opened
+thread. For a complete description of desired access flags, refer to the
+<strong>NtCreateThread API</strong> description.</p>
+<p><em>ObjectAttributes</em> - An pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object Management
+Specification</em> for details. Note that <em>OBJ_PERMANENT,
+OBJ_EXCLUSIVE, OBJ_OPEN_IF</em>, and <em>OBJ_OPEN_LINK</em> are not
+valid attributes for a thread object.</p>
+<p><em>ClientId</em> - An optional parameter that if specified, supplies
+the client identifier of the thread to be opened. It is an error to
+specify this parameter along with an <em>ObjectAttributes</em> variable
+that contains a thread name.</p>
+<p>Opening a thread object causes a new handle to be created. The access
+that the new handle has to the thread object is a function of the
+desired access and any <em>SECURITY_DESCRIPTOR</em> on the thread
+object.</p>
+<h2 id="ntqueryinformationthread">4.11 NtQueryInformationThread</h2>
+<p>Selected information about a thread can be retrieved using the
+<strong>NtQueryInformationThread</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQueryInformationThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>IN THREADINFOCLASS</strong>
+<em>ThreadInformationClass</em></p>
+<p><strong>OUT PVOID</strong> <em>ThreadInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>ThreadInformationLength,</em></p>
+<p><strong>OUT</strong> <strong>PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - An open handle to the thread object from
+which to retrieve information.</p>
+<p><em>ThreadInformationClass</em> - A variable that specifies the type
+of information to retrieve from the specified thread object.</p>
+<p>ThreadInformationClass Values</p>
+<p><em>ThreadBasicInformation -</em> Returns the basic information about
+the specified thread. This information class value requires
+<em>THREAD_QUERY_INFORMATION</em> access to the thread.</p>
+<p><em>ThreadTimes</em> - Returns the cpu time usage of the specified
+thread. This information class requires
+<em>THREAD_QUERY_INFORMATION</em> access to the thread.</p>
+<p><em>ThreadDescriptorTableEntry</em> - Returns a descriptor from
+appropriate descriptor table for the thread. This information class will
+return a descriptor from either the Ldt, or the Gdt for the thread. This
+information class is only available on x86 processors, and returns
+STATUS_NOT_IMPLEMENTED on other processors. This information class
+requires <em>THREAD_QUERY_INFORMATION</em> access to the thread.</p>
+<p><em>ThreadInformation</em> - A pointer to a buffer that will receive
+information about the specified thread. The format and contents of the
+buffer depend on the specified information class being queried.</p>
+<p>ThreadInformation Format by Information Class</p>
+<p><em>ThreadBasicInformation -</em> Data type is
+<em>PTHREAD_BASIC_INFORMATION</em>.</p>
+<p>THREAD_BASIC_INFORMATION Structure</p>
+<p><strong>ULONG</strong> <em>ExitStatus</em> - Specifies the exit
+status of the thread. This field only contains meaningful information if
+the thread is in the signaled state; otherwise, it contains a value of
+"exit status pending".</p>
+<p><strong>PTEB</strong> <em>TebBaseAddress</em> - Specifies the virtual
+address of the thread's <strong>TEB</strong>.</p>
+<p><strong>CLIENT_ID</strong> <em>ClientId</em> - Specifies the thread's
+client identifier.</p>
+<p><strong>KPRIORITY</strong> <em>Priority</em> - Specifies the current
+priority of the thread.</p>
+<p><strong>KAFFINITY</strong> <em>AffinityMask</em> - Specifies the
+current processor affinity mask of the thread.</p>
+<p><em>ThreadTimes</em> - Data type is <em>PKERNEL_USER_TIMES</em>.</p>
+<p>KERNEL_USER_TIMES Structure</p>
+<p><strong>TIME</strong> <em>UserTime</em> - Specifies the number of
+100ns units that the thread has spent executing in user mode.</p>
+<p><strong>TIME</strong> <em>KernelTime</em> - Specifies the number of
+100ns units that the thread has spent executing in kernel mode.</p>
+<p><strong>TIME</strong> <em>CreateTime</em> - Specifies the time that
+the thread was created.</p>
+<p><strong>TIME</strong> <em>ExitTime</em> - Specifies the time that the
+thread terminated.</p>
+<p><em>ThreadDescriptorTableEntry</em> - Data type is
+<em>PDESCRIPTOR_TABLE_ENTRY</em></p>
+<p>DESCRIPTOR_TABLE_ENTRY Structure</p>
+<p><strong>ULONG</strong> <em>Selector</em> - Specifies the number of
+the descriptor to return.</p>
+<p><strong>LDT_ENTRY</strong> <em>Descriptor</em> - Returns the
+descriptor contents.</p>
+<p><em>ThreadInformationLength</em> - Specifies the length in bytes of
+the thread information buffer (i.e.: the size of the information
+structure).</p>
+<p><em>ReturnLength</em> - An optional parameter that if specified,
+receives the number of bytes placed in thread information buffer.</p>
+<h2 id="ntsetinformationthread">4.12 NtSetInformationThread</h2>
+<p>Selected information can be set in a thread using the
+<strong>NtSetInformationThread</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtSetInformationThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>IN THREADINFOCLASS</strong>
+<em>ThreadInformationClass,</em></p>
+<p><strong>IN PVOID</strong> <em>ThreadInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>ThreadInformationLength</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - A variable that specifies the handle to the
+thread to set information into.</p>
+<p><em>ThreadInformationClass</em> - A variable that specifies the type
+of information to set into the specified thread object.</p>
+<p>ThreadInformationClass Values</p>
+<p><em>ThreadPriority -</em> Sets the priority of the specified thread.
+This information class value requires <em>THREAD_SET_INFORMATION</em>
+access to the thread.</p>
+<p><em>ThreadAffinityMask</em> - Sets the processor affinity mask of the
+specified thread. This information class requires
+<em>THREAD_SET_INFORMATION</em> access to the thread.</p>
+<p><em>ThreadImpersonationToken</em> - A handle to an impersonation
+token to be assigned as the impersonation token of the thread. This
+requires <strong>THREAD_SET_THREAD_TOKEN</strong> to the thread object
+and <strong>TOKEN_IMPERSONATE</strong> access to the token object. If
+the handle value is null, then any impersonation already in progress is
+discontinued.</p>
+<p><em>ThreadInformation</em> - A pointer to a buffer that contains the
+information to set in the specified thread. The format and contents of
+the buffer depend on the specified information class being queried.</p>
+<p>ThreadInformation Format by Information Class</p>
+<p><em>ThreadPriority -</em> Data type is <em>PKPRIORITY</em>.</p>
+<p><strong>KPRIORITY</strong> <em>Priority</em> - Specifies the priority
+of the thread.</p>
+<p><em>ThreadAffinityMask -</em> Data type is <em>PKAFFINITY</em>.</p>
+<p><strong>KAFFINITY</strong> <em>AffinityMask</em> - Specifies the
+affinity mask assigned to the specified thread. The specified mask is
+anded with the process' default affinity mask and with the system wide
+affinity mask (which specifies the entire set of active processors in
+the system). The net effect is to limit a threads allowable affinity
+mask such that it is a subset of the maximum affinity mask in the
+current configuration, and is also a subset of the affinity allowed to
+the process. Attempting to set an affinity that specifies no processors
+is an error condition.</p>
+<p><em>ThreadImpersonationToken</em> - Data type is <em>PHANDLE</em>.
+The handle value is that of an impersonation token, or may be null to
+indicate impersonation is to be discontinued.</p>
+<p><em>ThreadInformationLength</em> - Specifies the length in bytes of
+the thread information buffer.</p>
+<h2 id="ntimpersonatethread">4.13 NtImpersonateThread</h2>
+<p>Sets a server thread to be impersonating a client thread.</p>
+<p><strong>NTSTATUS<br />
+NtImpersonateThread</strong>(<em><br />
+</em> <strong>IN HANDLE</strong> <em>ServerThread</em>,<br />
+<strong>IN HANDLE</strong> <em>ClientThread</em><br />
+);</p>
+<p><u>Parameters:</u></p>
+<p><em>ServerThread</em> - A handle to the thread which is to be set to
+impersonate the client thread. This handle must be open for
+<strong>THREAD_SET_THREAD_TOKEN</strong> access.</p>
+<p><em>ClientThread</em> - A handle to the thread to be impersonated.
+This handle must be open for <strong>THREAD_IMPERSONATE</strong>
+access.</p>
+<p>This service causes the thread specified by the <em>ServerThread</em>
+argument to impersonate the thread specified by the
+<em>ClientThread</em> argument. The impersonation will have the
+following security quality of service parameters:</p>
+<p>o Delegation Level.</p>
+<p>o Dynamic Tracking.</p>
+<p>o Not EffectiveOnly.</p>
+<h2 id="ntalertthread">4.14 NtAlertThread</h2>
+<p>A thread can be alerted with the <strong>NtAlertThread</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtAlertThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - A handle to the thread to be alerted.</p>
+<p>This function provides a mechanism that can be used to interrupt
+thread execution in the caller's previous mode (if this service is
+called from user mode the alert mode is user; otherwise, the alert mode
+is kernel) at well defined points.</p>
+<p>Each thread has an alerted flag for each of the processor modes user
+and kernel. These flags are set by calling the
+<strong>NtAlertThread</strong> function.</p>
+<p>If <strong>NtAlertThread</strong> is called and the target thread is
+in a wait state, then several additional tests are performed to
+determine the correct action to take.</p>
+<p>If the mode of the wait is user (e.g. <strong>NtWait</strong> was
+called from user mode), and the alert mode is user, then a thread
+specific user mode <strong>APC</strong> is queued to the thread and the
+thread's wait will complete with a status of "alerted". When the
+<strong>APC</strong> executes it will raise the "alerted" condition.</p>
+<p>If the mode of the wait is user or kernel, and the wait is alertable,
+then the thread's wait will complete with a status of "alerted".</p>
+<p>If the target thread is not in a wait state, then the appropriate
+alerted bit in the target thread is set. Executing an
+<strong>NtTestAlert</strong>, or an alertable <strong>NtWait</strong>
+will clear the bit, return a status, and possibly queue a user mode
+<strong>APC</strong>.</p>
+<p>This service requires <em>THREAD_ALERT</em> access to the specified
+thread.</p>
+<h2 id="nttestalert">4.15 NtTestAlert</h2>
+<p>A thread can test its alerted flag using the
+<strong>NtTestAlert</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtTestAlert</strong>();</p>
+<p>The <strong>NtTestAlert</strong> function tests the calling thread's
+alerted flag for the thread's previous processor mode (i.e. if this
+function is called from user mode, the user mode alerted flag is tested;
+otherwise, the kernel mode alerted flag is tested). If the appropriate
+alerted flag is set, then the status value "alerted" is returned and the
+alerted flag is cleared; otherwise, a "normal" status value is returned.
+If the alerted flag was set and the previous mode is user, then a user
+<strong>APC</strong> is queued to the thread. When the
+<strong>APC</strong> executes, it will raise the "alerted"
+condition.</p>
+<p>In addition, <strong>NtTestAlert</strong> tests whether a user
+<strong>APC</strong> should be delivered. If the previous mode is user
+and the user <strong>APC</strong> queue contains an entry, then
+<strong>APC</strong> pending is set in the thread (this will cause an
+<strong>APC</strong> to be delivered to the thread on a transition from
+kernel mode into user mode).</p>
+<h2 id="ntalertresumethread">4.16 NtAlertResumeThread</h2>
+<p>A thread can be alerted and resumed with the
+<strong>NtAlertResumeThread</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtAlertResumeThread</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>OUT PULONG</strong> <em>PreviousSuspendCount</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - A handle to the thread to be alerted and
+resumed.</p>
+<p><em>PreviousSuspendCount</em> - A pointer to the variable that
+receives the thread's previous suspend count.</p>
+<p>Resuming and alerting a thread reverses the effects of a previous
+call to <strong>NtSuspendThread</strong> and causes the thread to be
+interrupted out of an alertable kernel mode wait with a status of
+"alerted". This function is provided to allow a subsystem to resume a
+thread and interrupt it out of an interruptible system service.</p>
+<p>When an attempt is made to resume and alert a thread, the thread is
+alerted with a kernel mode alert, and its suspend count is examined. If
+the count is zero, then the service returns the suspend count.
+Otherwise, the count is decremented and if the count reaches zero, the
+thread resumes. In either case, the previous value of the thread's
+suspend count is returned. A non-zero value indicates that the thread
+was previously suspended. The value minus 1 specifies the number of
+calls to <strong>NtResumeThread</strong> that must be made in order to
+bring the thread out of the suspend state.</p>
+<p>If the thread was waiting in a kernel mode alertable wait, its wait
+completes with a status of alerted.</p>
+<p>This service requires <em>THREAD_SUSPEND_RESUME</em> and
+<em>THREAD_ALERT</em> access to the specified thread.</p>
+<h2 id="ntregisterthreadterminationport">4.17
+NtRegisterThreadTerminationPort</h2>
+<p>A thread can arrange for a port to be notified when it terminates
+using <strong>NtRegisterThreadTerminationPort</strong>.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtRegisterThreadTerminationPort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><strong>ULONG</strong> <em>PortHandle</em> - A handle to the port
+object that is to be notified when the subject thread terminates.</p>
+<p>The <strong>NtRegisterThreadTerminationPort</strong> function is
+designed to allow a thread to specify a port object that is to be send a
+thread termination datagram when the subject thread terminates. Multiple
+calls to this service cause multiple ports to be notified when the
+thread terminates.</p>
+<p>Each thread has a list of ports that are to be notified via a thread
+termination datagram when the thread terminates. When a thread
+terminates, the list is scanned and for each entry in the list, a thread
+termination datagram specifying the thread's client identifier and exit
+status is sent to the port. If during the send operation any errors
+occur (e.g. the port's connection was broken...) the system skips to the
+next entry in the list.</p>
+<p>\ There is no need to provide this type of service at the process
+level since all of the process's port objects are closed during process
+termination. When a port object is closed (for the last time) its
+connections are broken, and the port that it was connected to is
+notified. \</p>
+<p>The service is useful for subsystems that maintain per thread state
+(e.g. The Presentation Manager (<strong>PM</strong>) Subsystem ). During
+the subsystem initialization that occurs in the client thread (e.g.
+calling <strong>WinInitialize</strong> ), a call can be made to
+<strong>NtRegisterThreadTerminationPort</strong> specifying the port to
+the subsystem. When the thread terminates, the subsystem will receive a
+thread termination datagram. This datagram can be used as a signal to
+the subsystem that allows it to free up any thread specific
+resources.</p>
+<p>Another use of this service is to allow a process to be notified when
+one of its own threads terminates. In order to do this, a multithreaded
+process creates a port to itself. A monitor thread monitors this port
+for thread termination datagrams. Each thread (in its startup routine)
+calls <strong>NtRegisterThreadTerminationPort</strong> specifying the
+port. Whenever a thread in the process terminates, the monitor thread is
+notified via the termination datagram. The monitor thread can use this
+event to perform appropriate actions.</p>
+<h2 id="ntimpersonatethread-1">4.18 NtImpersonateThread</h2>
+<p><strong>NTSTATUS<br />
+NtImpersonateThread(<br />
+IN HANDLE</strong> <em>ServerThreadHandle</em>,<br />
+<strong>IN HANDLE</strong> <em>ClientThreadHandle</em>,<br />
+<strong>IN PSECURITY_QUALITY_OF_SERVICE</strong>
+<em>SecurityQos</em><br />
+)</p>
+<p><u>Arguments</u>:</p>
+<p><em>ServerThreadHandle</em> - Is a handle to the server thread (the
+impersonator, or doing the impersonation). This handle must be open for
+THREAD_IMPERSONATE access.</p>
+<p><em>ClientThreadHandle</em> - Is a handle to the Client thread (the
+impersonatee, or one being impersonated). This handle must be open for
+THREAD_DIRECT_IMPERSONATION access.</p>
+<p><em>SecurityQos</em> - A pointer to security quality of service
+information indicating what form of impersonation is to be
+performed.</p>
+<p><u>Return Value</u>:</p>
+<p>STATUS_SUCCESS - Indicates the call completed successfully.</p>
+<p><u>Routine Description</u>:</p>
+<p>This routine is used to cause the server thread to impersonate the
+client thread. The impersonation is done according to the specified
+quality of service parameters.</p>
+<h1 id="system-information-api">5. System Information API</h1>
+<p>The following programming interface provide support for querying
+information about the system:</p>
+<p><strong>NtQuerySystemInformation</strong> - Returns information about
+the system.</p>
+<h2 id="ntquerysysteminformation">5.1 NtQuerySystemInformation</h2>
+<p>Information about the system can be retreived using the
+NtQuerySystemInformation system service.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQuerySystemInformation(</strong></p>
+<p><strong>IN SYSTEM_INFORMATION_CLASS</strong>
+<em>SystemInformationClass,</em></p>
+<p><strong>OUT PVOID</strong> <em>SystemInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>SystemInformationLength,</em></p>
+<p><strong>OUT PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>SystemInformationClass</em> - The system information class about
+which to retrieve information.</p>
+<p><em>SystemInformation</em> - A pointer to a buffer which receives the
+specified information. The format and content of the buffer depend on
+the specified system information class.</p>
+<p>SystemInformation Format by Information Class:</p>
+<p><em>SystemBasicInformation</em> - Data type is
+PSYSTEM_BASIC_INFORMATION</p>
+<p>SYSTEM_BASIC_INFORMATION Structure</p>
+<p><strong>ULONG</strong> <em>OemMachineId</em> - An OEM specific bit
+pattern that identifies the machine configuration.</p>
+<p><strong>ULONG</strong> <em>TimerResolutionInMicroSeconds</em> - The
+resolution of the hardware time. All time values in Windows NT are
+specified as 64-bit LARGE_INTEGER values in units of 100 nanoseconds.
+This field allows an application to understand how many of the low order
+bits of a system time value are insignificant.</p>
+<p><strong>ULONG</strong> <em>PageSize</em> - The physical page size for
+virtual memory objects. Physical memory is committed in PageSize
+chunks.</p>
+<p><strong>ULONG</strong> <em>AllocationGranularity</em> - The logical
+page size for virtual memory objects. Allocating 1 byte of virtual
+memory will actually allocate AllocationGranularity bytes of virtual
+memory. Storing into that byte will commit the first physical page of
+the virtual memory.</p>
+<p><strong>ULONG</strong> <em>MinimumUserModeAddress</em> - The smallest
+valid user mode address. The first AllocationGranullarity bytes of the
+virtual address space are reserved. This forces access violations for
+code the dereferences a zero pointer.</p>
+<p><strong>ULONG</strong> <em>MaximumUserModeAddress</em> - The largest
+valid used mode address. The next AllocationGranullarity bytes of the
+virtual address space are reserved. This allows system service routines
+to validate user mode pointer parameters quickly.</p>
+<p><strong>KAFFINITY</strong> <em>ActiveProcessorsAffinityMask</em> -
+The system wide affinity mask that specifies the set of processors
+configured into the system. This set represents the maximum allowable
+affinity of any thread within the system.</p>
+<p><strong>CCHAR</strong> <em>NumberOfProcessors</em> - The number of
+processors in the current hardware configuration.</p>
+<p><em>SystemProcessorInformation</em> - Data type is
+SYSTEM_PROCESSOR_INFORMATION</p>
+<p>SYSTEM_PROCESSOR_INFORMATION Structure</p>
+<p><strong>ULONG</strong> <em>ProcessorType</em> - The processor
+type.</p>
+<p>ProcessorType Values:</p>
+<p><em>PROCESSOR_INTEL_386</em></p>
+<p><em>PROCESSOR_INTEL_486</em></p>
+<p><em>PROCESSOR_INTEL_860</em></p>
+<p><em>PROCESSOR_MIPS_R2000</em></p>
+<p><em>PROCESSOR_MIPS_R3000</em></p>
+<p><em>PROCESSOR_MIPS_R4000</em></p>
+<p><strong>ULONG</strong> <em>ProcessorStepping</em> - The processor
+stepping. The high order 16 bits specify the stepping letter (0==A,
+1==B, etc.) and the low order 16 bits specify the stepping level (e.g.
+0, 1, 2, etc.).</p>
+<p><strong>ULONG</strong> <em>ProcessorOptions</em> - Flags that specify
+processor options that may or may not be present. The flags are
+processor specific.</p>
+<p>ProcessOptions flags for PROCESSOR_INTEL_386:</p>
+<p><em>PROCESSOR_OPTION_387</em> - A 387 co-processor chip is
+present.</p>
+<p><em>PROCESSOR_OPTION_WEITEK</em> - A Weitek floating pointer
+co-processor chip is present.</p>
+<p><em>SystemInformationLength</em> - Specifies the length in bytes of
+the system information buffer.</p>
+<p><em>ReturnLength</em> - An optional pointer which, if specified,
+receives the number of bytes placed in the system information
+buffer.</p>
+<p><u>Return Value</u>:</p>
+<p><strong>NTSTATUS</strong> - <em>STATUS_SUCCESS</em> if the operation
+is successful and an appropriate error value otherwise.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_SUCCESS</em> - successful completion.</p>
+<p>o <em>STATUS_INVALID_INFO_CLASS</em> - The
+<em>SystemInformationClass</em> parameter did not specify a valid
+value.</p>
+<p>o <em>STATUS_INFO_LENGTH_MISMATCH</em> - The value of the
+<em>SystemInformationLength</em> parameter did not match the length
+required for the information class requested by the
+<em>SystemInformationClass</em> parameter.</p>
+<p>o <em>STATUS_ACCESS_VIOLATION</em> - Either the
+<em>SystemInformation</em> buffer pointer or the <em>ReturnLength</em>
+pointer value specified an invalid address.</p>
+<h1 id="executive-apis">6. Executive APIs</h1>
+<p>The following programming interfaces are available from within the
+<strong>Windows NT</strong> executive:</p>
+<p><strong>PsCreateSystemProcess</strong> - Creates a system
+process.</p>
+<p><strong>PsCreateSystemThread</strong> - Creates a system thread.</p>
+<p><strong>PsLookupProcessThreadByCid</strong> - Locates the process and
+thread using the specified <strong>CID</strong>.</p>
+<p><strong>PsChargePoolQuota</strong> - Charges pool quota to the
+specified process.</p>
+<p><strong>PsReturnPoolQuota</strong> - Returns pool quota to the
+specified process.</p>
+<p><strong>PsGetCurrentThread</strong> - Returns the address of the
+currently executing thread's thread object.</p>
+<p><strong>PsGetCurrentProcess</strong> - Returns the address of the
+process object that the currently executing thread is attached to.</p>
+<p><strong>ExGetPreviousMode</strong> - Returns the processor mode that
+the thread was executing in prior to the last trap.</p>
+<p><strong>PsRevertToSelf</strong> - Reverts the calling thread's access
+token to its original value.</p>
+<p><strong>PsReferencePrimaryToken</strong> - This function returns a
+pointer to the primary token of a process. The reference count of that
+primary token is incremented to protect the pointer returned.</p>
+<p><strong>PsDereferencePrimaryToken</strong> - This function releases a
+pointer to a primary token obtained using
+<strong>PsReferencePrimaryToken()</strong>.</p>
+<p><strong>PsReferenceImpersonationToken</strong> - This function
+returns a pointer to the impersonation token of a thread. The reference
+count of that impersonation token is incremented to protect the pointer
+returned.</p>
+<p><strong>PsDereferenceImpersonationToken</strong> - This function
+releases a pointer to a primary token obtained using
+<strong>PsReferenceImpersonationToken()</strong>.</p>
+<p><strong>PsOpenTokenOfProcess</strong> - This function does the thread
+specific processing of an <strong>NtOpenThreadToken()</strong>
+service.</p>
+<p><strong>PsOpenTokenOfThread</strong> - This function does the thread
+specific processing of an <strong>NtOpenThreadToken()</strong>
+service.</p>
+<p><strong>PsImpersonateClient</strong> -This routine sets up the
+specified thread so that it is impersonating the specified client.</p>
+<h2 id="pscreatesystemprocess">6.1 PsCreateSystemProcess</h2>
+<p>A system process can be created using
+<strong>PsCreateSystemProcess</strong>.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>PsCreateSystemProcess(</strong></p>
+<p><strong>OUT HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN ACCESS_MASK</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>)</strong>;</p>
+<p><u>Parameters:</u></p>
+<p><em>ProcessHandle</em> - A pointer to a variable that will receive
+the process object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the created
+process. For a complete description of desired access flags, refer to
+the <strong>NtCreateProcess API</strong> description.</p>
+<p><em>ObjectAttributes</em> - An pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object Management
+Specification</em> for details. Note that <em>OBJ_PERMANENT,
+OBJ_EXCLUSIVE, OBJ_OPEN_IF</em>, and <em>OBJ_OPEN_LINK</em> are not
+valid attributes for a process object.</p>
+<p>Creating a system process creates a process object whose address
+space is initialized so that the "user" portion of the address space is
+empty, and the "system" portion of the address space maps the system.
+This option is not available from user-mode via
+<strong>NtCreateProcess</strong>. The process inherits its access token
+and quotas from the initial system process. It is created with an empty
+handle table. The process's debug and exception ports are
+<strong>NULL</strong>.</p>
+<p>The system does not treat a process created through this API any
+differently than any other process. Any <strong>Windows NT</strong> API
+that requires a handle to a process object may specify a process created
+through this API.</p>
+<h2 id="pscreatesystemthread">6.2 PsCreateSystemThread</h2>
+<p>A system thread that executes in kernel mode can be created and a
+handle opened for access to the thread with the
+<strong>PsCreateSystemThread</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>PsCreateSystemThread</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>ThreadHandle,</em></p>
+<p><strong>IN ACCESS_MASK</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>OUT PCLIENT_ID</strong> <em>ClientId</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN PKSTART_ROUTINE</strong> <em>StartRoutine,</em></p>
+<p><strong>IN PVOID</strong> <em>StartContext</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>ThreadHandle</em> - A pointer to a variable that will receive the
+thread object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the created
+thread. For a complete description of desired access flags, refer to the
+<strong>NtCreateThread API</strong> description.</p>
+<p><em>ObjectAttributes</em> - An pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object Management
+Specification</em> for details. Note that <em>OBJ_PERMANENT,
+OBJ_EXCLUSIVE, OBJ_OPEN_IF</em>, and <em>OBJ_OPEN_LINK</em> are not
+valid attributes for a thread object.</p>
+<p><em>ProcessHandle</em> - An open handle to the process object that
+the thread is to run in. The subject thread must have
+<em>PROCESS_CREATE_THREAD</em> access to this process. If this parameter
+is not supplied, then the thread will be created in the initial system
+process.</p>
+<p><em>ClientId</em> - A pointer to a structure that will receive the
+client identifier of the new thread.</p>
+<p><em>StartRoutine</em> - Supplies the address of a function in system
+space that the thread begins execution at. A return from this function
+causes the thread to terminate.</p>
+<p><em>StartContext</em> - Supplies a single argument passed to the
+thread when it begins execution.</p>
+<p>Creating a system thread begins a separate thread of execution within
+the system. System threads may only execute in kernel-mode. A system
+thread has no <strong>TEB</strong>, or user-mode context. It is not
+possible to terminate a system thread using
+<strong>NtTerminateThread</strong> unless the thread is terminating
+itself.</p>
+<h2 id="pslookupprocessthreadbycid">6.3 PsLookupProcessThreadByCid</h2>
+<p>A process and thread can be located by client id using the
+<strong>PsLookupProcessThreadByCid</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>PsLookupProcessThreadByCid</strong>(</p>
+<p><strong>IN PCID</strong> <em>Cid,</em></p>
+<p><strong>OUT PEPROCESS</strong> <em>Process</em>
+<strong>OPTIONAL,</strong></p>
+<p><strong>OUT PETHREAD</strong> <em>Thread</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Cid</em> - A pointer to the client id whose thread and process
+are to be located.</p>
+<p><em>Process</em> - An optional parameter that if specified receives a
+referenced pointer to the process object associated with the specified
+client id.</p>
+<p><em>Thread</em> - A parameter that receives a referenced pointer to
+the thread object associated with the specified client id.</p>
+<h2 id="pschargepoolquota">6.4 PsChargePoolQuota</h2>
+<p>Pool quota can be charged to the specified process using the
+<strong>PsChargePoolQuota</strong> function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>PsChargePoolQuota</strong>(</p>
+<p><strong>IN PEPROCESS</strong> <em>Process,</em></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Amount</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Process</em> - Supplies the address of a process to charge pool
+quota to.</p>
+<p><em>PoolType</em> - Supplies the pool type to charge the quota
+for.</p>
+<p><em>Amount</em> - Supplies the amount of quota to charge to the
+process.</p>
+<p>The <strong>PsChargePoolQuota</strong> function is designed to charge
+pool quota to a process subject to the quota limits of that process. If
+the quota charge would cause the process to exceed its quota limit for
+the specified pool type, then an <em>STATUS_QUOTA_EXCEEDED</em>
+exception is raised and the charge is not made. Otherwise, the quota
+pool usage of the specified process is adjusted (incremented) to account
+for the quota being charged to the process.</p>
+<h2 id="psreturnpoolquota">6.5 PsReturnPoolQuota</h2>
+<p>Pool quota can be returned to the specified process using the
+<strong>PsReturnPoolQuota</strong> function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>PsReturnPoolQuota</strong>(</p>
+<p><strong>IN PEPROCESS</strong> <em>Process,</em></p>
+<p><strong>IN POOL_TYPE</strong> <em>PoolType</em><strong>,</strong></p>
+<p><strong>IN ULONG</strong> <em>Amount</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Process</em> - Supplies the address of a process to return pool
+quota to.</p>
+<p><em>PoolType</em> - Supplies the pool type to return the quota
+for.</p>
+<p><em>Amount</em> - Supplies the amount of quota to return to the
+process.</p>
+<p>The <strong>PsReturnPoolQuota</strong> function is designed to return
+pool quota to a process to reverse the effects of a previous call to
+<strong>PsChargePoolQuota</strong>. The system will catch attemps to
+return more quota to the process than the process has been charged for
+and bug check. Otherwise, the quota pool usage of the specified process
+is adjusted (decremented) to account for the quota being returned to the
+process.</p>
+<h2 id="psgetcurrentthread">6.6 PsGetCurrentThread</h2>
+<p>The address of the thread object of the currently executing thread is
+returned using the <strong>GetCurrentThread</strong> function:</p>
+<p><strong>PETHREAD</strong></p>
+<p><strong>PsGetCurrentThread();</strong></p>
+<h2 id="psgetcurrentprocess">6.7 PsGetCurrentProcess</h2>
+<p>The address of the process object that the currently executing thread
+is attached to is returned using the
+<strong>PsGetCurrentProcess</strong> function:</p>
+<p><strong>PEPROCESS</strong></p>
+<p><strong>PsGetCurrentProcess();</strong></p>
+<h2 id="kegetpreviousmode">6.8 KeGetPreviousMode</h2>
+<p>The processor mode that the current thread was running in prior to
+the last trap or interrupt can be determined using the
+<strong>KeGetPreviousMode</strong> function:</p>
+<p><strong>KPROCESSOR_MODE</strong></p>
+<p><strong>KeGetPreviousMode();</strong></p>
+<p>The <strong>KeGetPreviousMode</strong> function is used mainly inside
+<strong>Windows NT</strong> system services to determine the processor
+mode that the thread was executing in prior to the system service.</p>
+<h2 id="psreverttoself">6.9 PsRevertToSelf</h2>
+<p>The current can switch to its original access token using the
+<strong>PsRevertToSelf</strong> function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>PsRevertToSelf</strong>();</p>
+<p>The <strong>PsRevertToSelf</strong> function switches the access
+token used by the calling thread back to its original value. This is the
+same token that would have been in effect if the thread had never called
+<strong>PsImpersonateThread</strong>.</p>
+<h2 id="psreferenceprimarytoken">6.10 PsReferencePrimaryToken</h2>
+<p><strong>PACCESS_TOKEN<br />
+PsReferencePrimaryToken</strong>(<br />
+<strong>IN</strong> <strong>PEPROCESS</strong> <em>Process</em><br />
+)</p>
+<p><u>Arguments</u>:</p>
+<p><em>Process</em> - Supplies the address of the process whose primary
+token is to be referenced.</p>
+<p><u>Return Value:</u></p>
+<p>A pointer to the specified process's primary token.</p>
+<p><u>Routine Description:</u></p>
+<p>This function returns a pointer to the primary token of a process.
+The reference count of that primary token is incremented to protect the
+pointer returned.</p>
+<p>When the pointer is no longer needed, it should be freed using
+<strong>PsDereferencePrimaryToken()</strong>.</p>
+<h2 id="psdereferenceprimarytoken">6.11 PsDereferencePrimaryToken</h2>
+<p><strong>VOID<br />
+PsDereferencePrimaryToken</strong>(<br />
+<strong>IN</strong> <strong>PACCESS_TOKEN</strong>
+<em>PrimaryToken</em><br />
+)</p>
+<p><u>Arguments</u>:</p>
+<p><em>PrimaryToken</em> - Pointer to a token obtained using
+<strong>PsReferencePrimaryToken()</strong>.</p>
+<p><u>Return Value:</u></p>
+<p>None.</p>
+<p><u>Routine Description:</u></p>
+<p>This function causes the referenced primary token to be dereferenced.
+This token is expected to have been referenced using
+<strong>PsReferencePrimaryToken()</strong>.</p>
+<h2 id="psreferenceimpersonationtoken">6.12
+PsReferenceImpersonationToken</h2>
+<p><strong>PACCESS_TOKEN<br />
+PsReferenceImpersonationToken</strong>(<br />
+<strong>IN</strong> <strong>PETHREAD</strong> <em>Thread</em>,<br />
+<strong>OUT</strong> <strong>PBOOLEAN</strong>
+<em>CopyOnOpen</em>,<br />
+<strong>OUT</strong> <strong>PBOOLEAN</strong>
+<em>EffectiveOnly</em>,<br />
+<strong>OUT</strong> <strong>PSECURITY_IMPERSONATION_LEVEL</strong>
+<em>ImpersonationLevel</em>,<br />
+)</p>
+<p><u>Arguments:</u></p>
+<p><em>Thread</em> - Supplies the address of the thread whose
+impersonation token is to be referenced.</p>
+<p><em>CopyOnOpen</em> - The current value of the Thread-&gt;CopyOnOpen
+field.</p>
+<p><em>EffectiveOnly</em> - The current value of the
+Thread-&gt;EffectiveOnly field.</p>
+<p><em>ImpersonationLevel</em> - The current value of the
+Thread-&gt;ImpersonationLevel field.</p>
+<p><u>Return Value:</u></p>
+<p>A pointer to the specified thread's impersonation token.</p>
+<p>If the thread is not currently impersonating a client, then NULL is
+returned.</p>
+<p><u>Routine Description:</u></p>
+<p>This function returns a pointer to the impersonation token of a
+thread. The reference count of that impersonation token is incremented
+to protect the pointer returned.</p>
+<p>If the thread is not currently impersonating a client, then a null
+pointer is returned.</p>
+<p>If the thread is impersonating a client, then information about the
+means of impersonation are also returned (ImpersonationLevel).</p>
+<p>If a non-null value is returned, then
+<strong>PsDereferenceImpersonationToken()</strong> must be called to
+decrement the token's reference count when the pointer is no longer
+needed.</p>
+<h2 id="psdereferenceimpersonationtoken">6.13
+PsDereferenceImpersonationToken</h2>
+<p><strong>VOID<br />
+PsDereferenceImpersonationToken</strong>(<br />
+<strong>IN</strong> <strong>PACCESS_TOKEN</strong>
+<em>ImpersonationToken</em><br />
+)</p>
+<p><u>Arguments</u>:</p>
+<p><em>ImpersonationToken</em> - Pointer to a token obtained using
+<strong>PsReferenceImpersonationToken()</strong>.</p>
+<p><u>Return Value:</u></p>
+<p>None.</p>
+<p><u>Routine Description:</u></p>
+<p>This function causes the referenced impersonation token to be
+dereferenced. This token is expected to have been referenced using
+<strong>PsReferenceImpersonationToken()</strong>.</p>
+<h2 id="psopentokenofprocess">6.14 PsOpenTokenOfProcess</h2>
+<p><strong>NTSTATUS<br />
+PsOpenTokenOfProcess</strong>(<br />
+<strong>IN HANDLE</strong> <em>ProcessHandle</em>,<br />
+<strong>OUT PACCESS_TOKEN</strong> *<em>Token</em><br />
+)</p>
+<p><u>Arguments:</u></p>
+<p><em>ProcessHandle</em> - Supplies a handle to a process object whose
+primary token is to be opened.</p>
+<p><em>Token</em> - If successful, receives a pointer to the process's
+token object.</p>
+<p><u>Return Value:</u></p>
+<p><strong>STATUS_SUCCESS</strong> - Indicates the call completed
+successfully.</p>
+<p>Status may also be any value returned by an attemp the reference the
+process object for PROCESS_QUERY_INFORMATION access.</p>
+<p><u>Routine Description:</u></p>
+<p>This function does the process specific processing of an
+NtOpenProcessToken() service.</p>
+<p>The service validates that the handle has appropriate access to
+referenced process. If so, it goes on to reference the primary token
+object to prevent it from going away while the rest of the
+NtOpenProcessToken() request is processed.</p>
+<p>NOTE: If this call completes successfully, the caller is responsible
+for decrementing the reference count of the target token. This must be
+done using the PsDereferencePrimaryToken() API.</p>
+<h2 id="psopentokenofthread">6.15 PsOpenTokenOfThread</h2>
+<p><strong>NTSTATUS<br />
+PsOpenTokenOfThread</strong>(<br />
+<strong>IN HANDLE</strong> <em>ThreadHandle</em>,<br />
+<strong>OUT PACCESS_TOKEN</strong> *<em>Token</em>,<br />
+<strong>OUT PBOOLEAN</strong> <strong>CopyOnOpen</strong>,<br />
+<strong>OUT PBOOLEAN</strong> <em>EffectiveOnly</em>,<br />
+<strong>OUT PSECURITY_IMPERSONATION_LEVEL</strong>
+<em>ImpersonationLevel</em><br />
+)</p>
+<p><u>Arguments:</u></p>
+<p><em>ThreadHandle</em> - Supplies a handle to a thread object.</p>
+<p><em>Token</em> - If successful, receives a pointer to the thread's
+token object.</p>
+<p><em>CopyOnOpen</em> - The current value of the Thread-&gt;CopyOnOpen
+field.</p>
+<p><em>EffectiveOnly</em> - The current value of the
+Thread-&gt;EffectiveOnly field.</p>
+<p><em>ImpersonationLevel</em> - The current value of the
+Thread-&gt;ImpersonationLevel field.</p>
+<p><u>Return Value:</u></p>
+<p><strong>STATUS_SUCCESS</strong> - Indicates the call completed
+successfully.</p>
+<p><strong>STATUS_NO_TOKEN</strong> - Indicates the referenced thread is
+not currently impersonating a client.</p>
+<p><strong>STATUS_CANT_OPEN_ANONYMOUS</strong> - Indicates the client
+requested anonymous impersonation level. An anonymous token can not be
+openned.</p>
+<p>status may also be any value returned by an attemp the reference the
+thread object for THREAD_QUERY_INFORMATION access.</p>
+<p><u>Routine Description:</u></p>
+<p>This function does the thread specific processing of an
+<strong>NtOpenThreadToken()</strong> service.</p>
+<p>The service validates that the handle has appropriate access to
+reference the thread. If so, it goes on to increment the reference count
+of the token object to prevent it from going away while the rest of the
+NtOpenThreadToken() request is processed.</p>
+<p>NOTE: If this call completes successfully, the caller is responsible
+for decrementing the reference count of the target token. This must be
+done using PsDereferenceImpersonationToken().</p>
+<h2 id="psimpersonateclient">6.16 PsImpersonateClient</h2>
+<p><strong>VOID<br />
+PsImpersonateClient</strong>(<br />
+<strong>IN PETHREAD</strong> <em>Thread</em>,<br />
+<strong>IN BOOLEAN</strong> <em>CopyOnOpen</em>,<br />
+<strong>IN BOOLEAN</strong> <em>EffectiveOnly</em>,<br />
+<strong>IN SECURITY_IMPERSONATION_LEVEL</strong>
+<em>ImpersonationLevel</em><br />
+)</p>
+<p><u>Arguments:</u></p>
+<p><em>Thread</em> - points to the thread which is going to impersonate
+a client.</p>
+<p><em>CopyOnOpen</em> - If TRUE, indicates the token is considered to
+be private by the assigner and should be copied if opened. For example,
+a session layer may be using a token to represent a client's context. If
+the session is trying to synchronize the context of the client, then
+user mode code should not be given direct access to the session layer's
+token.</p>
+<p>This field is ANDed with the DirectAccess field of the ClientContext
+to establish the CopyOnOpen value actually assigned to the
+impersonation.</p>
+<p><em>CopyOnOpen</em> - If TRUE, indicates the token is considered to
+be private by the assigner and should be copied if opened. For example,
+a session layer may be using a token to represent a client's context. If
+the session is trying to synchronize the context of the client, then
+user mode code should not be given direct access to the session layer's
+token.</p>
+<p>Basically, session layers should always specify TRUE for this, while
+tokens assigned by the server itself (handle based) should specify
+FALSE.</p>
+<p><em>EffectiveOnly</em> - Is a boolean value to be assigned as the
+Thread-&gt;EffectiveOnly field value for the impersonation. A value of
+FALSE indicates the server is allowed to enable currently disabled
+groups and privileges.</p>
+<p><em>ImpersonationLevel</em> - Is the impersonation level that the
+server is allowed to access the token with.</p>
+<p><u>Return Value:</u></p>
+<p><strong>STATUS_SUCCESS</strong> - Indicates the call completed
+successfully.</p>
+<p><u>Routine Description:</u></p>
+<p>This routine sets up the specified thread so that it is impersonating
+the specified client. This will result in the reference count of the
+token representing the client being incremented to reflect the new
+reference.</p>
+<p>If the thread is currently impersonating a client, that token will be
+dereferenced.</p>
+<p><strong>Revision History</strong></p>
+<p>Revision 1.2</p>
+<p>1. Simplify Create Thread.</p>
+<p>2. Remove create if, permanent, and other object options that are
+only there for orthoganality.</p>
+<p>3. Add port notification handlers.</p>
+<p>4. Add 32 bit exit status for process and thread termination.</p>
+<p>5. Add NtAlertThread/NtAlertResumeThread.</p>
+<p>6. Add get thread info.</p>
+<p>7. Add debugger port and subsystem port to process creation.</p>
+<p>8. Add process get/set info place holders.</p>
+<p>Revision 1.3</p>
+<p>1. Complicate create thread</p>
+<p>2. Reorganize considerations</p>
+<p>Revision 1.15, August 20, 1990, Jim Kelly</p>
+<p>1. Eliminated previous token query information levels. This is done
+using NtOpenProcessToken() and NtOpenThreadToken().</p>
+<p>2. Added information level allowing the setting of a primary
+token.</p>
+<p>3. Added PsReferenceImpersonationToken() and
+PsDereferenceImpersonationToken().</p>
+<p>4. Added PsReferencePrimaryToken() and
+PsDereferencePrimaryToken().</p>
+<p>5. Added PsImpersonateClient().</p>
+<p>6. Added PsOpenTokenOfProcess() and PsOpenTokenOfThread().</p>
+<p>7. Eliminated PsLockToken(), PsUnlockToken(), and
+PsImpersonateThread().</p>
+<p>8. Minor grammatical and spelling corrections.</p>
+<p>9. Removed <em>TokenLength</em> field from THREAD_BASIC_INFORMATION
+structure.</p>
+<p>Revision 1.22, February 7, 1991, Jim Kelly.</p>
+<p>1. Changed THREAD_IMPERSONATE_CLIENT access type to be
+THREAD_SET_THREAD_TOKEN.</p>
+<p>2. Added the ability to directly impersonate a thread. This resulted
+in a new API (<strong>NtImpersonateThread()</strong>) and a new access
+type (<strong>THREAD_IMPERSONATE</strong>).</p>
+<p>3. Corrected minor typos.</p>
+<p>Revision 1.24, February 28, 1991, Mark Lucovsky.</p>
+<p>1) ???</p>
+<p>Revision 1.24, April 21, 1991, Jim Kelly (JimK).</p>
+<p>1. Added NtImpersonateThread() service.</p>
+<p>Revision 1.25, May 2, 1991, Bryan Willman (bryanwi).</p>
+<p>1. Added ProcessLdtInformation and ProcessLdtSize to set of data
+types for NtQueryInformationProcess and NtSetInformationProcess.</p>
+<p>Revision 1.26, May 24, 1991, Dave Hastings (daveh).</p>
+<p>1. Added ThreadDescriptorTableEntry to NtQueryInformationThread.</p>
+<p>2. Allowed querying of specific regions of the LDT for
+ProcessLdtInformation.</p>
+<p>Revision 1.27, January 14, 1992, Jim Kelly (JimK).</p>
+<p>1. Eliminated PROCESS_SET_ACCESS_TOKEN as an access type. Changing
+the primary token of a process will be protected by
+PROCESS_SET_INFORMATION followed by a privilege test at the time the
+change is requested (rather than at open time).</p>
+<section id="footnotes" class="footnotes footnotes-end-of-document"
+role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>See the Windows NT Local Security Specification for more
+on security quality of service.<a href="#fnref1" class="footnote-back"
+role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>

@@ -1,0 +1,1141 @@
+<p>Portable Systems Group</p>
+<p>NT OS/2 Local Inter-Process Communication (LPC) Specification</p>
+<p><strong>Author:</strong> Steven R. Wood</p>
+<p>Revision 1.5, February 17, 1989</p>
+<p>.Begin Table C.</p>
+<p><a href="#overview">1. Overview <a href="#overview">1</a></a></p>
+<p><a href="#port-object">1.1. Port Object <a
+href="#port-object">1</a></a></p>
+<p><a href="#port-message-queues">1.2. Port Message Queues <a
+href="#port-message-queues">2</a></a></p>
+<p><a href="#port-creation">1.3. Port Creation <a
+href="#port-creation">3</a></a></p>
+<p><a href="#inter-process-communication-system-services">2.
+Inter-Process Communication System Services <a
+href="#inter-process-communication-system-services">5</a></a></p>
+<p><a href="#ntcreateport">2.1. NtCreatePort <a
+href="#ntcreateport">5</a></a></p>
+<p><a href="#port-message-structure">2.6. Port Message Structure <a
+href="#port-message-structure">14</a></a></p>
+<p><a href="#port-map-information-structure">2.7. Port Map Information
+Structure <a href="#port-map-information-structure">16</a></a></p>
+<p><a href="#ntrequestport">2.8. NtRequestPort <a
+href="#ntrequestport">17</a></a></p>
+<p><a href="#ntrequestwaitreplyport">2.9. NtRequestWaitReplyPort <a
+href="#ntrequestwaitreplyport">18</a></a></p>
+<p><a href="#ntreplyport">2.10. NtReplyPort <a
+href="#ntreplyport">19</a></a></p>
+<p><a href="#ntreplywaitreplyport">2.11. NtReplyWaitReplyPort <a
+href="#ntreplywaitreplyport">20</a></a></p>
+<p><a href="#ntreplywaitreceiveport">2.12. NtReplyWaitReceivePort <a
+href="#ntreplywaitreceiveport">21</a></a></p>
+<p><a href="#ntimpersonateclientofport">2.13. NtImpersonateClientOfPort
+<a href="#ntimpersonateclientofport">22</a></a></p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>The NT OS/2 system is implementing the majority of the Application
+Program Interfaces (API's) using the Client/Server model where an
+application's call to an API is intercepted by a stub in the client
+process that packages up the parameters to the call and sends them to a
+server process that will actually implement the API. The Local
+Inter-Process Communication (LPC) package is the system facility that
+allows the stub procedure to communicate the data to the server process
+and wait for a response. The design of the LPC facility is guided by the
+fact that it will be used primarily to model a synchronous procedure
+call between two processes in the same memory domain.</p>
+<h2 id="port-object">1.1. Port Object</h2>
+<p>The primary data structure used to implement the NT OS/2 LPC
+mechanism is the Port Object. There are two types of port objects
+needed; a connection port and a communication port.</p>
+<p>A connection port is created by a server process with a name. A
+server process usually maintains at least one thread that is listening
+for connection requests. A client process connects to the server process
+using the name of the connection port. Whenever a connection request is
+sent to a connection port, the server thread wakes up, examines the
+connection request and decides whether to reject or accept the
+connection. If the connection request is accepted, then the LPC facility
+creates two communication ports, one for the client and one for the
+server. The communication port objects have no names and cannot be
+inherited by child processes. Connection ports have names, but cannot be
+inherited.</p>
+<p>A port object contains the following information:</p>
+<ul class="incremental">
+<li><p>Flags that indicate which of the following queues are
+present.</p></li>
+<li><p>An optional queue for Connection messages.</p></li>
+<li><p>An optional queue for Request messages.</p></li>
+<li><p>A pointer to a connection port object.</p></li>
+<li><p>A pointer to a communication port object.</p></li>
+<li><p>Context value associated with a communication port.</p></li>
+<li><p>A zone segment that divided evenly into multiple chunks of a
+single size, which is the maximum message length. The zone segment
+consists of a singly linked list of free blocks, guarded by a spin
+lock.</p></li>
+<li><p>An event that is clear whenever a message is placed on the zone
+free list and the free list was empty at the time of insertion. Threads
+can wait on this event if they ever encounter an empty free
+list.</p></li>
+<li><p>An optional memory section handle that is mapped into both the
+client process and the server process address spaces. Location and size
+information is also recorded here so the memory can be unmapped
+later.</p></li>
+</ul>
+<p>A connection port has a queue for Connection messages. It may also
+have a queue for Request messages if the <strong>ReceiveAnyPort</strong>
+parameter is specified on the call to <strong>NtCreatePort</strong>. The
+pointer to the connection port object points to the connection port
+object itself. The pointer to the connected communication port is NULL,
+as is the context value.</p>
+<p>A server communication port does not have a queue for Connection
+messages. It may have a queue for Request messages if the
+<strong>ReceiveThisPort</strong> parameter is specified on the call to
+<strong>NtCompleteConnectPort</strong>. The pointer to the connection
+port object points to the connection port that the connection request
+came in on. The pointer to the communication port object points to the
+client communication port. The context value is set to the value
+specified on the call to <strong>NtCompleteConnectPort</strong>.</p>
+<p>A client communication port does not have a queue for Connection
+messages. It has a small queue for Request messages that will be used to
+queue lost reply messages. The pointer to the connection port object
+points to the connection port that the connection request came in on.
+The pointer to the communication port object points to the server
+communication port. The context value is set to NULL.</p>
+<p>The purpose of the optional memory section associated with a port is
+to optimize message passing. Since the maximum size of a message is
+fixed at connection port creation time, the intent is that for messages
+that are too big to fit in the message queue, the data is placed in the
+section object and the address of the data is passed via the message
+queue. The LPC mechanism has no knowledge of the format of the section
+object, it is only concerned with making the section visible to both
+the</p>
+<p>client and server processes whenever a connection is established. The
+memory is managed by the process that created the section. So the client
+process is solely responsible for managing the memory in the section
+object associated with the client communication port. Likewise the
+server process is solely responsible for managing the memory associated
+with the server communication port. The server will only need to provide
+a section object if it needs to perform callbacks to the client
+process.</p>
+<h2 id="port-message-queues">1.2. Port Message Queues</h2>
+<p>Message queues are used for both Connection messages and Request
+messages. Each queue contains the following information:</p>
+<ul class="incremental">
+<li><p>A linked list of messages that have been queued.</p></li>
+<li><p>A counting semaphore that is released whenever a message is
+placed in the queue.</p></li>
+<li><p>A serial number field that is used to generate unique message Ids
+as each message is placed in the queue.</p></li>
+<li><p>A maximum message size.</p></li>
+</ul>
+<p>Port objects and queues for port objects are allocated out of
+non-paged pool memory. Pool quota for a pair of communication ports is
+charged to the client process that caused the communication ports to be
+created with a call to <strong>NtConnectPort</strong>. Pool quota for a
+connection port is charged to the server process. There is no quota
+charging done when a message is queued to a port, since the storage for
+messages is pre-allocated in the zone segment. The zone segment of the
+sender's port is used for request message allocation. The zone segment
+of the connection port is used for connection request message
+allocation.</p>
+<p>The size of messages is fixed at the time the connection port is
+created. The size specified at connection port creation time is the
+maximum size of message the server is prepared to accept. The amount of
+data that is actually sent can be less than or equal to the message
+size. There is a limit on the size that can be specified on at port
+creation time, since space for queued messages is allocated out of pool
+memory in the system portion of the address space.</p>
+<h2 id="port-creation">1.3. Port Creation</h2>
+<p>Port objects are created in two ways. A connection port is created by
+calling the <strong>NtCreatePort</strong> system service.</p>
+<p>A pair of communication port objects is created whenever a server
+process accepts a connection request to a connection port. These are
+called the client port and the server port. When the client process
+sends a request to its port, it appears in the server port's request
+queue. When the server process sends a message to its port it appears in
+the client port's message queue. The client port and server port are
+bound together internally. The client port handle is valid only to the
+client process and the server port handle is valid only to the server
+process.</p>
+<p>The following API calls are defined for ports:</p>
+<p><strong>NtCreatePort</strong> - used by server process to create a
+connection port</p>
+<p><strong>NtConnectPort</strong> - used by client processes to connect
+to a server process</p>
+<p><strong>NtListenPort</strong> - used by server process to listen for
+connection requests</p>
+<p><strong>NtAcceptConnectPort</strong> - used by server process to
+accept or reject a connection request</p>
+<p><strong>NtCompleteConnectPort</strong> - used by server process to
+complete the acceptance of a connection request</p>
+<p><strong>NtRequestPort</strong> - used to send a datagram message</p>
+<p><strong>NtRequestWaitReplyPort</strong> - used to send a message and
+wait for a reply</p>
+<p><strong>NtReplyPort</strong> - used to reply to a particular
+message</p>
+<p><strong>NtReplyWaitReplyPort</strong> - used to reply to a particular
+message and then wait for a reply to a previous message</p>
+<p><strong>NtReplyWaitReceivePort</strong> - used by server process to
+wait for a message from a client process</p>
+<p><strong>NtImpersonateClientOfPort</strong> - used by server thread to
+temporarily acquire the identifier set of a client thread</p>
+<p>The following is an overview of how the API calls are used by the
+client and server processes:</p>
+<p><strong>Server Process:</strong></p>
+<p>Process initialization calls <strong>NtCreatePort</strong> to create
+a connection port object.</p>
+<p>The main server thread then blocks in a call to
+<strong>NtListenPort</strong>. Whenever it returns it means that a new
+client process has called <strong>NtConnectPort</strong>. The server
+examines the connection request and calls
+<strong>NtAcceptConnectPort</strong> to either accept or reject the
+connection request. If it wants to accept, then it can also specify a
+section object for use when issuing callbacks to the client.
+<strong>NtAcceptConnectPort</strong> returns the server communication
+port handle to the server and causes the client process to return from
+its call to <strong>NtConnectPort</strong> with the client communication
+port handle. The server's main thread then goes back to the
+<strong>NtListenPort</strong> call to block waiting for another new
+client connection request.</p>
+<p>One or more server request threads are blocked in
+<strong>NtReplyWaitReceivePort</strong>, waiting for a message to any of
+the connected server communication port objects. When
+<strong>NtReplyWaitReceivePort</strong> returns, the server will have a
+message, along with a unique identifier for the client thread that sent
+the message, a unique identifier for this particular message and the
+context value associated with the communication port that was the target
+of the request.</p>
+<p>After processing a message, a server request thread will use the
+<strong>NtReplyWaitReceivePort</strong> call to send a reply back to the
+previous message received (based on the unique message identifier) and
+then wait for another request.</p>
+<p><strong>Client Process:</strong></p>
+<p>Process initialization will allocate a section object for passing
+information to the server process. <strong>NtConnectPort</strong> will
+then be called to create a port handle that is connected to the server
+process. <strong>NtConnectPort</strong> will return with an error if
+called incorrectly or if the server rejects the connection request.</p>
+<p>Otherwise, when it returns, the client will have a valid
+communication port handle that is connected to the server process.
+<strong>NtConnectPort</strong> will block if there is no server thread
+waiting in a corresponding call to <strong>NtListenPort</strong>. A side
+effect of <strong>NtConnectPort</strong> is to make the client's section
+object visible in the server process' address space (most likely at a
+different virtual address than the client's). The base address of the
+client's section object in the server's address space will be returned
+to the client.</p>
+<p>Whenever a thread in the client process wants to send a request to
+the server, it will call <strong>NtRequestWaitReplyPort</strong>, which
+will send the request and wait for a reply.</p>
+<p><strong>Callbacks:</strong></p>
+<p>The server can call back to the client process by using the
+<strong>NtRequestWaitReplyPort</strong> service, specifying a particular
+message identifier. This will unblock the client process, which is
+waiting for a reply to that message. The client process will examine the
+message and determine that it is a request instead of a reply. The
+client will process the request and send a reply using the
+<strong>NtReplyWaitReplyPort</strong> service. This service will send
+the reply back to the server and then block waiting for the original
+reply. If during the process of handling the callback request from the
+server, the client process calls <strong>NtRequestWaitReplyPort</strong>
+to send another request to the server, then the server will perform
+similar logic when it notices that it received a request instead of a
+reply.</p>
+<h1 id="inter-process-communication-system-services">2. Inter-Process
+Communication System Services</h1>
+<h2 id="ntcreateport">2.1. NtCreatePort</h2>
+<p>A server process can create a named connection port with the
+<strong>NtCreatePort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreatePort</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>,</p>
+<p><strong>IN ULONG</strong> <em>MaxConnectionInfoLength</em>,</p>
+<p><strong>IN ULONG</strong> <em>MaxMessageLength</em>,</p>
+<p><strong>IN BOOLEAN</strong> <em>ReceiveAnyPort</em></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - A pointer to a variable that will receive the
+connection port object handle value.</p>
+<p><em>ObjectAttributes</em> - A pointer to a structure that specifies
+the name of the object, an access control list (ACL) to be applied to
+the object, and a set of object attribute flags.
+<em>ObjectAttributes</em> Structure - See the Object Manager
+Specification for a detailed description of the fields in this
+structure. If the <em>ObjectName</em> field is not specified, then an
+unconnected communication port is created rather than a connection port.
+This is useful for sending and receiving messages between threads of a
+single process. If the <em>SecurityDescriptor</em> field is not
+specified, then any process will be allowed to access this port. The
+<em>Attributes</em> field must be zero or OBJ_CASE_INSENSITIVE, as none
+of the other standard values are relevant for this call. Connection
+ports cannot be inherited, are always placed in the process's handle
+table and are exclusive to the creating process.</p>
+<p><em>MaxConnectionInfoLength</em> - Specifies the maximum length of
+additional information that can be sent with a connection request via
+the <strong>NtConnectPort</strong> system service. The value of this
+parameter cannot exceed PORT_MAXIMUM_CONNECTINFO_LENGTH bytes.</p>
+<p><em>MaxMessageLength</em> - Specifies the maximum length of messages
+sent or received on communication ports created from this connection
+port. The value of this parameter cannot exceed
+PORT_MAXIMUM_MESSAGE_LENGTH bytes.</p>
+<p><em>ReceiveAnyPort</em> - A Boolean value that specifies if request
+messages queued to communication ports cloned from this connection port
+are to be queued to the connection port rather than the communication
+port.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>A connection port is created with the name and attributes specified
+in the <em>ObjectAttributes</em> structure. A handle to the connection
+port object is returned in the location pointed to by the
+<em>PortHandle</em> parameter. The returned handle can then be used to
+listen for connection requests to that port name, using the
+<strong>NtListenPort</strong> service.</p>
+<p>The standard object architecture defined desired access parameter is
+not necessary since this service can only create a new port, not access
+an existing port.</p>
+<p>A named connection port cannot be used to send and receive messages.
+It is only valid as a parameter to the <strong>NtListenPort</strong>
+service.</p>
+<p>An unnamed connection port can be used to send and receive messages
+within the process that created it.</p>
+<p>The following errors can be returned by this function:</p>
+<p>- STATUS_INVALID_PARAMETER</p>
+<p>- STATUS_INVALID_PORT_ATTRIBUTES</p>
+<p>- STATUS_OBJECT_PATH_INVALID</p>
+<p>- STATUS_OBJECT_PATH_NOT_FOUND</p>
+<p>- STATUS_OBJECT_PATH_SYNTAX_INVALID</p>
+<p>- STATUS_OBJECT_NAME_INVALID</p>
+<p>- STATUS_OBJECT_NAME_COLLISION</p>
+<p>- STATUS_NO_MEMORY</p>
+<p><strong>2.2. NtConnectPort</strong></p>
+<p>A client process can connect to a server process by name using the
+<strong>NtConnectPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtConnectPort</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>IN PSTRING</strong> <em>PortName</em>,</p>
+<p><strong>IN PSECURITY_QUALITY_OF_SERVICE</strong>
+<em>SecurityQos</em>,</p>
+<p><strong>IN ULONG</strong> <em>PortAttributes</em>,</p>
+<p><strong>IN OUT PPORT_VIEW</strong> <em>ClientView</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>OUT PREMOTE_PORT_VIEW</strong> <em>ServerView</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>OUT PULONG</strong> <em>MaxMessageLength</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN OUT PVOID</strong> <em>ConnectionInformation</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN OUT PULONG</strong> <em>ConnectionInformationLength</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN BOOLEAN</strong> <em>Alertable</em>,</p>
+<p><strong>IN PTIME</strong> <em>Timeout</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - A pointer to a variable that will receive the
+client communication port object handle value.</p>
+<p><em>PortName</em> - A pointer to a port name string. The form of the
+name is [\name...\name]\port_name.</p>
+<p><em>SecurityQos</em> - A pointer to security quality of service
+information to be applied to the server on the client's behalf.</p>
+<p><em>PortAttributes</em> - A set of flags that control the behavior of
+this port.</p>
+<p><em>PortAttributes</em> Flags: (none yet defined.)</p>
+<p><em>ClientView</em> - An optional pointer to a structure that
+specifies the section that all client threads will use to send messages
+to the server.</p>
+<p><em>ClientView</em> Structure:</p>
+<p><strong>ULONG</strong> <em>Length</em> - Specifies the size of this
+data structure in bytes.</p>
+<p><strong>HANDLE</strong> <em>SectionHandle</em> - Specifies an open
+handle to a section object.</p>
+<p><strong>ULONG</strong> <em>SectionOffset</em> - Specifies a field
+that will receive the actual offset, in bytes, from the start of the
+section. The initial value of this parameter specifies the byte offset
+within the section that the client's view is based. The value is rounded
+down to the next host page size boundary.</p>
+<p><strong>ULONG</strong> <em>ViewSize</em> - Specifies a field that
+will receive the actual size, in bytes, of the view. If the value of
+this parameter is zero, then the client's view of the section will be
+mapped starting at the specified section offset and continuing to the
+end of the section. Otherwise, the initial value of this parameter
+specifies the size, in bytes, of the client's view and is rounded up to
+the next host page size boundary.</p>
+<p><strong>PVOID</strong> <em>ViewBase</em> - Specifies a field that
+will receive the base address of the section in the client's address
+space.</p>
+<p><strong>PVOID</strong> <em>ViewRemoteBase</em> - Specifies a field
+that will receive the base address of the client's section in the
+server's address space. Used to generate pointers that are meaningful to
+the server.</p>
+<p><em>ServerView</em> - An optional pointer to a structure that will
+receive information about the server process' view in the client's
+address space. The client process can use this information to validate
+pointers it receives from the server process.</p>
+<p><em>ServerView</em> Structure:</p>
+<p><strong>ULONG</strong> <em>Length</em> - Specifies the size of this
+data structure in bytes.</p>
+<p><strong>PVOID</strong> <em>ViewBase</em> - Specifies a field that
+will receive the base address of the server's section in the client's
+address space.</p>
+<p><strong>ULONG</strong> <em>ViewSize</em> - Specifies a field that
+will receive the size, in bytes, of the server's view in the client's
+address space. If this field is zero, then server has no view in the
+client's address space.</p>
+<p><em>MaxMessageLength</em> - An optional pointer to a variable that
+will receive the maximum length of messages that can be sent to the
+server. The value of this parameter will be equal to or greater than the
+value specified for the <em>MaxMessageLength</em> parameter to
+<strong>NtCreatePort</strong>. It might be greater to allow for optimal
+use of the memory associated with a port object.</p>
+<p><em>ConnectionInformation</em> - An optional pointer to uninterpreted
+data. This data is intended for clients to pass package, version and
+protocol identification information to the server to allow the server to
+determine if it can satisfy the client before accepting the connection.
+Upon return to the client, the <em>ConnectionInformation</em> data block
+contains any information passed back from the server by its call to the
+<strong>NtAcceptConnectPort</strong> service. The output data overwrites
+the input data.</p>
+<p><em>ConnectionInformationLength</em> - Pointer to the length of the
+<em>ConnectionInformation</em> data block. The output value is the
+length of the data stored in the <em>ConnectionInformation</em> data
+block by the server's call to the <strong>NtAcceptConnectPort</strong>
+service. This parameter is <strong>OPTIONAL</strong> only if the
+<em>ConnectionInformation</em> parameter is null, otherwise it is
+required.</p>
+<p><em>Alertable</em> - A Boolean value that specifies if the wait is
+user mode alertable.</p>
+<p><em>Timeout</em> - An optional pointer to timeout value that
+specifies the absolute or relative time over which any wait is to be
+completed. If not specified then the service will wait indefinitely.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>The <em>PortName</em> parameter specifies the name of the server port
+to connect to. It must correspond to an object name specified on a call
+to <strong>NtCreatePort</strong>. The service sends a connection request
+to the server thread that is listening for them with the
+<strong>NtListenPort</strong> service. The client thread then blocks
+until a server thread receives the connection request and responds with
+a call to the <strong>NtAcceptConnectPort</strong> service. The server
+thread receives the ID of the client thread, along with any information
+passed via the <em>ConnectionInformation</em> parameter. The server
+thread then decides to either accept or reject the connection
+request.</p>
+<p>The server communicates the acceptance or rejection with the
+<strong>NtAcceptConnectPort</strong> service. The server can pass back
+data to the client about the acceptance or rejection via the
+<em>ConnectionInformation</em> data block.</p>
+<p>If the server accepts the connection request, then the client
+receives a communication port object in the location pointed to by the
+<em>PortHandle</em> parameter. This object handle has no name associated
+with it and is private to the client process (i.e. it cannot be
+inherited by a child process). The client uses the handle to send and
+receive messages to/from the server process using the
+<strong>NtRequestWaitReplyPort</strong> service.</p>
+<p>If the <em>ClientView</em> parameter was specified, then the section
+handle is examined. If it is a valid section handle, then the portion of
+the section described by the <em>SectionOffset</em> and
+<em>ViewSize</em> fields will be mapped into both the client and server
+process' address spaces. The address in client address space will be
+returned in the <em>ViewBase</em> field. The address in the server
+address space will be returned in the</p>
+<p><em>ViewRemoteBase</em> field. The actual offset and size used to map
+the section will be returned in the <em>SectionOffset</em> and
+<em>ViewSize</em> fields. Since the LPC system services do not
+explicitly manage the memory described by the view section, it is up to
+the caller to insure that the memory is committed prior to being
+referenced.</p>
+<p>A client can control how the server gets to use its security
+attributes (IDs, privileges, et cetera) at port connection time. This is
+done by specifying security quality of service information using the
+<em>SecurityQos</em> parameter.</p>
+<p>If the server rejects the connection request, then no communication
+port object handle is returned, and the return status indicates an error
+occurred. The server may optionally return information in the
+<em>ConnectionInformation</em> data block giving the reason the
+connection requests was rejected.</p>
+<p>If the <em>PortName</em> does not exist, or the client process does
+not have sufficient access rights then the returned status will indicate
+that the port was not found.</p>
+<p>The following errors can be returned by this function:</p>
+<p>- STATUS_INVALID_PARAMETER</p>
+<p>- STATUS_INVALID_PORT_ATTRIBUTES</p>
+<p>- STATUS_OBJECT_PATH_INVALID</p>
+<p>- STATUS_OBJECT_PATH_NOT_FOUND</p>
+<p>- STATUS_OBJECT_PATH_SYNTAX_INVALID</p>
+<p>- STATUS_OBJECT_NAME_INVALID</p>
+<p>- STATUS_OBJECT_NAME_NOT_FOUND</p>
+<p>- STATUS_ACCESS_DENIED</p>
+<p>- STATUS_PORT_CONNECTION_REFUSED</p>
+<p>- STATUS_INVALID_PORT_HANDLE</p>
+<p>- STATUS_NO_MEMORY</p>
+<p><strong>2.3. NtListenPort</strong></p>
+<p>A server thread can listen for connection requests from client
+threads using the <strong>NtListenPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtListenPort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>OUT PCONNECTION_REQUEST</strong>
+<em>ConnectionRequest</em>,</p>
+<p><strong>OUT PVOID</strong> <em>ConnectionInformation</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN OUT PULONG</strong> <em>ConnectionInformationLength</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN BOOLEAN</strong> <em>Alertable</em>,</p>
+<p><strong>IN PTIME</strong> <em>Timeout</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - Specifies the connection port to listen for
+connection requests to.</p>
+<p><em>ConnectionRequest</em> - Pointer to a structure that describes
+the connection request the client is making:</p>
+<p><em>ConnectionRequest</em> Structure:</p>
+<p><strong>ULONG</strong> <em>Length</em> - Specifies the size of this
+data structure in bytes.</p>
+<p><strong>CLIENT_ID</strong> <em>ClientId</em> - A structure that
+contains the client identifier of the thread that sent the request.</p>
+<p><em>ClientId</em> Structure:</p>
+<p><strong>ULONG</strong> <em>UniqueProcessId</em> - A unique value for
+each process in the system.</p>
+<p><strong>ULONG</strong> <em>UniqueThreadId</em> - A unique value for
+each thread in the system.</p>
+<p><strong>ULONG</strong> <em>RequestId</em> - A unique value that
+identifies this connection request.</p>
+<p><strong>ULONG</strong> <em>PortAttributes</em> - Specifies the value
+of the <em>PortAttributes</em> parameter that the client specified on
+the <strong>NtConnectPort</strong> call.</p>
+<p><strong>ULONG</strong> <em>ClientViewSize</em> - Specifies the value
+of the <em>ViewSize</em> field of the <em>ClientView</em> parameter that
+the client specified on the <strong>NtConnectPort</strong> call. Allows
+the server to prevent clients from consuming an unreasonable amount of
+the server's address space.</p>
+<p><em>ConnectionInformation</em> - An optional pointer to uninterpreted
+data from the corresponding call to <strong>NtConnectPort</strong>. This
+data is intended for clients to pass package, version and protocol
+identification to the server to allow it to determine if it can satisfy
+the client before accepting the connection.</p>
+<p><em>ConnectionInformationLength</em> - A pointer to the maximum
+length of the <em>ConnectionInformation</em> data block. The output
+value is the actual length of data stored in the
+<em>ConnectionInformation</em> data block. This parameter is
+<strong>OPTIONAL</strong> only if the <em>ConnectionInformation</em>
+parameter is NULL, otherwise it is required.</p>
+<p><em>Alertable</em> - A Boolean value that specifies if the wait is
+user mode alertable.</p>
+<p><em>Timeout</em> - An optional pointer to timeout value that
+specifies the absolute or relative time over which any wait is to be
+completed. If not specified then the service will wait indefinitely.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>This call will return each time a client thread makes a call to the
+<strong>NtConnectPort</strong> service with a name that matches the name
+of the connection port object specified by the <em>PortHandle</em>
+parameter. Upon return, the location pointed to by the
+<em>ConnectionRequest</em> parameter will contain information about the
+connection request. The contents of this data structure must be passed
+to the <strong>NtAcceptConnectPort</strong> service to either accept or
+reject the connection request.</p>
+<p>If the <em>ConnectionInformation</em> parameter is specified, then it
+will receive the corresponding data the client specified with the
+<em>ConnectionInformation</em> parameter of the
+<strong>NtConnectPort</strong> service. The
+<em>ConnectionInformationLength</em> parameter specifies the amount of
+data that can be received and its output value is the actual amount of
+data received.</p>
+<p>The server process can examine the <em>ConnectionRequest</em> and
+<em>ConnectionInformation</em> data structures to determine whether or
+not to accept the connection request. In either case the server process
+must respond with a call to the <strong>NtAcceptConnectPort</strong>
+service to communicate the acceptance or rejection to the client
+thread.</p>
+<p>If the server accepts a connection request, then it must also call
+the <strong>NtCompleteConnectPort</strong> service to actually release
+the client process from its wait inside <strong>NtConnectPort</strong>.
+The reason for a two stage acceptance is to allow the server process to
+save away in its internal data structure that describes a connection to
+a client, the OUT parameters returned by the
+<strong>NtAcceptConnectPort</strong> service.</p>
+<p>A server process can maintain multiple threads waiting for connection
+requests in the <strong>NtListenPort</strong> service, although it is
+anticipated that only one thread will be used in most cases.</p>
+<p><strong>2.4. NtAcceptConnectPort</strong></p>
+<p>A server process can accept or reject a client connection request
+using the <strong>NtAcceptConnectPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtAcceptConnectPort</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>IN PVOID</strong> <em>PortContext</em>,</p>
+<p><strong>IN PCONNECTION_REQUEST</strong>
+<em>ConnectionRequest</em>,</p>
+<p><strong>IN BOOLEAN</strong> <em>AcceptConnection</em>,</p>
+<p><strong>IN BOOLEAN</strong> <em>ReceiveThisPort</em>,</p>
+<p><strong>IN OUT PPORT_VIEW</strong> <em>ServerView</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>OUT PREMOTE_PORT_VIEW</strong> <em>ClientView</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN PVOID</strong> <em>ConnectionInformation</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN ULONG</strong> <em>ConnectionInformationLength</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - A pointer to a variable that will receive the
+server communication port object handle value.</p>
+<p><em>PortContext</em> - A pointer value that is saved in the server
+communication port structure created by this service. This value is not
+interpreted by the system, but is returned by the
+<strong>NtReplyWaitReceive</strong> service whenever a message is
+received from the server communication port created by this call.</p>
+<p><em>ConnectionRequest</em> - A pointer to a structure that describes
+the connection request being accepted or rejected:</p>
+<p><em>ConnectionRequest</em> Structure:</p>
+<p><strong>ULONG</strong> <em>Length</em> - Specifies the size of this
+data structure in bytes.</p>
+<p><strong>CLIENT_ID</strong> <em>ClientId</em> - Specifies a structure
+that contains the client identifier of the thread that sent the
+request.</p>
+<p><em>ClientId</em> Structure:</p>
+<p><strong>ULONG</strong> <em>UniqueProcessId</em> - A unique value for
+each process in the system.</p>
+<p><strong>ULONG</strong> <em>UniqueThreadId</em> - A unique value for
+each thread in the system.</p>
+<p><strong>ULONG</strong> <em>RequestId</em> - A unique value that
+identifies the connection request being completed.</p>
+<p><strong>ULONG</strong> <em>PortAttributes</em> - This field has no
+meaning for this service.</p>
+<p><strong>ULONG</strong> <em>ClientViewSize</em> - This field has no
+meaning for this service.</p>
+<p><em>AcceptConnection</em> - Specifies a Boolean value which indicates
+where the connection request is being accepted or rejected. A value of
+TRUE means that the connection request is accepted and a server
+communication port handle will be created and connected to the client's
+communication port handle. A value of FALSE means that the connection
+request is not accepted.</p>
+<p><em>ReceiveThisPort</em> - Specifies a Boolean value which indicates
+if this server communication port should have its own receive queue or
+if all messages sent to this port should be queued in the receive queue
+of the communication port.</p>
+<p><em>ServerView</em> - A pointer to a structure that specifies the
+section that the server process will use to send messages back to the
+client process connected to this port.</p>
+<p><em>ServerView</em> Structure:</p>
+<p><strong>ULONG</strong> <em>Length</em> - Specifies the size of this
+data structure in bytes.</p>
+<p><strong>HANDLE</strong> <em>SectionHandle</em> - Specifies an open
+handle to a section object.</p>
+<p><strong>ULONG</strong> <em>SectionOffset</em> - Specifies a field
+that will receive the actual offset, in bytes, from the start of the
+section. The initial value of this parameter specifies the byte offset
+within the section that the server's view is based. The value is rounded
+down to the next host page size boundary.</p>
+<p><strong>ULONG</strong> <em>ViewSize</em> - Specifies a field that
+will receive the actual size, in bytes, of the view. If the value of
+this parameter is zero, then the server's view of the section will be
+mapped starting at the specified section offset and continuing to the
+end of the section. Otherwise, the initial value of this parameter
+specifies the size, in bytes, of the server's view and is rounded up to
+the next host page size boundary.</p>
+<p><strong>PVOID</strong> <em>ViewBase</em> - Specifies a field that
+will receive the base address of the section in the server's address
+space.</p>
+<p><strong>PVOID</strong> <em>ViewRemoteBase</em> - Specifies a field
+that will receive the base address of the server's section in the
+client's address space. Used to generate pointers that are meaningful to
+the client.</p>
+<p><em>ClientView</em> - An optional pointer to a structure that will
+receive information about the client process' view in the server's
+address space. The server process can use this information to validate
+pointers it receives from the client process.</p>
+<p><em>ClientView</em> Structure:</p>
+<p><strong>ULONG</strong> <em>Length</em> - Specifies the size of this
+data structure in bytes.</p>
+<p><strong>PVOID</strong> <em>ViewBase</em> - Specifies a field that
+will receive the base address of the client's section in the server's
+address space.</p>
+<p><strong>ULONG</strong> <em>ViewSize</em> - Specifies a field that
+will receive the size, in bytes, of the client's view in the server's
+address space. If this field is zero, then client has no view in the
+server's address space.</p>
+<p><em>ConnectionInformation</em> - An optional pointer to uninterpreted
+data that is to be returned to the caller of
+<strong>NtConnectPort</strong>.</p>
+<p><em>ConnectionInformationLength</em> - Specifies the length of the
+<em>ConnectionInformation</em> data block. This parameter is
+<strong>OPTIONAL</strong> only if the <em>ConnectionInformation</em>
+parameter is null, otherwise it is required. The length cannot be
+greater than the length received from the client.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>The <em>ConnectionRequest</em> parameter must specify a connection
+request returned by a previous call to the <strong>NtListenPort</strong>
+service. This service will either complete the connection if the
+<em>AcceptConnection</em> parameter is TRUE, or reject the connection
+request if the <em>AcceptConnection</em> parameter is FALSE.</p>
+<p>In either case, if the <em>ConnectionInformation</em> parameter is
+specified, then any data it points to is returned to the client process
+via the <em>ConnectionInformation</em> parameter that was specified on
+the <strong>NtConnectPort</strong> service call. The amount of data
+returned to the client is specified by the
+<em>ConnectionInformationLength</em> parameter.</p>
+<p>If the connection request is accepted, then two communication port
+objects will be created and connected together. One will be inserted in
+the client process' handle table and returned to the client via the
+<em>PortHandle</em> parameter it specified on the
+<strong>NtConnectPort</strong> service. The other will be inserted in
+the server process' handle table and returned via the
+<em>PortHandle</em> parameter specified on the
+<strong>NtAcceptConnectPort</strong> service. In addition all of the
+server's communication ports will be linked together with the head of
+the queue in the connection port object. This allows a server thread to
+wait for any message to any of its connected communication ports.</p>
+<p>If the connection request is accepted, and the <em>ServerView</em>
+parameter was specified, then the section handle is examined. If it is
+valid, then the portion of the section described by the
+<em>SectionOffset</em> and <em>ViewSize</em> fields will be mapped into
+both the client and server process address spaces. The address in
+server's address space will be returned in the <em>ViewBase</em> field.
+The address in the client's address space will be returned in the
+<em>ViewRemoteBase</em> field. The actual offset and size used to map
+the section will be returned in the <em>SectionOffset</em> and
+<em>ViewSize</em> fields. Since the LPC system services do not
+explicitly manage the memory described by the view section, it is up to
+the caller to insure that the memory is committed prior to being
+referenced.</p>
+<p>If the server accepts a connection request, then it must also call
+the <strong>NtCompleteConnectPort</strong> service to actually release
+the client process from its wait inside <strong>NtConnectPort</strong>.
+The reason for a two stage acceptance is to allow the server process to
+save away in its internal data structure that describes a connection to
+a client, the OUT parameters returned by the
+<strong>NtAcceptConnectPort</strong> service, <em>PortHandle</em>,
+<em>ClientView</em> and <em>ServerView</em>.</p>
+<p>Communication port objects are temporary objects that have no names
+and cannot be inherited. When either the client or server process calls
+the <strong>NtClose</strong> service for a communication port, the port
+will be deleted since there can never be more than one outstanding
+handle for each communication port. The port object type specific delete
+procedure will then be invoked. This delete procedure will examine the
+communication port, and if it is connected to a server communication
+port, it will queue an LPC_PORT_CLOSED datagram to the server's message
+queue. This will allow server process to notice when a port becomes
+disconnected, either because of an explicit call to
+<strong>NtClose</strong> or an implicit call due to process
+termination.</p>
+<p><strong>2.5. NtCompleteConnectPort</strong></p>
+<p>After accepting a connection with the
+<strong>NtAcceptConnectPort</strong> service, a server process can
+release a client process from its wait inside of the
+<strong>NtConnectPort</strong> service with the
+<strong>NtCompleteConnectPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCompleteConnectPort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - Specifies a server communication port returned
+by the <strong>NtAcceptConnectPort</strong> Service.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>A server process must call this service whenever it accepts a
+connection request with the <strong>NtAcceptConnectPort</strong>
+service. This service will then satisfy the wait of the client process
+inside of the <strong>NtConnectPort</strong> service.</p>
+<p>The reason for a two stage acceptance is to allow the server process
+to save away in its internal data structure that describes a connection
+to a client, the OUT parameters returned by the
+<strong>NtAcceptConnectPort</strong> service, <em>PortHandle</em>,
+<em>ClientView</em> and <em>ServerView</em>.</p>
+<h2 id="port-message-structure">2.6. Port Message Structure</h2>
+<p>A port message is a variable size structure that can be placed in the
+message queue of a port. It contains information filled in by the system
+that uniquely identifies the thread that sent the message, along with a
+serial number that uniquely identifies the message so that reply
+messages can be matched up with the message being replied to. The type
+declaration for a port message only specifies the fixed size header that
+is associated with all messages. The application specific data
+associated with a message should immediately follow the fixed size
+header.</p>
+<p><strong>typedef struct _PORT_MESSAGE</strong> {</p>
+<p><strong>CSHORT</strong> <em>DataLength</em>;</p>
+<p><strong>CSHORT</strong> <em>TotalLength</em>;</p>
+<p><strong>CSHORT</strong> <em>Type</em>;</p>
+<p><strong>CSHORT</strong> <em>MapInfoOffset</em>;</p>
+<p><strong>CLIENT_ID</strong> <em>ClientId</em>;</p>
+<p><strong>ULONG</strong> <em>MessageId</em>;</p>
+<p>} <strong>PORT_MESSAGE, *PPORT_MESSAGE</strong>;</p>
+<p><strong>PORT_MESSAGE</strong> Structure:</p>
+<p><em>DataLength</em> - Specifies the size, in bytes, of the data
+portion of this message. Must be less than the <em>TotalLength</em>
+field.</p>
+<p><em>TotalLength</em> - Specifies the total size of this data
+structure in bytes. The maximum size of the message is limited by the
+value of the <em>MaxMessageLength</em> parameter to the
+<strong>NtCreatePort</strong> service.</p>
+<p><em>Type</em> - For messages being sent, this field is filled in by
+the system service that sends the message. For messages being received,
+this field identifies the source of the message.</p>
+<p><em>Type</em> Values:</p>
+<p>LPC_DATAGRAM - Indicates that this is a request message generated by
+a call to <strong>NtRequestPort</strong>. No reply is expected.</p>
+<p>LPC_REQUEST - Indicates that this is a request message generated by a
+call to <strong>NtRequestWaitReplyPort</strong>. The sender is expecting
+a reply.</p>
+<p>LPC_REPLY - Indicates that this is a reply to a previous request
+message that was generated by a call to <strong>NtReplyPort</strong> or
+<strong>NtReplyWaitReplyPort</strong> or
+<strong>NtReplyWaitReceivePort</strong>.</p>
+<p>LPC_LOST_REPLY - Indicates that the recipient of a message was unable
+to reply to a message it received. The message data buffer contains the
+reply that could not be delivered. This message is queue to a
+communication port whenever a reply was attempted and the sending thread
+was not waiting for a reply.</p>
+<p>LPC_PORT_CLOSED - Indicates that the client thread has closed its
+port and therefore become disconnected from the server. This message is
+sent from the client process to the server when the port is closed.</p>
+<p>LPC_CLIENT_DIED - Indicates that the client thread has died. The
+<em>ClientId</em> field contains the ID of the client thread. The
+message data buffer contains the thread termination code. This datagram
+is queued to each port associated with the dying thread via the
+<strong>NtRegisterThreadTerminationPort</strong> system service.</p>
+<p>LPC_EXCEPTION - Indicates that an unhandled exception occurred in the
+client thread. The message data buffer contains the number of the
+exception. The client thread is blocked waiting for a reply to this
+message. The reply states whether or not the server process handled the
+exception. This message is sent to the <em>ExceptionPort</em> associated
+with a process as specified via the call to the
+<strong>NtCreateProcess</strong> system service.</p>
+<p>LPC_DEBUG_EVENT - Indicates that this is a debugger event. This
+message is sent to the <em>DebugPort</em> associated with a process as
+specified via the call to the <strong>NtCreateProcess</strong> system
+service.</p>
+<p><em>MapInfoOffset</em> - Offset within the message structure of a
+PORT_MAP_INFORMATION data structure. If zero, then there is no
+PORT_MAP_INFORMATION data structure associated with this message. Must
+be a valid offset within the message buffer.</p>
+<p><em>ClientId</em> - a structure that contains the client identifier
+of the thread that sent the message.</p>
+<p><em>ClientId</em> Structure:</p>
+<p><strong>ULONG</strong> <em>UniqueProcessId</em> - A unique value for
+each process in the system.</p>
+<p><strong>ULONG</strong> <em>UniqueThreadId</em> - A unique value for
+each thread in the system.</p>
+<p><em>MessageId</em> - unique value that identifies this message.</p>
+<p>The <em>MessageType</em>, <em>ClientId</em> and <em>MessageId</em>
+fields are filled in by the system service that sends the messages. For
+messages being received they identify the source of the message. For
+messages being replied to the <em>ClientId</em> and <em>MessageId</em>
+fields are used to determine who is waiting for the reply.</p>
+<p>Note that the actual message structure contains two unions to allow
+for the code generated by the stub compiler to efficiently initialize
+the first four fields of a message using just two store
+instructions.</p>
+<h2 id="port-map-information-structure">2.7. Port Map Information
+Structure</h2>
+<p>In order to support passing large pieces of data efficiently, the LPC
+mechanism supports the ability to pass objects that lie on a page
+boundary and whose size is a multiple of the page size. The
+<em>MapInfoOffset</em> field above enables this feature and causes one
+or more page aligned regions in the sender's address space to be doubly
+mapped into the receiver's address space for the duration of the
+message.</p>
+<p>If the <em>MapInfoOffset</em> field is not zero, then it is an offset
+within the message data buffer of a
+<strong>PORT_MAP_INFORMATION</strong> data structure.</p>
+<p><strong>typedef struct _PORT_MAP_INFORMATION</strong> {</p>
+<p><strong>ULONG</strong> <em>CountMapEntries</em>;</p>
+<p><strong>PORT_MAP_ENTRY</strong> <em>MapEntries</em>[];</p>
+<p>} <strong>PORT_MAP_INFORMATION, *PPORT_MAP_INFORMATION</strong>;</p>
+<p><strong>PORT_MAP_INFORMATION</strong> Structure:</p>
+<p><em>CountMapEntries</em> - The number of entries in the
+<em>MapEntries</em> array.</p>
+<p><em>MapEntries</em> - Specifies an array of
+<strong>PORT_MAP_ENTRY</strong> structures.</p>
+<p><strong>PORT_MAP_ENTRY</strong> Structure:</p>
+<p><strong>PVOID</strong> <em>Base</em> - Specifies the address of first
+page in a region of the sender's address space that is to be doubly
+mapped into the receiver's address space. This address must be aligned
+on a page boundary.</p>
+<p><strong>ULONG</strong> <em>Size</em> - Specifies the number of bytes
+to map. This value must be a multiple of the page size; if zero, then no
+pages are mapped.</p>
+<p>The address of the Port Map Information structure can be computed as
+follows:</p>
+<p><strong>PPORT_MAP_INFORMATION</strong> <em>MapInfo</em> =</p>
+<p>(<strong>PPORT_MAP_INFORMATION</strong>)((<strong>PCH</strong>)<em>PortMsg</em>
++ <em>PortMsg</em>-&gt;<em>MapInfoOffset</em>);</p>
+<p>The mapping occurs when the message is received by the target thread.
+The mapping is destroyed when the target thread replies to the
+message.</p>
+<h2 id="ntrequestport">2.8. NtRequestPort</h2>
+<p>A client and server process can send datagram messages using the
+<strong>NtRequestPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtRequestPort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>IN PPORT_MESSAGE</strong> <em>RequestMessage</em></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - Specifies the handle of the communication port
+to send the request message to.</p>
+<p><em>RequestMessage</em> - Specifies a pointer to the request
+message.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>The <em>Type</em> field of the message is set to LPC_DATAGRAM by the
+service.</p>
+<p>The message pointed to by the <em>RequestMessage</em> parameter is
+placed in the message queue of the port connected to the communication
+port specified by the <em>PortHandle</em> parameter. This service
+returns an error if <em>PortHandle</em> is invalid or if the
+<em>MessageId</em> field of the <em>PortMessage</em> structure is
+non-zero.</p>
+<h2 id="ntrequestwaitreplyport">2.9. NtRequestWaitReplyPort</h2>
+<p>A client and server process can send a request and wait for a reply
+using the <strong>NtRequestWaitReplyPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtRequestWaitReplyPort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>IN PPORT_MESSAGE</strong> <em>RequestMessage</em>,</p>
+<p><strong>OUT PPORT_MESSAGE</strong> <em>ReplyMessage</em>,</p>
+<p><strong>IN BOOLEAN</strong> <em>Alertable</em>,</p>
+<p><strong>IN PTIME</strong> <em>Timeout</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - Specifies the handle of the communication port
+to send the request message to.</p>
+<p><em>RequestMessage</em> - Specifies a pointer to a request message to
+send.</p>
+<p><em>ReplyMessage</em> - Specifies the address of a variable that will
+receive the reply message. This parameter may point to the same buffer
+as the <em>RequestMessage</em> parameter.</p>
+<p><em>Alertable</em> - A Boolean value that specifies if the wait is
+user mode alertable.</p>
+<p><em>Timeout</em> - An optional pointer to timeout value that
+specifies the absolute or relative time over which any wait is to be
+completed. If not specified then the service will wait indefinitely.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>If the <em>Type</em> field of the <em>RequestMessage</em> structure
+is equal to LPC_REQUEST, then this is identified as a callback request.
+The <em>ClientId</em> and <em>MessageId</em> fields are used to identify
+the thread that is waiting for a reply. This thread is unblocked and the
+current thread that called this service then blocks waiting for a
+reply.</p>
+<p>The Type field of the message is set to LPC_REQUEST by the service.
+Otherwise the Type field of the message must be zero and it will be set
+to LPC_REQUEST by the service. The message pointed to by the
+<em>RequestMessage</em> parameter is placed in the message queue of the
+port connected to the communication port specified by the
+<em>PortHandle</em> parameter. This service returns an error if
+<em>PortHandle</em> is invalid. The calling thread then blocks waiting
+for a reply.</p>
+<p>The reply message is stored in the location pointed to by the
+<em>ReplyMessage</em> parameter. The <em>ClientId</em>,
+<em>MessageId</em> and message type fields will be filled in by the
+service.</p>
+<p>The <em>Timeout</em> parameter is used as the timeout value when
+waiting for a reply. If the wait times out, then an error code is
+returned.</p>
+<h2 id="ntreplyport">2.10. NtReplyPort</h2>
+<p>A client and server process can send a reply to a previous request
+message with the <strong>NtReplyPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtReplyPort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>IN PPORT_MESSAGE</strong> <em>ReplyMessage</em>,</p>
+<p><strong>IN LPC_REPLY_BOOST</strong> <em>ReplyBoost</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - Specifies the handle of the communication port
+that the original message was received from.</p>
+<p><em>ReplyMessage</em> - Specifies a pointer to the reply message to
+be sent. The <em>ClientId</em> and <em>MessageId</em> fields determine
+which thread will get the reply.</p>
+<p><em>ReplyBoost</em> - This optional parameter specifies the amount of
+priority boost the thread waiting for the reply message is to receive.
+This parameter may only be specified if the calling thread has the
+SE_LPC_REPLY_BOOST_PRIVILEGE privilege. This parameter and the privilege
+test are ignored if the <em>ReplyMessage</em> parameter is not
+specified.</p>
+<p><em>ReplyBoost</em> Values:</p>
+<p><em>NoLpcReplyBoost</em> - no priority boost will be given to the
+thread waiting for the reply. No privilege is required to specify this
+value.</p>
+<p><em>LowLpcReplyBoost</em> - a small priority boost will be given to
+the thread waiting for the reply.</p>
+<p><em>MediumLpcReplyBoost</em> - a medium priority boost will be given
+to the thread waiting for the reply.</p>
+<p><em>HighLpcReplyBoost</em> - a large priority boost will be given to
+the thread waiting for the reply.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>The Type field of the message is set to LPC_REPLY by the service. If
+the <em>MapInfoOffset</em> field of the reply message is non-zero, then
+the PORT_MAP_INFORMATION structure it points to will be processed and
+the relevant pages in the caller's address space will be unmapped.</p>
+<p>The <em>ClientId</em> and <em>MessageId</em> fields of the
+<em>ReplyMessage</em> structure are used to identify the thread waiting
+for this reply. If the target thread is in fact waiting for this reply
+message, then the reply message is copied into the thread's message
+buffer and the thread's wait is satisfied.</p>
+<p>If the thread is not waiting for a reply or is waiting for a reply to
+some other <em>MessageId</em>, then the message is placed in the message
+queue of the port that is connected to the communication port specified
+by the <em>PortHandle</em> parameter and the <em>Type</em> field of the
+message is set to LPC_LOST_REPLY.</p>
+<h2 id="ntreplywaitreplyport">2.11. NtReplyWaitReplyPort</h2>
+<p>A client and server process can send a reply to a previous message
+and block waiting for a reply using the
+<strong>NtReplyWaitReplyPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtReplyWaitReplyPort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>IN OUT PPORT_MESSAGE</strong> <em>ReplyMessage</em>,</p>
+<p><strong>IN LPC_REPLY_BOOST</strong> <em>ReplyBoost</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN BOOLEAN</strong> <em>Alertable</em>,</p>
+<p><strong>IN PTIME</strong> <em>Timeout</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - Specifies the handle of the communication port
+that the original message was received from.</p>
+<p><em>ReplyMessage</em> - Specifies a pointer to the reply message to
+be sent. The <em>ClientId</em> and <em>MessageId</em> fields determine
+which thread will get the reply. This buffer also receives any reply
+that comes back from the wait.</p>
+<p><em>ReplyBoost</em> - This optional parameter specifies the amount of
+priority boost the thread waiting for the reply message is to receive.
+This parameter may only be specified if the calling thread has the
+SE_LPC_REPLY_BOOST_PRIVILEGE privilege. This parameter and the privilege
+test are ignored if the <em>ReplyMessage</em> parameter is not
+specified.</p>
+<p><em>ReplyBoost</em> Values:</p>
+<p><em>NoLpcReplyBoost</em> - no priority boost will be given to the
+thread waiting for the reply. No privilege is required to specify this
+value.</p>
+<p><em>LowLpcReplyBoost</em> - a small priority boost will be given to
+the thread waiting for the reply.</p>
+<p><em>MediumLpcReplyBoost</em> - a medium priority boost will be given
+to the thread waiting for the reply.</p>
+<p><em>HighLpcReplyBoost</em> - a large priority boost will be given to
+the thread waiting for the reply.</p>
+<p><em>Alertable</em> - A Boolean value that specifies if the wait is
+user mode alertable.</p>
+<p><em>Timeout</em> - An optional pointer to timeout value that
+specifies the absolute or relative time over which any wait is to be
+completed. If not specified then the service will wait indefinitely.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>This service works the same as <strong>NtReplyPort</strong>, except
+that after delivering the reply message, it blocks waiting for a reply
+to a previous message. When the reply is received, it will be placed in
+the location specified by the <em>ReplyMessage</em> parameter.</p>
+<h2 id="ntreplywaitreceiveport">2.12. NtReplyWaitReceivePort</h2>
+<p>A client and server process can receive messages using the
+<strong>NtReplyWaitReceivePort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtReplyWaitReceivePort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>OUT PVOID</strong> *<em>PortContext</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN PPORT_MESSAGE</strong> <em>ReplyMessage</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN LPC_REPLY_BOOST</strong> <em>ReplyBoost</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>OUT PPORT_MESSAGE</strong> <em>ReceiveMessage</em>,</p>
+<p><strong>IN BOOLEAN</strong> <em>Alertable</em>,</p>
+<p><strong>IN PTIME</strong> <em>Timeout</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - Specifies the handle of the connection or
+communication port to do the receive from.</p>
+<p><em>PortContext</em> - Specifies an optional pointer to a variable
+that is to receive the context value associated with the communication
+port that the message is being received from. This context variable was
+specified on the call to the <strong>NtAcceptConnectPort</strong>
+service.</p>
+<p><em>ReplyMessage</em> - This optional parameter specifies the address
+of a reply message to be sent. The <em>ClientId</em> and
+<em>MessageId</em> fields determine which thread will get the reply. See
+description of <strong>NtReplyPort</strong> for how the reply is sent.
+The reply is sent before blocking for the receive.</p>
+<p><em>ReplyBoost</em> - This optional parameter specifies the amount of
+priority boost the thread waiting for the reply message is to receive.
+This parameter may only be specified if the calling thread has the
+SE_LPC_REPLY_BOOST_PRIVILEGE privilege. This parameter and the privilege
+test are ignored if the <em>ReplyMessage</em> parameter is not
+specified.</p>
+<p><em>ReplyBoost</em> Values:</p>
+<p><em>NoLpcReplyBoost</em> - no priority boost will be given to the
+thread waiting for the reply. No privilege is required to specify this
+value.</p>
+<p><em>LowLpcReplyBoost</em> - a small priority boost will be given to
+the thread waiting for the reply.</p>
+<p><em>MediumLpcReplyBoost</em> - a medium priority boost will be given
+to the thread waiting for the reply.</p>
+<p><em>HighLpcReplyBoost</em> - a large priority boost will be given to
+the thread waiting for the reply.</p>
+<p><em>ReceiveMessage</em> - Specifies the address of a variable to
+receive the message.</p>
+<p><em>Alertable</em> - A Boolean value that specifies if the wait is
+user mode alertable.</p>
+<p><em>Timeout</em> - An optional pointer to timeout value that
+specifies the absolute or relative time over which any wait is to be
+completed. If not specified then the service will wait indefinitely.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>If the <em>ReplyMessage</em> parameter is specified, then the reply
+will be sent using <strong>NtReplyPort</strong>.</p>
+<p>If the <em>PortHandle</em> parameter specifies a connection port,
+then the receive will return whenever a message is sent to a server
+communication port that does not have its own receive queue and the
+message is therefore queued to the receive queue of the connection
+port.</p>
+<p>If the <em>PortHandle</em> parameter specifies a server communication
+port that does not have a receive queue, then behaves as if the
+associated connection port handle was specified. Otherwise the receive
+will return whenever message is placed in the receive queue associated
+with the server communication port.</p>
+<p>The received message will be returned in the variable specified by
+the <em>ReceiveMessage</em> parameter. If the <em>MapInfoOffset</em>
+field of the reply message is non-zero, then the PORT_MAP_INFORMATION
+structure it points to will be processed and the relevant pages will be
+mapped into the caller's address space. The service returns an error if
+there is not enough room in the caller's address space to accommodate
+the mappings.</p>
+<h2 id="ntimpersonateclientofport">2.13. NtImpersonateClientOfPort</h2>
+<p>A server process can utilize the security context of a client process
+with the <strong>NtImpersonateClientOfPort</strong> service:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtImpersonateClientOfPort</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>PortHandle</em>,</p>
+<p><strong>IN PPORT_MESSAGE</strong> <em>Message</em></p>
+<p>)</p>
+<p><u>Parameters</u>:</p>
+<p><em>PortHandle</em> - Specifies the handle of the communication port
+that the message was received from.</p>
+<p><em>Message</em> - Specifies an address of a message that was
+received from the client that is to be impersonated. The
+<em>ClientId</em> field of the message identifies the client thread that
+is to be impersonated. The client thread must be waiting for a reply to
+the message in order to impersonate the client.</p>
+<p><u>Return Value</u>: Status code that indicates whether or not the
+operation was successful.</p>
+<p>This service establishes an impersonation token for the calling
+thread. The impersonation token corresponds to the context provided by
+the port client. The client must currently be waiting for a reply to the
+specified message.</p>
+<p>This service returns an error status code if the client thread is not
+waiting for a reply to the message. The security quality of service
+parameters specified by the client upon connection dictate what use the
+server will have of the client's security context.</p>
+<p>For complicated or extended impersonation needs, the server may open
+a copy of the client's token (using
+<strong>NtOpenThreadToken()</strong>). This must be done while
+impersonating the client.</p>
+<h1 id="section"></h1>

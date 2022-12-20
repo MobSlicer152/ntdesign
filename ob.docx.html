@@ -1,0 +1,2635 @@
+<p><strong>Portable Systems Group</strong><br />
+<br />
+<strong>NT OS/2 Object Management Specification</strong><br />
+<br />
+<strong>Author:</strong> <em>Steven R. Wood</em><br />
+<br />
+<em>Revision 1.6, May 24, 1991</em><br />
+<em>Original Draft February 17, 1989</em></p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>1.1 What is an Object? 1</p>
+<p>1.2 Object Management Goals 1</p>
+<p>1.3 Object Data Structures 1</p>
+<p>1.4 Object Header 1</p>
+<p>1.5 Object Types 2</p>
+<p>1.6 Object Handles 3</p>
+<p>1.7 Object Attributes Structure 4</p>
+<p>1.8 Resource Quotas and Objects 5</p>
+<p>1.9 Object Retention 6</p>
+<p>1.10 Exclusive Object Handles 6</p>
+<p>1.11 Object Name Space 7</p>
+<p>1.12 Preventing Deadlock 8</p>
+<p>2. Object Executive APIs 9</p>
+<p>2.1 Creating Object Types 9</p>
+<p>2.2 Object Type Procedure Templates 11</p>
+<p>2.2.1 Object Dump Procedure 12</p>
+<p>2.2.2 Object Open Procedure 12</p>
+<p>2.2.3 Object Close Procedure 13</p>
+<p>2.2.4 Object Delete Procedure 14</p>
+<p>2.2.5 Object Parse Procedure 15</p>
+<p>2.2.6 Object Security Procedure 17</p>
+<p>2.3 Creating An Object 18</p>
+<p>2.4 Creating an Instance of an Object 20</p>
+<p>2.5 Open Object by Name 23</p>
+<p>2.6 Open Object by Pointer 24</p>
+<p>2.7 Referencing An Object 26</p>
+<p>2.8 Reference Object by Name 27</p>
+<p>2.9 Reference Object by Pointer 29</p>
+<p>2.10 Making an Object Temporary 30</p>
+<p>2.11 Dereferencing an Object 30</p>
+<p>2.12 Object Management during Process Creation and Deletion 31</p>
+<p>2.12.1 Process Creation Hook 31</p>
+<p>2.12.2 Process Deletion Hook 31</p>
+<p>2.13 Dump Object Support 32</p>
+<p>2.14 Check Traverse Access 34</p>
+<p>2.15 Check Create Instance access 35</p>
+<p>2.16 Check Create Object Access 36</p>
+<p>2.17 Check Implicit Object Access 37</p>
+<p>2.18 Checking Access for Object Reference 38</p>
+<p>2.19 Locking a security descriptor 39</p>
+<p>2.20 Unlocking a security descriptor 39</p>
+<p>2.21 Query an object's Security Descriptor field 39</p>
+<p>2.22 Set an object's Security Descriptor field 40</p>
+<p>2.23 Query an object's Security information 41</p>
+<p>2.24 Release an object's Security information 41</p>
+<p>2.25 Set Security Quota Charged for object 42</p>
+<p>2.26 Validate security information against quota 43</p>
+<p>3. Object System Services 43</p>
+<p>3.1 Create Directory Object 43</p>
+<p>3.2 Open Object Directory 45</p>
+<p>3.3 Query Object Directory 46</p>
+<p>3.4 Create Symbolic Link 48</p>
+<p>3.5 Open Symbolic Link 49</p>
+<p>3.6 Query Symbolic Link 50</p>
+<p>3.7 Wait For Single Object 50</p>
+<p>3.8 Wait for Multiple Objects 51</p>
+<p>3.9 Duplicate Handle 53</p>
+<p>3.10 Close Handle 54</p>
+<p>3.11 Making an Object Temporary 55</p>
+<p>3.12 Query Object 56</p>
+<p>3.13 Set Security Descriptor for an Object 58</p>
+<p>3.14 Query Security Descriptor for an Object 59</p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This specification describes the Object Management for the NT OS/2
+system. Object Management is provided by a set of routines that are
+available within the NT OS/2 executive and invoked from kernel mode.
+This specification also describes generic object management user level
+NT routines and support for directories.</p>
+<h2 id="what-is-an-object">1.1 What is an Object?</h2>
+<p>An object is an opaque data structure that defines a protected entity
+that is implemented and manipulated by the operating system. A
+particular object type is described by the set of operations that may be
+performed upon it (wait, create, clear, set, cancel,...) and its
+relationship to other objects. All objects have the same standard set of
+rules for creation, deletion, protection, access, management, and
+naming.</p>
+<h2 id="object-management-goals">1.2 Object Management Goals</h2>
+<p>o Provide an extensible, well defined mechanism for the definition
+and manipulation of executive data structures.</p>
+<p>o Provide uniform rules for object retention. This is especially
+important in a multiprocessor system.</p>
+<p>o Provide uniform security and protection that allows certification
+at C2 and beyond without modification.</p>
+<p>o Provide a mechanism to add new object types to the system without
+modifying existing system code. This means that only the object type
+specific routines should have knowledge of the internal structure of a
+particular object type.</p>
+<p>o Provide orthogonal specification of APIs which operate on
+objects.</p>
+<p>o Provide attributes on objects to support POSIX compatibility.</p>
+<p>o Provide a naming hierarchy which is integrated with the file system
+and mimics the OS/2 and POSIX file system directory hierarchy.</p>
+<h2 id="object-data-structures">1.3 Object Data Structures</h2>
+<p>An instance of an object type is represented by a data structure
+which contains a standard object header and an object type specific
+object body. The object management routines operate on the object
+header, while the object type's specific routines operate on the object
+body.</p>
+<h2 id="object-header">1.4 Object Header</h2>
+<p>The object header contains information used by the object management
+routines to manipulate the object. The following items are maintained in
+the object header:</p>
+<p>o Pointer to the name of the object, if any.</p>
+<p>o Pointer to the directory object which contains this object's name,
+if any.</p>
+<p>o Pointer to the SecurityDescriptor for the object, if any.</p>
+<p>o AccessMode of the object, either KernelMode only or UserMode and
+KernelMode.</p>
+<p>o Pointer to the Owner Process of the object for exclusive objects,
+if any.</p>
+<p>o Retention counts for the object.</p>
+<p>o Pointer to an optional handle count data base, that maintains a per
+process handle count for a given object.</p>
+<p>o Pointer to the object type structure that defines the type of the
+object.</p>
+<p>o Permanent / temporary attribute.</p>
+<p>o Paged and nonpaged pool quota charges associated with the
+object.</p>
+<p>o Structure control linking all objects of the same type
+together.</p>
+<h2 id="object-types">1.5 Object Types</h2>
+<p>Every object has an object type. The object type is defined by an
+Object Type Descriptor structure. An object type is nothing more than an
+object whose object body contains the following information:</p>
+<p>o Type specific mutex.</p>
+<p>o Structure control linking all objects of the same type
+together.</p>
+<p>o Dispatcher object offset.</p>
+<p>o Pool type to use when allocating space for objects of this
+type.</p>
+<p>o Invalid object attribute bits.</p>
+<p>o Mapping vector to map generic access bits into standard and/or
+specific access bits.</p>
+<p>o Valid access bits.</p>
+<p>o Pointer to a type specific dump procedure, if any.</p>
+<p>o Pointer to a type specific delete procedure, if any.</p>
+<p>o Pointer to a type specific open procedure, if any.</p>
+<p>o Pointer to a type specific close procedure, if any.</p>
+<p>o Pointer to a type specific parse procedure, if any.</p>
+<p>o Pointer to a type specific security procedure, if any.</p>
+<p>These items are used to manage type specific attributes of each
+object. The type specific mutex is acquired whenever an object of that
+type is being created, deleted, or having its security descriptor
+examined or modified. This prevents race conditions between object
+creation and deletion.</p>
+<p>The SecurityDescriptor associated with an object type descriptor is
+examined for OBJECT_TYPE_CREATE access by the ObCreateObject function
+every time an object of the corresponding object type is created. This
+provides a mechanism to grant or deny the ability to create objects of a
+specific type on an individual identifier basis using the
+SecurityDescriptor associated with the object type descriptor
+structure.</p>
+<p>The name is used to uniquely identify the type. All type names are
+stored in the \ObjectTypes object directory.</p>
+<p>The pool type determines whether the object header and object body
+are allocated from paged pool or non-paged pool.</p>
+<p>The dispatcher offset is used to implement a generic wait function.
+Waiting on an object waits on the offset within the object body
+specified by the dispatcher offset. This allows a program to wait on
+multiple objects of different types or a single object of unknown type,
+without having to know the object type.</p>
+<p>The six type specific procedures are called whenever a type specific
+action must be performed from within the context of the object
+manager.</p>
+<h2 id="object-handles">1.6 Object Handles</h2>
+<p>An object handle is a 32-bit opaque pointer to an object. There may
+be more than one handle for a given object, as a result of sharing via
+inheritance or naming. Associated with each handle is a pointer to the
+object, a granted access mask that was computed at the time the handle
+was created and handle attributes such as where the handle should be
+inherited on child process creation.</p>
+<p>Object handles are created by inserting an object into an object
+table. An object table consists of an array of object table entries. An
+object handle is an index into an object table to the object table entry
+for that handle. The object table entry contains the information
+associated with the handle (i.e. the pointer to the object, the granted
+access mask and the handle attributes). There is an object table
+associated with each process. Thus handles are process specific, and
+meaningless outside of the context in which the handle was created. All
+object handles associated with a process are automatically "closed" upon
+that process terminating.</p>
+<p>Each object table has a mutex associated with it. This mutex is
+acquired any time the object table is examined or modified.</p>
+<p>The low order 2 bits of a 32-bit object handle are set to zero by the
+system when a handle is created and are ignored by all system services
+that accept a handle. This allows applications to encode application
+specific type information in the low order two bits.</p>
+<p>In the debugging version of the system, part of each 32-bit object
+handle is reserved for a serial number that is also stored in the
+associated object table entry. When an object handle is used to
+reference an object, the serial number in the 32-bit handle is compared
+with that in the object table entry and an error is returned if they
+don't match. This will catch cases when an old handle is reused
+inadvertantly.</p>
+<p>When creating a handle to an object, the caller may specify a
+<em>DesiredAccess</em> parameter. The Object Manager probes the security
+descriptor associated with an object with the <em>DesiredAccess</em>
+parameter. If all requested access bits are allowed by the security
+descriptor then the access is granted, and the <em>DesiredAccess</em>
+parameter is stored in the object table entry as the granted access
+mask.</p>
+<p>Some objects may require a more sophisticated access control scheme
+than simply checking the bits in the security descriptor. For example, a
+particular kind of access to an object may be granted by being given
+explicit permission via the security descriptor, or by having a
+privilege, or by having a particular kind of access to the object's
+container. In order to accomodate access schemes such as these, the
+caller may create an AccessState structure (via SeCreateAccessState). An
+AccessState structure contains the desired access mask, a record of the
+currently granted access mask, and room for a set of privileges. The
+caller performs whatever kind of access checking is necessary to suit
+it's needs, clearing bits in the imbedded <em>DesiredAccess</em> mask as
+appropriate. When all of the object specific logic is complete, the
+structure is then passed to the object manager for whatever security
+processing remains.</p>
+<p>When referencing an object via an object handle, the caller also
+specifies a <em>DesiredAccess</em> parameter. However, in this case, the
+test for access is nothing more than a bit test against the granted
+access mask stored in the associated object table entry. Thus object
+handle creation encapsulates the security check for NT OS/2. Please
+refer to the Local Security chapter for a description of the bits
+defined for <em>DesiredAccess</em>, and for a description of the
+AccessState structure.</p>
+<h2 id="object-attributes-structure">1.7 Object Attributes
+Structure</h2>
+<p>When a handle to an object is created, the object is specified with
+an Object Attributes structure. The structure identifies the object by
+name, specifies attributes about the object and/or handle being created
+and specifies an optional security descriptor to associate with the
+created object.</p>
+<p>typedef struct <strong>_OBJECT_ATTRIBUTES</strong> {</p>
+<p><strong>ULONG</strong> <em>Length</em>;</p>
+<p><strong>HANDLE</strong> <em>RootDirectory</em>;</p>
+<p><strong>PSTRING</strong> <em>ObjectName</em>;</p>
+<p><strong>ULONG</strong> <em>Attributes</em>;</p>
+<p><strong>PVOID</strong> <em>SecurityDescriptor</em>;</p>
+<p><strong>PVOID</strong> <em>SecurityQualityOfService</em>; \par}
+<strong>OBJECT_ATTRIBUTES</strong>,
+<strong>*typedef</strong>OBJECT_ATTRIBUTES</p>
+<p><u>OBJECT_ATTRIBUTES Structure:</u></p>
+<p><em>Length</em> ——Specifies the length of this structure. Must be set
+to sizeof( OBJECT_ATTRIBUTES ).</p>
+<p><em>RootDirectory</em> ——An optional handle to a directory object
+that specifies where to start the name lookup. If this field is
+specified, then the <em>ObjectName</em> field must also be
+specified.</p>
+<p>If this field is not specified and the <em>ObjectName</em> field is
+specified, then the name lookup begins in the root directory of the
+object name space.</p>
+<p><em>ObjectName</em> ——A pointer to an object name string. The form of
+the name is:</p>
+<p>[\name...\name]\object_name</p>
+<p>The name must begin with a leading path separator character (\) if
+the <em>RootDirectory</em> field is NOT specified. If the
+<em>RootDirectory</em> field is specified, then it must NOT begin with a
+leading path separator as the name is relative to that directory.</p>
+<p><em>Attributes</em> ——A set of flags that control attributes about
+the object and the handle.</p>
+<p>Attributes Flags:</p>
+<p><em>OBJ_INHERIT</em> ——The open handle is to be inherited by child
+process's whenever the calling process creates a new process.</p>
+<p><em>OBJ_EXCLUSIVE</em> ——The object is to be accessed exclusively by
+the current process. Invalid if <em>OBJ_INHERIT</em> also specified.</p>
+<p><em>OBJ_PERMANENT</em> ——The object is to be created as a permanent
+object.</p>
+<p><em>OBJ_CASE_INSENSITIVE</em> ——Indicates that the name lookup should
+be performed in a manner which ignores the case of <em>ObjectName</em>
+rather than performing an exact match search.</p>
+<p><em>OBJ_OPENIF</em> ——Return a handle to an already existing object
+if an object by the same name already exists. If the name does not
+exist, and the call is a create, then create the name.</p>
+<p><em>SecurityDescriptor</em> ——An optional pointer to a security
+descriptor to associate with this object. See the Local Security
+Specification for a description of a Security Descriptor. If an object
+is created without a security descriptor, then access to the object will
+be uncontrolled.</p>
+<p><em>SecurityQualityOfService</em> ——An optional pointer to the
+security quality of service parameters specified by the client for this
+communication session.</p>
+<h2 id="resource-quotas-and-objects">1.8 Resource Quotas and
+Objects</h2>
+<p>Objects are allocated from system memory, either paged or nonpaged
+pool. When an object is created the resource charges are specified and
+stored in the object's header. When a process creates a handle for an
+object, the resource charges stored in the object's header are levied
+against the process. This occurs whenever any handle is created to an
+object. So if process A creates an object and a handle to go with it, it
+gets charged quota for that object. If process A then creates process B,
+such that process B inherits a handle to the object, then process B is
+also charged quota for the same object. The same is true if process A
+creates a second handle to the same object.</p>
+<p>The resource charge is removed whenever a handle is closed. The
+resource charge includes the space for the object header, the object
+body, the handle table entry, the object name, if any and the security
+descriptor, if any. If there is no security descriptor, then a fixed
+amount is charged (256 bytes) in case the process later attaches a
+security descriptor to the object with the
+<strong>NtSetSecurityObject</strong> system service.</p>
+<h2 id="object-retention">1.9 Object Retention</h2>
+<p>Once an instance of an object has been created, two fields and the
+permanent flag contained within the object's header, control retention.
+The fields are named <em>HandleCount</em> and <em>PointerCount</em>.</p>
+<p>The <em>HandleCount</em> represents the number of references to this
+object from various object tables. This count is incremented each time
+an object is inserted into an object table. It is decremented each time
+a handle is closed, either with <strong>NtClose</strong> or as a result
+of process termination. If this count becomes zero, a check is made to
+determine if an attempt should be made to delete the object's name. If
+the permanent flag in the object's header is false and the object has a
+name, then an attempt is made to delete the object's name by
+conditionally removing its directory entry. Conditional deletion means
+that the necessary mutexes are released, the directory mutex is
+acquired, the directory entry is located and the <em>HandleCount</em> is
+checked again. If the count is still zero, the object's name is deleted.
+This is done because the object was declared as temporary and the last
+handle to the object has been closed.</p>
+<p>Once the conditional deletion of the object's name has occurred, the
+<em>PointerCount</em> for the object is decremented.</p>
+<p>The <em>PointerCount</em> represents the number of pointers in
+existence which refer to the object. When an object is first created
+with the ObCreateObject function, this count is set to one to account
+for the reference returned to the caller. In addition, if the object has
+a name, the count is set to two to account for the pointer from the
+directory object which contains the name. This count is incremented for
+each object table that refers to the object.</p>
+<p>The <em>PointerCount</em> is also updated as the object is referenced
+and dereferenced. When the <em>PointerCount</em> is decremented to zero,
+the object is deleted as there are no pointers outstanding. The
+<em>PointerCount</em> is never allowed to be decremented below the value
+of the <em>HandleCount</em>.</p>
+<h2 id="exclusive-object-handles">1.10 Exclusive Object Handles</h2>
+<p>Exclusive object handles provide a method of obtaining exclusive
+access to a system wide resource such as a tape drive. The semantics
+provided by exclusive handles cannot be provided by access protection
+because access protection determines who can access an object, while an
+exclusive handle essentially "reserves" an object.</p>
+<p>Exclusive object handles are provided by specifying
+<em>OBJ_EXCLUSIVE</em> in the object attributes structure.</p>
+<p>Exclusive object creation has the following rules:</p>
+<p>o Any instance of an object whose type allows exclusion, may be
+opened or created for exclusion provided the <em>HandleCount</em> is
+zero.</p>
+<p>o Any instance of an object which has a non-zero <em>HandleCount</em>
+and is not marked as exclusive cannot be opened for exclusion.</p>
+<p>o Any instance of an object which has a non-zero <em>HandleCount</em>
+and is marked as exclusive can only be opened for exclusion from the
+owning process. This allows the owning process to open an exclusive
+object multiple times.</p>
+<p>Finally, exclusive object handles may not be inherited by other
+processes. This means that an error will be returned if both
+<em>OBJ_EXCLUSIVE</em> and <em>OBJ_INHERIT</em> are specified in the
+object attributes structure.</p>
+<h2 id="object-name-space">1.11 Object Name Space</h2>
+<p>The Object Manager manages the global name space for NT OS/2. This
+name space is used to access all named objects that are contained in the
+local machine environment. Some of the objects that can have names
+are:</p>
+<p>directory objects</p>
+<p>object type objects</p>
+<p>symbolic link objects</p>
+<p>semaphore and event objects</p>
+<p>process and thread objects</p>
+<p>section and segment objects</p>
+<p>port objects</p>
+<p>device objects</p>
+<p>file system objects</p>
+<p>file objects</p>
+<p>The object name space is modelled after OS/2 file naming convention,
+where directory names in a path are separated by a backslash (\). Case
+insensitivity is optional whenever a name lookup is performed. Case is
+always preserved when a name is inserted into a directory.</p>
+<p>During system initialization, the Object Manager creates the root
+directory of the object name space. The
+<strong>NtCreateDirectoryObject</strong> system service can be used to
+create other directories within the object name space. The
+<strong>ObInsertObject</strong> function can be used to create object
+names within a directory object.</p>
+<p>The entire object name space is guarded by a single mutex. This mutex
+is acquired whenever an portion of the directory structure is examined
+or modified.</p>
+<p>A name lookup occurs whenever a new object is being inserted or an
+existing object is being opened by name. The name lookup is accomplished
+by searching in the root directory for the first name in the path. If no
+matching name is found, an error is returned.</p>
+<p>The root directory defaults to the actual root directory of the
+global name space. However, then specifying an object name, a root
+directory handle may also be specified. This is the only form of
+relative name lookup supported by the Object Manager.</p>
+<p>If a matching name is found and there are more tokens left in the
+name string, the corresponding object header is examined. If the object
+is not a directory object, its corresponding object type structure is
+examined for a parse routine. If no parse routine exists, an error
+status code is returned. Otherwise, the directory mutex is released, and
+the parse routine is called.</p>
+<p>The parse routine can return one of three values: STATUS_SUCCESS to
+indicate that the object was found, STATUS_REPARSE to indicate that a
+reparse should occur or an error status code to indicate that the name
+was not found or invalid.</p>
+<p>The parse procedure is passed pointers to both the complete name
+string and the remaining portion of the name string. If the parse
+routine returns reparse it should deallocate the original string and
+allocate the new string to parse, or modify the original string.</p>
+<p>After the Object Manager's system initialization, the object name
+space looks like:</p>
+<p>\ - Root Directory</p>
+<p>\ObjectTypes - Object Type Name Directory</p>
+<p>\ObjectTypes\Type - Type Object Type</p>
+<p>\ObjectTypes\Directory - Directory Object Type</p>
+<p>\ObjectTypes\SymbolicLink - Symbolic Link Object Type</p>
+<p>Other components of system initialization will create additional
+type, directory and object names within the object name space.</p>
+<h2 id="preventing-deadlock">1.12 Preventing Deadlock</h2>
+<p>To detect deadlock, the kernel associates a level number with each
+mutex. If an attempt is made to acquire a mutex with a level number less
+than a currently owned mutex a system bugcheck occurs. Associated with
+the Object Management routines are three levels of mutex.</p>
+<p>o The lowest level is the object table mutex.</p>
+<p>o The next higher level is the directory mutex.</p>
+<p>o The highest level is the type specific mutex.</p>
+<h1 id="object-executive-apis">2. Object Executive APIs</h1>
+<h2 id="creating-object-types">2.1 Creating Object Types</h2>
+<p>New object types can be added to the system with the
+<strong>ObCreateObjectType</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObCreateObjectType</strong>(</p>
+<p><strong>IN</strong> <strong>PSTRING</strong> <em>TypeName</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_TYPE_INITIALIZER</strong>
+<em>ObjectTypeInitializer</em>,</p>
+<p><strong>IN</strong> <strong>PULONG</strong>
+<em>DispatcherObjectOffset</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>PSECURITY_DESCRIPTOR</strong>
+<em>SecurityDescriptor</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>OUT</strong> <strong>POBJECT_TYPE</strong>
+<strong>*</strong><em>ObjectType</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>TypeName</em> ——A required pointer to a name string. This name
+must not contain the path separator character (OBJ_NAME_PATH_SEPARATOR),
+otherwise the STATUS_INVALID_OBJECT_NAME error status code is
+returned.</p>
+<p><em>ObjectTypeInitializer</em> ——A required pointer to a structure
+that specifies type specific information about the new object type being
+created.</p>
+<p>OBJECT_TYPE_INITIALIZER Structure:</p>
+<p><strong>ULONG</strong> <em>Length</em> ——Specifies the size of this
+data structure in bytes.</p>
+<p><strong>ULONG</strong> <em>InvalidAttributes</em> ——Specifies object
+attributes that are invalid for objects of this type. An attempt to
+specify any these attributes when creating an object of this type will
+result in the STATUS_INVALID_PARAMETER error status code being returned.
+This field may not specify any bits that are not contained in
+OBJ_VALID_ATTRIBUTES.</p>
+<p><strong>GENERIC_MAPPING</strong> <em>GenericMapping</em> ——Specifies
+the mapping of the GENERIC_READ, GENERIC_WRITE and GENERIC_EXECUTE
+access rights for this object type.</p>
+<p><strong>ULONG</strong> <em>ValidAccessMask</em> ——Specifies the valid
+access bits that may be specified with the <em>DesiredAccess</em>
+parameter when creating a handle to an object of this type. The mask is
+only used to remove unsupported access bits and does not cause an error
+if an unsupported access bit is specified. Thus specifying a
+<em>DesiredAccess</em> of -1 (all ones) will result in requesting a
+<em>DesiredAccess</em> equal to the <em>ValidAccessMask</em> for the
+type of object being created.</p>
+<p><strong>POOL_TYPE</strong> <em>PoolType</em> ——Specifies the type of
+pool, one of NonPagedPool or PagedPool. This parameter must specify
+NonPagedPool if the <em>DispatcherObjectOffset</em> parameter is
+specified. The STATUS_INVALID_PARAMETER error status code is returned if
+the later condition is not met.</p>
+<p><strong>BOOLEAN</strong> <em>MaintainHandleCount</em> ——Specifies
+whether a handle count data base should be maintained. If TRUE, then for
+each object of this type, a data base is kept that keeps track of how
+many handles to that object each process currently has. This allows the
+Open/Close object type procedures to implement special logic when the
+first handle to an object is created and when the last handle to an
+object within a process is closed. If this field is TRUE then at least
+one of the OpenProcedure or CloseProcedure fields must be non-NULL,
+otherwise the STATUS_INVALID_PARAMETER error status code is
+returned.</p>
+<p><strong>OB_DUMP_METHOD</strong> <em>DumpProcedure</em> ——An optional
+pointer to the procedure to invoke on object dumping. This procedure is
+useful for the debugging version of NT OS/2 to allow a uniform way to
+dump the contents of an object in human readable form.</p>
+<p>If this field is NULL, no routine is called when an object is
+dumped.</p>
+<p><strong>OB_OPEN_METHOD</strong> <em>OpenProcedure</em> ——An optional
+pointer to the procedure to invoke whenever a handle to an object of
+this type is created.</p>
+<p>If this field is NULL, no routine is called when a handle to an
+object of this type is created.</p>
+<p><strong>OB_CLOSE_METHOD</strong> <em>CloseProcedure</em> ——An
+optional pointer to the procedure to invoke whenever a handle to an
+object of this type is destroyed.</p>
+<p>If this field is NULL, no routine is called when a handle to an
+object of this type is destroyed.</p>
+<p><strong>OB_DELETE_METHOD</strong> <em>DeleteProcedure</em> ——An
+optional pointer to the procedure to invoke on object deletion. This
+procedure is responsible for deallocating any pool which was allocated
+by object type specific routines and performing any "cleanup"
+operations. When the <em>DeleteProcedure</em> returns, the object
+management routines deallocate the object structure, unlinks the object
+from its object type structure, etc.</p>
+<p>If this field is NULL, no routine is called before deallocating the
+object structure.</p>
+<p><strong>OB_PARSE_METHOD</strong> <em>ParseProcedure</em> ——An
+optional pointer to the parse routine for this object type. If, during
+name parsing, an object of this type is encountered and additional parse
+tokens exist, this routine is invoked.</p>
+<p><strong>OB_SECURITY_METHOD</strong> <em>SecurityProcedure</em> ——An
+optional pointer to the procedure to invoke whenever the
+<em>SecurityDescriptor</em> associated with an object is set or queried
+via the <strong>NtSetSecurityObject</strong> and
+<strong>NtQuerySecurityObject</strong> system services. Note that
+another procedure (SeAssignSecurity) and not this procedure is used to
+insert an original security descriptor on an object.</p>
+<p>If this field is NULL, then the SeDefaultObjectMethod will be called
+instead.</p>
+<p><em>SecurityDescriptor</em> ——An optional pointer to a Security
+Descriptor. This descriptor will be attached to the type object. Any
+attempt to create an object of this type will require the
+OBJECT_TYPE_CREATE access right.</p>
+<p><em>DispatcherObjectOffset</em> ——An optional pointer to the offset
+into the object body of a kernel dispatcher object for wait operations.
+If this value is not specified then an object of this type cannot be
+used as an argument to the <strong>NtWaitForSingleObject</strong> and
+<strong>NtWaitForMultipleObjects</strong> system services.</p>
+<p><em>ObjectType</em> ——A pointer to a variable which receives the
+location of the object type structure created.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>The create object type function creates an object type structure.
+This function returns a pointer to the object type structure via the
+<em>ObjectType</em> parameter.</p>
+<p>The <em>TypeName</em> is inserted into the \ObjectTypes object
+directory. If the name already exists, then this function will return an
+error.</p>
+<p>This function returns one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_INVALID_PARAMETER ——one of the parameters was invalid.</p>
+<p>o STATUS_OBJECT_NAME_INVALID ——the type name string contained a path
+separator character (OBJ_NAME_PATH_SEPARATOR).</p>
+<p>o STATUS_NO_MEMORY ——unable to allocate NonPagedPool for the object
+type structure.</p>
+<h2 id="object-type-procedure-templates">2.2 Object Type Procedure
+Templates</h2>
+<p>This section describes the six different procedure types that can be
+associated with an object type. These procedures are called whenever
+certain actions are performed upon an object whose object type structure
+contains the addresses of these procedures.</p>
+<h3 id="object-dump-procedure">2.2.1 Object Dump Procedure</h3>
+<p><strong>VOID</strong></p>
+<p>typedef</p>
+<p>(<strong>*OB_DUMP_METHOD</strong>)(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>POB_DUMP_CONTROL</strong>
+<em>DumpControl</em> <strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to the object's body.</p>
+<p><em>DumpControl</em> ——An optional pointer to a dump control
+structure. This structure specifies the output stream and the detail
+level. If not specified then output should be sent to the standard
+output stream. Default detail level is 1.</p>
+<p>OB_DUMP_CONTROL Structure:</p>
+<p><strong>PVOID</strong> <em>Stream</em> ——an opaque pointer to an
+output stream.</p>
+<p><strong>ULONG</strong> <em>DetailLevel</em> ——level of detail to
+show, along with some modifiers. See ObDumpObject description for
+values.</p>
+<p>This function is called whenever one of the ObDumpObject functions is
+called for an object of this type. This procedure is free to write to
+the output stream an ASCII representation of its contents. The content
+is governed by the <em>DetailLevel</em> parameter.</p>
+<h3 id="object-open-procedure">2.2.2 Object Open Procedure</h3>
+<p><strong>VOID</strong></p>
+<p>typedef</p>
+<p>(<strong>*OB_OPEN_METHOD</strong>)(</p>
+<p><strong>IN</strong> <strong>OB_OPEN_REASON</strong>
+<em>OpenReason</em>,</p>
+<p><strong>IN</strong> <strong>PEPROCESS</strong> <em>Process</em>,</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>GrantedAccess</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>HandleCount</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>OpenReason</em> ——Indicates one of four specific reasons for the
+handle being created. These are:</p>
+<p>OpenReason Values:</p>
+<p><em>ObCreateHandle</em> ——a handle to a new object is being created
+via the <strong>ObInsertObject</strong> interface.</p>
+<p><em>ObOpenHandle</em> ——a handle to an existing object is being
+created via the <strong>ObInsertObject</strong>,
+<strong>ObOpenObjectByName</strong> or the
+<strong>ObOpenObjectByPointer</strong> interface.</p>
+<p><em>ObDuplicateHandle</em> ——a handle to an existing object is being
+created via the <strong>NtDuplicateObject</strong> system service.</p>
+<p><em>ObInheritHandle</em> ——a handle to an existing object is being
+created a a result of object inheritence during process creation.</p>
+<p><em>Process</em> ——Specifies a pointer to the process for which the
+handle has been created.</p>
+<p><em>Object</em> ——Specifies a pointer to the object for which the
+handle has been created.</p>
+<p><em>GrantedAccess</em> ——Specifies the granted access mask associated
+with the newly created handle.</p>
+<p><em>HandleCount</em> ——Optional parameter, that is non-zero if the
+<em>MaintainHandleCount</em> in the associated object type structure is
+TRUE. If non-zero then represents the number of handles to the specified
+<em>Object</em> that have been created in the object table associated
+with the specified <em>Process</em>. Interesting value is 1, which means
+this is the first handle to the specified <em>Object</em> for the
+specified <em>Process</em>.</p>
+<p>This function is called whenever a handle to an object is created.
+The <em>OpenReason</em> parameter specifies the reason the handle is
+being created.</p>
+<p>This function is called after the handle has actually been inserted
+in the object table for the specified process, but before the object
+type mutex has been released. This means that the function must not
+attempt to manipulate any object handles itself, as it my result in an
+attempt to recusively acquire the object type mutex.</p>
+<h3 id="object-close-procedure">2.2.3 Object Close Procedure</h3>
+<p><strong>VOID</strong></p>
+<p>typedef</p>
+<p>(<strong>*OB_CLOSE_METHOD</strong>)(</p>
+<p><strong>IN</strong> <strong>PEPROCESS</strong> <em>Process</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>GrantedAccess</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>HandleCount</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Process</em> ——Specifies a pointer to the process for which the
+handle has been destroyed.</p>
+<p><em>Object</em> ——Specifies a pointer to the object for which the
+handle is been destroyed.</p>
+<p><em>GrantedAccess</em> ——Specifies the granted access mask that was
+associated with the destroyed handle.</p>
+<p><em>HandleCount</em> ——Optional parameter, that is non-zero if the
+<em>MaintainHandleCount</em> in the associated object type structure is
+TRUE. If non-zero then represents the number of handles to the specified
+<em>Object</em> that have been created in the object table associated
+with the specified <em>Process</em>, including the handle that has just
+been destroyed. Interesting value is 1, which means this is the last
+handle to the specified <em>Object</em> for the specified
+<em>Process</em>.</p>
+<p>This function is called whenever a handle to an object is
+destroyed.</p>
+<p>This function is called after the handle has actually been deleted
+from the object table for the specified process, but before the object
+type mutex has been released. This means that the function must not
+attempt to manipulate any object handles itself, as it my result in an
+attempt to recusively acquire the object type mutex. Also, the object
+name, if any, is still valid when this function is called.</p>
+<h3 id="object-delete-procedure">2.2.4 Object Delete Procedure</h3>
+<p><strong>VOID</strong></p>
+<p>typedef</p>
+<p>(<strong>*OB_DELETE_METHOD</strong>)(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to the object's body.</p>
+<p>This function is called whenever the <em>PointerCount</em> associated
+with the object is decremented to zero, and the object is a temporary
+object. See the section on <em>Object</em> Retention for a description
+of how the <em>PointerCount</em> can become zero.</p>
+<h3 id="object-parse-procedure">2.2.5 Object Parse Procedure</h3>
+<p><strong>NTSTATUS</strong></p>
+<p>typedef</p>
+<p>(<strong>*OB_PARSE_METHOD</strong>)(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>ParseObject</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_TYPE</strong>
+<em>ObjectType</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong>
+<strong>PACCESS_STATE</strong> <em>AccessState</em>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>AccessMode</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>Attributes</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PSTRING</strong>
+<em>CompleteName</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PSTRING</strong>
+<em>RemainingName</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PVOID</strong>
+<em>Context</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>PSECURITY_QUALITY_OF_SERVICE</strong>
+<em>SecurityQos</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>OUT</strong> <strong>PVOID</strong>
+<strong>*</strong><em>Object</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ParseObject</em> ——a pointer to the object, whose type contains
+this procedure as its <em>ParseProcedure</em>.</p>
+<p><em>ObjectType</em> ——A pointer that supplies the type of object
+being referenced.</p>
+<p><em>AccessState</em> ——A pointer to a structure that contains a
+record of desired types of access, already granted access types, and a
+list of privileges that may have been used to obtain some of the granted
+access types. If privileges are passed, a control flag in the argument
+indicates whether any of the privileges or all of the privileges are
+needed to open the object.</p>
+<p><em>AccessMode</em> ——Indicates the access mode to use for the access
+check. One of UserMode or KernelMode.</p>
+<p><em>Attributes</em> ——A set of flags that control the object
+attributes.</p>
+<p><em>OBJ_CASE_INSENSITIVE</em> ——Indicates that the name lookup should
+be performed in a manner which ignores the case of the
+<em>ObjectName</em> rather than performing an exact match search.</p>
+<p><em>CompleteName</em> ——A pointer to the complete path name being
+parsed.</p>
+<p><em>RemainingName</em> ——A pointer to the portion of the complete
+path name that remains to be parsed.</p>
+<p><em>Context</em> ——An optional pointer that is passed uninterpreted
+to the <em>ParseProcedure</em>. It is the same <em>Context</em>
+parameter that was passed to the routine that triggered the name
+lookup.</p>
+<p><em>SecurityQos</em> ——An optional pointer to the security quality of
+service parameters specified by the client for this communication
+session.</p>
+<p><em>Object</em> ——A pointer to a variable which receives the address
+of the object that the remaining name parsed to.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p><em>CompleteName</em> and <em>RemainingName</em> both point to the
+same string, with <em>RemainingName</em> describing a suffix of the
+<em>CompleteName</em>. Storage for the name string is from paged or
+nonpaged pool. This allows parse routines to allocate storage for a new
+name, copy any information necessary into the newly allocated storage,
+and deallocate the storage containing the previous name string. The
+Buffer fields in the <em>CompleteName</em> and <em>RemainingName</em>
+structures would then be updated to point to the newly allocated string
+and the <em>Length</em> fields would be updated as appropriate.</p>
+<p>This function is called whenever an object is looked up by name. See
+the <em>Object</em> Name Space section for a description about how name
+lookup is performed.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_REPARSE ——a success status code that tells the object
+manager to start the parse over at the beginning of the
+<em>CompleteName</em> string. The assumption being that the function
+modified the <em>CompleteName</em> string to point to a new name, such
+as the target of a symbolic link.</p>
+<p>o STATUS_OBJECT_PATH_SYNTAX_BAD ——if the parse failed because of an
+ill formed path name.</p>
+<p>o STATUS_OBJECT_PATH_NOT_FOUND ——if the parse was terminated because
+a path component was not found and there were characters remaining to
+parse.</p>
+<p>o STATUS_OBJECT_NAME_NOT_FOUND ——if the parse was terminated because
+a path component was not found and there were no more characters
+remaining to parse.</p>
+<p>o STATUS_OBJECT_PATH_INVALID ——if the parse succeeded and matched an
+object, but there were more characters remaining to be parsed.</p>
+<p>o STATUS_ACCESS_DENIED ——if any of the access tests involved in
+creating the object failed.</p>
+<h3 id="object-security-procedure">2.2.6 Object Security Procedure</h3>
+<p><strong>NTSTATUS</strong></p>
+<p>typedef</p>
+<p>(<strong>*OB_SECURITY_METHOD</strong>)(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>SECURITY_OPERATION_CODE</strong>
+<em>OperationCode</em>,</p>
+<p><strong>IN</strong> <strong>PSECURITY_INFORMATION</strong>
+<em>SecurityInformation</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong>
+<strong>PSECURITY_DESCRIPTOR</strong> <em>SecurityDescriptor</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PULONG</strong>
+<em>CapturedLength</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong>
+<strong>PSECURITY_DESCRIPTOR</strong>
+<strong>*</strong><em>ObjectsSecurityDescriptor</em>,</p>
+<p><strong>IN</strong> <strong>POOL_TYPE</strong> <em>PoolType</em>,</p>
+<p><strong>IN</strong> <strong>PGENERIC_MAPPING</strong>
+<em>GenericMapping</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to an object</p>
+<p><em>OperationCode</em> ——Indicates one of three specific operations
+that the method can perform.</p>
+<p>OperationCode Values:</p>
+<p><em>SetSecurityDescriptor</em> ——used to alter the security
+descriptor protecting an operation. The security method will take the
+input security descriptor and apply the portions of it specified by the
+<em>SecurityInformation</em> argument to the object.</p>
+<p><em>QuerySecurityDescriptor</em> ——used to return to the caller a
+copy of the portions of object's security descriptor requested by the
+<em>SecurityInformation</em> argument. The information will be returned
+in the form of a security descriptor in the <em>SecurityDescriptor</em>
+buffer.</p>
+<p><em>DeleteSecurityDescriptor</em> ——used when an instance of an
+object is being deleted. The method will cleanup (and delete as
+necessary) any storage associated with the object's security
+descriptor.</p>
+<p><em>AssignSecurityDescriptor</em> ——used when an instance of an
+object is being created and security is being assigned to the object for
+the first time. The method will take the contents of the
+<em>SecurityDescriptor</em> field and assign it to the object.</p>
+<p><em>SecurityInformation</em> ——Specifies which security information
+is being set or queried.</p>
+<p><em>SecurityDescriptor</em> ——Points to buffer to either set or read
+the security descriptor from. This buffer will be probed and captured as
+necessary by this procedure. This parameter is ignored for the delete
+operation.</p>
+<p>This parameter is ignored for the delete operation.</p>
+<p><em>CapturedLength</em> ——For a query operation this specifies the
+size, in bytes, of the output security descriptor buffer and on return
+contains the number of bytes needed to store the complete security
+descriptor. If the length needed is greater than the length supplied the
+operation will fail. This parameter is ignored for the set and delete
+operations. It is expected to be point into kernel space, ie, it need
+not be probed and it will not change.</p>
+<p><em>ObjectsSecurityDescriptor</em> ——This supplies the address of a
+variable pointing to the current object's security descriptor. This
+parameter will be used if the object's security descriptor is stored as
+part of the object header (this occurs as the default method). If this
+parameter is used then the procedure will deallocate and reallocate pool
+as necessary to hold the object's security descriptor. Alternate methods
+(e.g., the file system) will not use this parameter and instead will
+have the underlying file system store the descriptor (this means that
+system wide file object handles are not allowed).</p>
+<p>This parameter is ignored for the assign operation.</p>
+<p><em>PoolType</em> ——Specifies the type of pool to allocate for the
+object's security descriptor if needed. This parameter is ignored for
+the query and delete operations.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>Before calling this procedure the object manager will have determined
+that the requested action is allowed according to the granted access
+rights and privileges of the caller.</p>
+<h2 id="creating-an-object">2.3 Creating An Object</h2>
+<p>The data structures for an object are created with the ObCreateObject
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObCreateObject</strong>(</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>ProbeMode</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_TYPE</strong>
+<em>ObjectType</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_ATTRIBUTES</strong>
+<em>ObjectAttributes</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>OwnershipMode</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PVOID</strong>
+<em>ParseContext</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>ObjectBodySize</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>PagedPoolCharge</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>NonPagedPoolCharge</em>,</p>
+<p><strong>OUT</strong> <strong>PVOID</strong>
+<strong>*</strong><em>Object</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ProbeMode</em> ——Specifies one of UserMode or KernelMode. This is
+the mode used when probing the <em>ObjectAttributes</em> structure.</p>
+<p><em>ObjectType</em> ——An pointer to the object type structure
+describing the type of object to create.</p>
+<p><em>ObjectAttributes</em> ——An optional pointer to an <em>Object</em>
+<em>Attributes</em> structure. Refer to the <em>Object</em>
+<em>Attributes</em> discussion for details.</p>
+<p><em>OwnershipMode</em> ——Specifies one of UserMode or KernelMode. For
+existing objects, this parameter is ignored.</p>
+<p>The <em>OwnershipMode</em> controls the interpretation of the
+<em>SecurityDescriptor</em>. If the <em>OwnershipMode</em> is KernelMode
+and the object does not have a <em>SecurityDescriptor</em> then no
+access to the object with an <em>AccessMode</em> of UserMode is allowed.
+If the <em>OwnershipMode</em> is KernelMode and the <em>AccessMode</em>
+is KernelMode then the <em>SecurityDescriptor</em> is examined to
+determine access.</p>
+<p>If the <em>OwnershipMode</em> is UserMode and the <em>AccessMode</em>
+is KernelMode then the access is always allowed. If the
+<em>OwnershipMode</em> is UserMode and the <em>AccessMode</em> is
+UserMode then the <em>SecurityDescriptor</em> is examined to determine
+access.</p>
+<p><em>ParseContext</em> ——An optional pointer that is passed
+uninterpreted to any <em>ParseProcedure</em> that is called during the
+course of performing the name lookup.</p>
+<p><em>ObjectBodySize</em> ——Size of the object body in bytes.</p>
+<p><em>PagedPoolCharge</em> ——The number of bytes of paged pool to
+charge to the current process.</p>
+<p><em>NonPagedPoolCharge</em> ——The number of bytes of nonpaged pool to
+charge to the current process.</p>
+<p><em>Object</em> ——A pointer to a variable which receives the address
+of the newly created object.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>Creating an object causes a block of storage from pool to be
+allocated. The size of the block is the sum of the object header size
+and the object body size. The object header is initialized and the
+<em>PointerCount</em> is set to 1 and the <em>HandleCount</em> is set to
+zero.</p>
+<p>The address of the uninitialized object body is returned via the
+<em>Object</em> parameter. It is the responsibility of the object type
+specific creation routine to initialize the object body.</p>
+<p>The <em>ObjectAttributes</em> parameter is considered unprobed and
+thus is probed by this function, using the mode specified in the
+<em>ProbeMode</em> parameter.</p>
+<p>The <em>Attributes</em> field of the <em>ObjectAttributes</em>
+parameter is validated and stored in the object header.</p>
+<p>The <em>RootDirectory</em> field of the <em>ObjectAttributes</em>
+parameter is captured into the object header at this time. The handle is
+not referenced at this time. It will be referenced when
+<strong>ObInsertObject</strong> is called to insert the object into an
+object table.</p>
+<p>If specified, any string structure specified by the
+<em>ObjectName</em> field of the <em>ObjectAttributes</em> parameter is
+captured into the object header at this time. The actual buffer pointer
+to by the string structure is not probed at this time. Instead it is
+probed when <strong>ObInsertObject</strong> is called to insert the
+object into an object table.</p>
+<p>The <em>SecurityDescriptor</em> field of the
+<em>ObjectAttributes</em> parameter is captured into the object header
+at this time. The pointer is not probed until
+<strong>ObInsertObject</strong> is called to insert the object into an
+object table. If for some reason the attempt to insert the object fails,
+<strong>ObInsertObject</strong> will clear the field in the object
+header before attempting to dereference the object.</p>
+<p>The <em>SecurityQualityOfService</em> field of the
+<em>ObjectAttributes</em> parameter is captured into the object header
+at this time. The purpose of capturing it into the object header is to
+facilitate passing the QOS information to
+<strong>ObInsertObject</strong>. Rather than put a pointer to the QOS
+information into the <em>Object</em> header, the <em>SecurityQos</em>
+field is temporarily used to hold the pointer to the QOS structure. Note
+that in the case of an error, this field must be zero'd out before the
+object is freed, to prevent the pointer from being interpreted as a
+quantity of pool memory to be freed.</p>
+<p>The <em>ParseContext</em> parameter is also captured into the object
+header for later use when <strong>ObInsertObject</strong> is called.</p>
+<p>Memory for the object header and object body is allocated from the
+pool type specified in the object type descriptor. The amount of quota
+to charge is calculated. Quota includes the memory for the object header
+and body, plus any additional quota specified by the
+<em>PagedPoolCharge</em> and <em>NonPagedPoolCharge</em> parameters. The
+total quota to charge is remembered in the object header. This will
+allow the quota to be charged each time a handle is created for this
+object, using the either <strong>ObOpenObjectByName</strong> function or
+the <strong>ObInsertObject</strong> function.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_INVALID_PARAMETER ——one of the parameters was invalid.</p>
+<p>o STATUS_OBJECT_NAME_INVALID ——an object name was specified in the
+<em>ObjectAttributes</em> structure, but it has a zero length.</p>
+<p>o STATUS_NO_MEMORY ——no memory to allocate the object.</p>
+<p>o STATUS_ACCESS_VIOLATION ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer or the
+<em>ObjectAttributes</em>-&gt;ObjectName-&gt;Buffer pointer were
+invalid.</p>
+<p>o STATUS_DATATYPE_MISALIGNMENT ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer were not
+aligned on a 4 byte boundary.</p>
+<h2 id="creating-an-instance-of-an-object">2.4 Creating an Instance of
+an Object</h2>
+<p>An instance of an object is created by inserting the new created
+object into the calling process's object table and obtaining an object
+handle. This is accomplished with the <strong>ObInsertObject</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObInsertObject</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>PACCESS_STATE</strong>
+<em>PassedAccessState</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>DesiredAccess</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>ObjectPointerBias</em>,</p>
+<p><strong>OUT</strong> <strong>PVOID</strong>
+<strong>*</strong><em>NewObject</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>OUT</strong> <strong>PHANDLE</strong> <em>Handle</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to the object's body. The object must be
+one that was returned by <strong>ObCreateObject</strong>.</p>
+<p><em>PassedAccessState</em> ——An optional pointer to a structure that
+contains a record of desired types of access, already granted access
+types, and a list of privileges that may have been used to obtain some
+of the granted access types. If privileges are passed, a control flag in
+the argument indicates whether any of the privileges or all of the
+privileges are needed to open the object.</p>
+<p><em>DesiredAccess</em> ——An optional parameter describing the desired
+types of access to the object. The interpretation of this field is
+object type dependent. Simple access requests (ie, those that intend to
+compare the desired access to the Dacl on the object) need only pass a
+<em>DesiredAccess</em> mask, rather than constructing an
+<em>AccessState</em> structure.</p>
+<p><em>ObjectPointerBias</em> ——Value to increment the
+<em>PointerCount</em> by. This occurs whether or not the object is
+successfully inserted into the object table.</p>
+<p><em>NewObject</em> ——An optional pointer to a variable that will will
+receive the pointer to the referenced object's body. A pointer to the
+referenced object's body is returned only if the
+<em>ObjectPointerBias</em> field is not zero and the argument is
+present. If the argument is supplied and the <em>ObjectPointerBias</em>
+is zero, then NULL is returned in the pointer.</p>
+<p><em>Handle</em> ——A pointer to a variable that will receive the
+object handle value.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>Inserting the object into a table causes an object handle to be
+allocated from the appropriate table thereby making the object visible.
+If the object was given a name, the name is visible to all threads that
+have "read" or "execute" access to the directory path that contains the
+name.</p>
+<p>The <em>ObjectName</em> field of the <em>ObjectAttributes</em>
+parameter to <strong>ObCreateObject</strong> is extracted from the
+object header and probed for accessiblility. Storage is then allocated
+for a copy of the string, so that any parse procedures called can
+reallocate the string for reparse operations. The <em>Attributes</em>
+and <em>ParseContext</em> fields that were captured into the object
+header are used along with the captured <em>ObjectName</em> as
+additional parameters to the name lookup procedure.</p>
+<p>During the creation of a new object's instance, checks are performed
+to ensure that the name of the object, if any, is unique within the
+specified directory. If the name is not unique, the newly created object
+is deleted and the <em>OBJ_OPENIF</em> option is used to determine the
+appropriate action.</p>
+<p>If <em>OBJ_OPENIF</em> was specified, the object instance with the
+collided name is examined to see if the desired access can be granted.
+If so, a handle is created to the collided object. If
+<em>OBJ_OPENIF</em> was not specified, an error status is returned to
+the caller.</p>
+<p>In the process of creating or opening a named object, several
+different security operations may be performed. For each subdirectory in
+the object's path, the current subject must have TRAVERSE access to that
+subdirectory in order for the name search to continue. The interface to
+perform this test is <strong>ObCheckTraverseAccess</strong>.
+<strong>ObCheckTraverseAccess</strong> will be called by the object
+manager as appropriate if the object does not have an object-specific
+parse routine. For those objects that do specify parse routines, it is
+the responsiblity of the parse routine to check traverse access to each
+subdirectory. <strong>ObCheckTraverseAccess</strong> may generate audit
+messages.</p>
+<p>If the object is being created, it is necessary to check to make sure
+that the subject has the ability to create an object in the specified
+directory. Note that this is a different access type than the ability to
+traverse the parent directory. The interface that performs this test is
+<strong>ObCheckCreateObjectAccess</strong>. Like
+<strong>ObCheckTraverseAccess</strong>, this routine will be called by
+the object manager unless there exists an object-specific parse routine,
+in which case it is the responsibility of the parse routine to make the
+call.</p>
+<p>Finally, a new handle to the object is created, and the count of
+outstanding handles to the object is incremented in the object header.
+Depending on whether the object is being created or simply opened, the
+parse routine must call either
+<strong>ObCheckCreateInstanceAccess</strong> or ObpCheckObjectAccess
+respectively.</p>
+<p>The <strong>ObInsertObject</strong> function automatically
+dereferences the specified object, even if the operation fails for any
+reason. This means that the <em>Object</em> value is no longer usable
+when this function returns. This is due to the fact that at the
+completion of the <strong>ObInsertObject</strong> function, the object
+handle could now be deleted by another thread of execution causing the
+storage for the object to be deallocated or the name could have
+collided, causing the original object to be deleted.</p>
+<p>The <em>ObjectPointerBias</em> parameter provides a mechanism for
+ensuring a pointer to the object can be utilized. When the
+<em>ObjectPointerBias</em> is not zero, the value is added to the
+<em>PointerCount</em> in the object header referenced by the handle.
+This prevents the object from being deleted. The <em>NewObject</em>
+parameter receives the pointer to the object body referred to by the
+object. This may be a different object then the one which was inserted
+due to name collisions.</p>
+<p>This is typically the last operation that is performed when an
+instance of an object is created, and the handle and status value are
+returned to the caller.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_OBJECT_NAME_EXISTS ——the object name already existed and
+<em>OBJ_OPENIF</em> was specified. This is a warning status code.</p>
+<p>o STATUS_OBJECT_TYPE_MISMATCH ——the object name already existed, but
+was a different type than specified by the <em>ObjectType</em>
+parameter.</p>
+<p>o STATUS_OBJECT_NAME_COLLISION ——the object name already existed and
+<em>OBJ_OPENIF</em> was not specified.</p>
+<p>o STATUS_OBJECT_PATH_SYNTAX_BAD ——if the parse failed because of an
+ill formed path name.</p>
+<p>o STATUS_OBJECT_PATH_NOT_FOUND ——if the parse was terminated because
+a path component was not found and there were characters remaining to
+parse.</p>
+<p>o STATUS_OBJECT_NAME_NOT_FOUND ——if the parse was terminated because
+a path component was not found and there were no more characters
+remaining to parse.</p>
+<p>o STATUS_OBJECT_PATH_INVALID ——if the parse succeeded and matched an
+object, but there were more characters remaining to be parsed.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_QUOTA_EXCEEDED</p>
+<p>o STATUS_NO_MEMORY</p>
+<h2 id="open-object-by-name">2.5 Open Object by Name</h2>
+<p>An object can be opened by name with the
+<strong>ObOpenObjectByName</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObOpenObjectByName</strong>(</p>
+<p><strong>IN</strong> <strong>POBJECT_ATTRIBUTES</strong>
+<em>ObjectAttributes</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_TYPE</strong> <em>ObjectType</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>AccessMode</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong>
+<strong>PACCESS_STATE</strong> <em>PassedAccessState</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>DesiredAccess</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PVOID</strong>
+<em>ParseContext</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>OUT</strong> <strong>PHANDLE</strong> <em>Handle</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ObjectAttributes</em> ——A pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object</em>
+<em>Attributes</em> discussion for details.</p>
+<p><em>ObjectType</em> ——A optional pointer to the object type structure
+for the object's type.</p>
+<p><em>AccessMode</em> ——Indicates the access mode to use for the access
+check. One of UserMode or KernelMode.</p>
+<p><em>ParseContext</em> ——An optional pointer that is passed
+uninterpreted to any <em>ParseProcedure</em> that is called during the
+course of performing the name lookup.</p>
+<p><em>PassedAccessState</em> ——An optional pointer to a structure that
+contains a record of desired types of access, already granted access
+types, and a list of privileges that may have been used to obtain some
+of the granted access types. If privileges are passed, a control flag in
+the argument indicates whether any of the privileges or all of the
+privileges are needed to open the object.</p>
+<p><em>DesiredAccess</em> ——The desired types of access to the object.
+The interpretation of this field is object type dependent. Simple access
+requests (ie, those that intend to compare the desired access to the
+Dacl on the object) need only pass a <em>DesiredAccess</em> mask, rather
+than constructing an <em>AccessState</em> structure.</p>
+<p><em>Handle</em> ——A pointer to a variable that will receive the
+object handle.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>Opening an object by name causes a name search to be performed. If
+this function completes successfully, a pointer to the named object's
+body is inserted into the specified object table.</p>
+<p>Successful opening of an object by name causes the
+<em>HandleCount</em> and <em>PointerCount</em> for the specified object
+to be incremented.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_OBJECT_TYPE_MISMATCH ——the object name was found, but was a
+different type than specified by the <em>ObjectType</em> parameter.</p>
+<p>o STATUS_OBJECT_PATH_SYNTAX_BAD ——if the parse failed because of an
+ill formed path name.</p>
+<p>o STATUS_OBJECT_PATH_NOT_FOUND ——if the parse was terminated because
+a path component was not found and there were characters remaining to
+parse.</p>
+<p>o STATUS_OBJECT_NAME_NOT_FOUND ——if the parse was terminated because
+a path component was not found and there were no more characters
+remaining to parse.</p>
+<p>o STATUS_OBJECT_PATH_INVALID ——if the parse succeeded and matched an
+object, but there were more characters remaining to be parsed.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_QUOTA_EXCEEDED</p>
+<p>o STATUS_NO_MEMORY</p>
+<h2 id="open-object-by-pointer">2.6 Open Object by Pointer</h2>
+<p>A handle to an object can be opened by pointer with the
+<strong>ObOpenObjectByPointer</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObOpenObjectByPointer</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>HandleAttributes</em>,</p>
+<p><strong>IN</strong> <strong>PACCESS_STATE</strong>
+<em>PassedAccessState</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>DesiredAccess</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>POBJECT_TYPE</strong> <em>ObjectType</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>AccessMode</em>,</p>
+<p><strong>OUT</strong> <strong>PHANDLE</strong> <em>Handle</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to the object that is being opened.</p>
+<p><em>HandleAttributes</em> ——The attributes to associated with the
+handle. Same as the <em>Attributes</em> field in the
+<em>ObjectAttributes</em> structure. Refer to the <em>Object</em>
+<em>Attributes</em> discussion for details.</p>
+<p><em>PassedAccessState</em> ——An optional pointer to a structure that
+contains a record of desired types of access, already granted access
+types, and a list of privileges that may have been used to obtain some
+of the granted access types. If privileges are passed, a control flag in
+the argument indicates whether any of the privileges or all of the
+privileges are needed to open the object.</p>
+<p><em>DesiredAccess</em> ——The desired types of access to the object.
+The interpretation of this field is object type dependent. Simple access
+requests (ie, those that intend to compare the desired access to the
+Dacl on the object) need only pass a <em>DesiredAccess</em> mask, rather
+than constructing an <em>AccessState</em> structure.</p>
+<p><em>ObjectType</em> ——A optional pointer to the object type structure
+for the object's type.</p>
+<p><em>AccessMode</em> ——Indicates the access mode to use for the access
+check. One of UserMode or KernelMode.</p>
+<p><em>Handle</em> ——A pointer to a variable that will receive the
+object handle.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>Opening an object by pointer the <em>HandleCount</em> and
+<em>PointerCount</em> for the specified object to be incremented and a
+handle to the object created.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_OBJECT_TYPE_MISMATCH</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_QUOTA_EXCEEDED</p>
+<p>o STATUS_NO_MEMORY</p>
+<h2 id="referencing-an-object">2.7 Referencing An Object</h2>
+<p>A user mode routine refers to an instance of an object through an
+object handle. In order for the executive to operate upon the object,
+access validation must be performed on the object handle, and the object
+handle must be converted to a pointer to the desired object's body. This
+is accomplished with the <strong>ObReferenceObjectByHandle</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObReferenceObjectByHandle</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handle</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>DesiredAccess</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_TYPE</strong> <em>ObjectType</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>AccessMode</em>,</p>
+<p><strong>OUT</strong> <strong>PVOID</strong>
+<strong>*</strong><em>Object</em>,</p>
+<p><strong>OUT</strong> <strong>POBJECT_HANDLE_INFORMATION</strong>
+<em>HandleInformation</em> <strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Handle</em> ——An open handle to an object.</p>
+<p><em>DesiredAccess</em> ——The desired types of access to the object.
+The interpretation of this field is object type dependent.</p>
+<p><em>ObjectType</em> ——An optional pointer to the object type
+structure for the object's type. If this value is omitted, no type check
+is performed.</p>
+<p><em>AccessMode</em> ——Indicates the access mode to use for the access
+check. One of UserMode or KernelMode.</p>
+<p><em>Object</em> ——A pointer to a variable that will receive a pointer
+to the object's body.</p>
+<p><em>HandleInformation</em> ——An optional pointer to XXXXXXXXXX</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function uses the specified object handle as an index into the
+process object table. The index is validated against the object table
+bounds and converted into a pointer to a specific entry in the object
+table.</p>
+<p>If the <em>AccessMode</em> is KernelMode, the desired access is
+always allowed.</p>
+<p>If the <em>AccessMode</em> is UserMode, the desired access is
+compared to the granted access field stored within the table. If all of
+the bits in the <em>DesiredAccess</em> mask are set in the granted
+access mask, then access is granted. Otherwise the STATUS_ACCESS_DENIED
+error status code is returned.</p>
+<p>If the desired access is allowed, a pointer to the object header is
+obtained from the table. If the specified <em>ObjectType</em> is
+supplied, it is compared to the object type field within the object
+header, and if they are equal a pointer to the object body is returned
+to the caller as the function value, and the <em>PointerCount</em> field
+in the object header is incremented.</p>
+<p>Incrementing the <em>PointerCount</em> field prevents the object from
+being deleted while it is being operated upon.</p>
+<p>A pointer to the object body is retreived from the object table entry
+and returned to the caller via the <em>Object</em> parameter.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_OBJECT_TYPE_MISMATCH</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<h2 id="reference-object-by-name">2.8 Reference Object by Name</h2>
+<p>An object can be referenced by name with the
+<strong>ObReferenceObjectByName</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObReferenceObjectByName</strong>(</p>
+<p><strong>IN</strong> <strong>PSTRING</strong> <em>ObjectName</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>Attributes</em>,</p>
+<p><strong>IN</strong> <strong>PACCESS_STATE</strong>
+<em>PassedAccessState</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>DesiredAccess</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>POBJECT_TYPE</strong>
+<em>ObjectType</em>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>AccessMode</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PVOID</strong>
+<em>ParseContext</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>OUT</strong> <strong>PVOID</strong>
+<strong>*</strong><em>Object</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ObjectName</em> ——A pointer to a string which specifies the name
+of the object to open.</p>
+<p><em>Attributes</em> ——A set of flags that control the object
+attributes.</p>
+<p><em>OBJ_CASE_INSENSITIVE</em> ——Indicates that the name lookup should
+be performed in a manner which ignores the case of the
+<em>ObjectName</em> rather than performing an exact match search.</p>
+<p><em>PassedAccessState</em> ——An optional pointer to a structure that
+contains a record of desired types of access, already granted access
+types, and a list of privileges that may have been used to obtain some
+of the granted access types. If privileges are passed, a control flag in
+the argument indicates whether any of the privileges or all of the
+privileges are needed to open the object.</p>
+<p><em>DesiredAccess</em> ——The desired types of access to the object.
+The interpretation of this field is object type dependent. Simple access
+requests (ie, those that intend to compare the desired access to the
+Dacl on the object) need only pass a <em>DesiredAccess</em> mask, rather
+than constructing an <em>AccessState</em> structure.</p>
+<p><em>ObjectType</em> ——A pointer to the object type structure for the
+object's type.</p>
+<p><em>AccessMode</em> ——Indicates the access mode to use for the access
+check. One of UserMode or KernelMode.</p>
+<p><em>ParseContext</em> ——An optional pointer that is passed
+uninterpreted to any <em>ParseProcedure</em> that is called during the
+course of performing the name lookup.</p>
+<p><em>Object</em> ——A pointer to a variable that will receive a pointer
+to the object's body.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>Referencing an object by name causes a name search to be performed.
+If this function completes successfully, a pointer to the named object's
+body is returned as the function value. The name search is accomplished
+by acquiring the directory mutex, and searching in the root directory
+for the first name in the path. If no matching name is found, an error
+status code is returned.</p>
+<p>If a matching name is found and there are more tokens left in the
+name string, the corresponding object header is examined. If the object
+is not a directory object, its corresponding object type structure is
+examined for a parse routine. If no parse routine exists, an error
+status code is returned. Otherwise, the directory mutex is released, and
+the parse routine is called.</p>
+<p>The parse routine is responsible for either returning a pointer to an
+object, which can be referenced as a result of the parse, or returning a
+unique value, OBJ_REPARSE to indicate that the name lookup should start
+over from the beginning of the string.</p>
+<p>If the value returned is OBJ_REPARSE, the directory mutex is acquired
+and name parsing beings using the complete string as the name. This
+requires the parse routine to deallocate the previous string and
+allocate the new string to parse, or modify the original string.</p>
+<p>Successful referencing of an object by name causes the
+<em>PointerCount</em> for the specified object to be incremented.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_OBJECT_TYPE_MISMATCH ——the object name was found, but was a
+different type than specified by the <em>ObjectType</em> parameter.</p>
+<p>o STATUS_OBJECT_PATH_SYNTAX_BAD ——if the parse failed because of an
+ill formed path name.</p>
+<p>o STATUS_OBJECT_PATH_NOT_FOUND ——if the parse was terminated because
+a path component was not found and there were characters remaining to
+parse.</p>
+<p>o STATUS_OBJECT_NAME_NOT_FOUND ——if the parse was terminated because
+a path component was not found and there were no more characters
+remaining to parse.</p>
+<p>o STATUS_OBJECT_PATH_INVALID ——if the parse succeeded and matched an
+object, but there were more characters remaining to be parsed.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_NO_MEMORY</p>
+<h2 id="reference-object-by-pointer">2.9 Reference Object by
+Pointer</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObReferenceObjectByPointer</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>DesiredAccess</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_TYPE</strong>
+<em>ObjectType</em>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>AccessMode</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to the object's body.</p>
+<p><em>DesiredAccess</em> ——A mask representing the desired access to
+the object.</p>
+<p><em>ObjectType</em> ——A pointer to the object type structure for the
+object.</p>
+<p><em>AccessMode</em> ——Indicates the access mode to use for the access
+check. One of UserMode or KernelMode.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_OBJECT_TYPE_MISMATCH</p>
+<h2 id="making-an-object-temporary">2.10 Making an Object Temporary</h2>
+<p>An object can be made temporary with the ObMakeTemporaryObject
+function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObMakeTemporaryObject</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to an object.</p>
+<p>This is a generic function and operates on any type of object.</p>
+<p>Making an object temporary causes the permanent flag of the
+associated object to be cleared. A temporary object has a name as long
+as its <em>HandleCount</em> is greater than zero. When the
+<em>HandleCount</em> becomes zero, the name is deleted and the
+<em>PointerCount</em> adjusted appropriately.</p>
+<h2 id="dereferencing-an-object">2.11 Dereferencing an Object</h2>
+<p>A referenced object is dereferenced with the ObDereferenceObject
+function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObDereferenceObject</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to the object's body.</p>
+<p>When an object is dereferenced, its <em>PointerCount</em> is
+decremented and retention checks are performed.</p>
+<h2 id="object-management-during-process-creation-and-deletion">2.12
+Object Management during Process Creation and Deletion</h2>
+<p>The <em>Process</em> Structure component uses these function during
+process creation and deletion to initialize and cleanup the object table
+associated with a process.</p>
+<h3 id="process-creation-hook">2.12.1 Process Creation Hook</h3>
+<p>The <em>Process</em> Structure component calls the <em>Object</em>
+Management component at process creation time via the
+<strong>ObInitProcess</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObInitProcess</strong>(</p>
+<p><strong>PEPROCESS</strong> <em>ParentProcess</em>
+<strong>OPTIONAL</strong>,</p>
+<p><strong>PEPROCESS</strong> <em>NewProcess</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ParentProcess</em> ——An optional pointer to the process to
+inherit any handles from.</p>
+<p><em>NewProcess</em> ——A pointer to the process that is being
+created.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This functions creates an object table for the <em>NewProcess</em>.
+It then scans the object table associated with the
+<em>ParentProcess</em>, if any, and creates copies of all handles that
+were created with the <em>OBJ_INHERIT</em> attribute.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_QUOTA_EXCEEDED</p>
+<p>o STATUS_NO_MEMORY</p>
+<h3 id="process-deletion-hook">2.12.2 Process Deletion Hook</h3>
+<p>The <em>Process</em> Structure component calls the <em>Object</em>
+Management component at process deletion time via the
+<strong>ObKillProcess</strong> function.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObKillProcess</strong>(</p>
+<p><strong>PEPROCESS</strong> <em>Process</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Process</em> ——A pointer to the process that is being
+destroyed.</p>
+<p>This function scans the object table associated with the process
+being destroyed and calls <strong>NtClose</strong> for each valid
+handle.</p>
+<h2 id="dump-object-support">2.13 Dump Object Support</h2>
+<p>Objects are displayed using the
+<strong>ObDumpObjectByHandle</strong>,
+<strong>ObDumpObjectByName</strong> and
+<strong>ObDumpObjectByPointer</strong> functions. These functions
+display the contents of an object or objects to a specified output
+stream with a specified level of information. The default output stream
+is standard output.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObDumpObjectByHandle</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handle</em>,</p>
+<p><strong>IN</strong> <strong>POB_DUMP_CONTROL</strong>
+<em>DumpControl</em> <strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Handle</em> ——An open handle to an object.</p>
+<p><em>DumpControl</em> ——An optional pointer to a dump control
+structure. This structure specifies the output stream and the detail
+level. If not specified then output should be sent to the standard
+output stream. Default detail level is 1.</p>
+<p>OB_DUMP_CONTROL Structure:</p>
+<p><strong>PVOID</strong> <em>Stream</em> ——an opaque pointer to an
+output stream.</p>
+<p><strong>ULONG</strong> <em>DetailLevel</em> ——level of detail to
+show, along with some modifiers.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObDumpObjectByName</strong>(</p>
+<p><strong>IN</strong> <strong>PSTRING</strong> <em>ObjectName</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>Attributes</em>,</p>
+<p><strong>IN</strong> <strong>POB_DUMP_CONTROL</strong>
+<em>DumpControl</em> <strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ObjectName</em> ——A pointer to a string which specifies the name
+of the object to open.</p>
+<p><em>Attributes</em> ——A set of flags that control the object
+attributes.</p>
+<p><em>OBJ_CASE_INSENSITIVE</em> ——Indicates that the name lookup should
+be performed in a manner which ignores the case of the
+<em>ObjectName</em> rather than performing an exact match search.</p>
+<p><em>DumpControl</em> ——See <strong>ObDumpObjectByHandle</strong>
+description for meaning of this parameter.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObDumpObjectByPointer</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>POB_DUMP_CONTROL</strong>
+<em>DumpControl</em> <strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——A pointer to the object's body.</p>
+<p><em>DumpControl</em> ——See <strong>ObDumpObjectByHandle</strong>
+description for meaning of this parameter.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<h2 id="check-traverse-access">2.14 Check Traverse Access</h2>
+<p>A parse routine calls <strong>ObCheckTraverseAccess</strong> for each
+section of a pathname to see if the caller has Traverse access to that
+directory.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ObCheckTraverseAccess</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong>
+<em>DirectoryObject</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>TraverseAccess</em>,</p>
+<p><strong>IN</strong> <strong>PACCESS_STATE</strong>
+<em>AccessState</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>TypeMutexLocked</em>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>PreviousMode</em>,</p>
+<p><strong>OUT</strong> <strong>PNTSTATUS</strong>
+<em>AccessStatus</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>DirectoryObject</em> ——The object header of the object being
+examined.</p>
+<p><em>TraverseAccess</em> ——The access mask corresponding to traverse
+access for this directory type.</p>
+<p><em>AccessState</em> ——Checks for traverse access will typically be
+incidental to some other access attempt. Information on the current
+state of that access attempt is required so that the constituent access
+attempts may be associated with each other in the audit log.</p>
+<p><em>TypeMutexLocked</em> ——Supplies a boolean indicating whether or
+not the object's type mutext is locked.</p>
+<p><em>AccessMode</em> ——The previous processor mode.</p>
+<p><em>AccessStatus</em> ——Pointer to a variable to return the status
+code of the access attempt. In the case of failure this status code must
+be propagated back to the user.</p>
+<p><u>Return Value:</u></p>
+<p>BOOLEAN ——TRUE if access is allowed and FALSE otherwise.
+<em>AccessStatus</em> contains the status code to be passed back to the
+caller. It is not correct to simply pass back STATUS_ACCESS_DENIED,
+since this will have to change with the advent of mandatory access
+control.</p>
+<p>This routine is to be called by <em>Object</em> parse methods as they
+parse the component subdirectories of a path. On each subdirectory, they
+must call <strong>ObCheckTraverseAccess</strong>, which will examine the
+security descriptors on the object to determine if it is legal to
+traverse that directory. If it returns failure, the value returned in
+<em>AccessStatus</em> must be propogated back to the user.</p>
+<p>This routine will generate audit records as appropriate.</p>
+<h2 id="check-create-instance-access">2.15 Check Create Instance
+access</h2>
+<p>A parse routine calls ObCheckCreateInstance to determine if the
+caller is allowed to create an instance of an object.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ObCheckCreateInstanceAccess</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>CreateInstanceAccess</em>,</p>
+<p><strong>IN</strong> <strong>PACCESS_STATE</strong>
+<em>AccessState</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>TypeMutexLocked</em>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>PreviousMode</em>,</p>
+<p><strong>OUT</strong> <strong>PNTSTATUS</strong>
+<em>AccessStatus</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——The object header of the object being examined.</p>
+<p><em>CreateInstanceAccess</em> ——The access mask corresponding to
+create access for this object type.</p>
+<p><em>AccessState</em> ——Checks for create access will typically be
+incidental to some other access attempt. Information on the current
+state of that access attempt is required so that the constituent access
+attempts may be associated with each other in the audit log.</p>
+<p><em>TypeMutexLocked</em> ——Indicates whether the type mutex for this
+object's type is locked. The type mutex is used to protect the object's
+security descriptor from being modified while it is being accessed.</p>
+<p><em>AccessMode</em> ——The previous processor mode.</p>
+<p><em>AccessStatus</em> ——Pointer to a variable to return the status
+code of the access attempt. In the case of failure this status code must
+be propagated back to the user.</p>
+<p><u>Return Value:</u></p>
+<p>BOOLEAN ——TRUE if access is allowed and FALSE otherwise.
+<em>AccessStatus</em> contains the status code to be passed back to the
+caller.</p>
+<p>Routine Description:</p>
+<p>Parse routines must call this routine to check for Create Instance
+access to the object. If the attempt fails, the caller must propagate
+the result returned in <em>AccessStatus</em> back to the user, rather
+than simply returning STATUS_ACCESS_DENIED.</p>
+<p>Note that checking for the ability to create an object of a given
+type is different from creating the object itself. This attempt may be
+audited, even if the attempt to create the object ultimately fails.</p>
+<h2 id="check-create-object-access">2.16 Check Create Object Access</h2>
+<p>A parse routine calls <strong>ObCheckCreateObjectAccess</strong> to
+see if it may create an object in the passed directory.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ObCheckCreateObjectAccess</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong>
+<em>DirectoryObject</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>CreateAccess</em>,</p>
+<p><strong>IN</strong> <strong>PACCESS_STATE</strong>
+<em>AccessState</em> <strong>OPTIONAL</strong>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>TypeMutexLocked</em>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>PreviousMode</em>,</p>
+<p><strong>OUT</strong> <strong>PNTSTATUS</strong>
+<em>AccessStatus</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>DirectoryObject</em> ——The object header of the object being
+examined.</p>
+<p><em>CreateAccess</em> ——The access mask corresponding to create
+access for this directory type.</p>
+<p><em>AccessState</em> ——Checks for traverse access will typically be
+incidental to some other access attempt. Information on the current
+state of that access attempt is required so that the constituent access
+attempts may be associated with each other in the audit log.</p>
+<p><em>TypeMutexLocked</em> ——Indicates whether the type mutex for this
+object's type is locked. The type mutex is used to protect the object's
+security descriptor from being modified while it is being accessed.</p>
+<p><em>AccessMode</em> ——The previous processor mode.</p>
+<p><em>AccessStatus</em> ——Pointer to a variable to return the status
+code of the access attempt. In the case of failure this status code must
+be propagated back to the user.</p>
+<p><u>Return Value:</u></p>
+<p>BOOLEAN ——TRUE if access is allowed and FALSE otherwise.
+<em>AccessStatus</em> contains the status code to be passed back to the
+caller.</p>
+<p>Routine Description:</p>
+<p>This routine checks to see if we are allowed to create an object in
+the given directory. If the attempt fails, the caller must propagate the
+result returned in <em>AccessStatus</em> back to the user, rather than
+simply returning STATUS_ACCESS_DENIED.</p>
+<p>This routine may generate audit messages as appropriate.</p>
+<h2 id="check-implicit-object-access">2.17 Check Implicit Object
+Access</h2>
+<p>Check object access when there will be no handle allocated.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ObCheckImplicitObjectAccess</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong>
+<strong>PACCESS_STATE</strong> <em>AccessState</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>TypeMutexLocked</em>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>AccessMode</em>,</p>
+<p><strong>OUT</strong> <strong>PNTSTATUS</strong>
+<em>AccessStatus</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ObjectHeader</em> ——The object header of the object being
+examined.</p>
+<p><em>AccessState</em> ——The ACCESS_STATE structure containing
+accumulated information about the current access attempt.</p>
+<p><em>TypeMutexLocked</em> ——Indicates whether the type mutex for this
+object's type is locked. The type mutex is used to protect the object's
+security descriptor from being modified while it is being accessed.</p>
+<p><em>AccessMode</em> ——The previous processor mode.</p>
+<p><em>AccessStatus</em> ——Pointer to a variable to return the status
+code of the access attempt. In the case of failure this status code must
+be propagated back to the user.</p>
+<p><u>Return Value:</u></p>
+<p>BOOLEAN ——TRUE if access is allowed and FALSE otherwise</p>
+<p>Routine Description:</p>
+<p>This routine is used to perform access validation for reasons other
+than opening or creating an object. For example, a file system may want
+to determine of a subject has FILE_LIST_DIRECTORY access to a directory
+as part of some other access validation. For access operations on
+objects that are being opened or created, use ObpCheckObjectAccess.</p>
+<p>The routine performs access validation on the passed object. The
+remaining desired access mask is extracted from the <em>AccessState</em>
+parameter and passed to the appropriate security routine to perform the
+access check.</p>
+<p>Note that the RemainingDesiredAccess field in the
+<em>AccessState</em> parameter is not modified.</p>
+<h2 id="checking-access-for-object-reference">2.18 Checking Access for
+Object Reference</h2>
+<p>This routine is to be used to determine if a reference by name should
+be permitted.</p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ObCheckObjectReference</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong>
+<strong>PACCESS_STATE</strong> <em>AccessState</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>TypeMutexLocked</em>,</p>
+<p><strong>IN</strong> <strong>KPROCESSOR_MODE</strong>
+<em>AccessMode</em>,</p>
+<p><strong>OUT</strong> <strong>PNTSTATUS</strong>
+<em>AccessStatus</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ObjectHeader</em> ——The object header of the object being
+examined.</p>
+<p><em>AccessState</em> ——The ACCESS_STATE structure containing
+accumulated information about the current attempt to gain access to the
+object.</p>
+<p><em>TypeMutexLocked</em> ——Indicates whether the type mutex for this
+object's type is locked. The type mutex is used to protect the object's
+security descriptor from being modified while it is being accessed.</p>
+<p><em>AccessMode</em> ——The previous processor mode.</p>
+<p><em>AccessStatus</em> ——Pointer to a variable to return the status
+code of the access attempt. In the case of failure this status code must
+be propagated back to the user.</p>
+<p><u>Return Value:</u></p>
+<p>BOOLEAN ——TRUE if access is allowed and FALSE otherwise</p>
+<p>Routine Description:</p>
+<p>The routine performs access validation on the passed object. The
+remaining desired access mask is extracted from the <em>AccessState</em>
+parameter and passes to the appropriate security routine to perform the
+access check.</p>
+<p>If the access attempt is successful, SeAccessCheck returns a mask
+containing the granted accesses. The bits in this mask are turned on in
+the PreviouslyGrantedAccess field of the <em>AccessState</em>, and are
+turned off in the RemainingDesiredAccess field.</p>
+<p>This routine differs from ObpCheckObjectAccess in that it calls a
+different audit routine.</p>
+<h2 id="locking-a-security-descriptor">2.19 Locking a security
+descriptor</h2>
+<p>Call <strong>ObLockSecurityDescriptor</strong> before reading or
+writing an object's security descriptor.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObLockSecurityDescriptor</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——supplies a pointer to the object whose security
+descriptor is being examined.</p>
+<p>Return Value: None.</p>
+<p>Routine Description:</p>
+<p>This function acquires the object type mutex for the passed object,
+which will protect the object's security descriptor from modification by
+another thread.</p>
+<h2 id="unlocking-a-security-descriptor">2.20 Unlocking a security
+descriptor</h2>
+<p>Call <strong>ObLockSecurityDescriptor</strong> before reading or
+writing an object's security descriptor.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObUnlockSecurityDescriptor</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——supplies a pointer to the object whose security
+descriptor is being examined.</p>
+<p>Return Value: None.</p>
+<p>Routine Description:</p>
+<p>This function releases the object type mutex for the passed object,
+which has been protecting the object's security descriptor from
+modification by another thread.</p>
+<h2 id="query-an-objects-security-descriptor-field">2.21 Query an
+object's Security Descriptor field</h2>
+<p>This routine allows components outside of OB to retrieve the Security
+Descriptor pointer in an object's header. The contents of this pointer
+does not necessarily reflect the actual security descriptor attached to
+an object.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObQueryObjectSecurityDescriptor</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>OUT</strong> <strong>PSECURITY_DESCRIPTOR</strong>
+<strong>*</strong><em>SecurityDescriptor</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——Supplies a pointer to the object</p>
+<p><em>SecurityDescriptor</em> ——Returns the contents of the object
+header's <em>SecurityDescriptor</em> field, which may be NULL.</p>
+<p>Routine Description:</p>
+<p>Takes a pointer to an object and returns a pointer to the security
+descriptor contained in the header.</p>
+<h2 id="set-an-objects-security-descriptor-field">2.22 Set an object's
+Security Descriptor field</h2>
+<p>This routine permits components outside of OB to set the security
+descriptor field in an object's header.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObAssignObjectSecurityDescriptor</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>PSECURITY_DESCRIPTOR</strong>
+<em>SecurityDescriptor</em>,</p>
+<p><strong>IN</strong> <strong>POOL_TYPE</strong> <em>PoolType</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——Supplies a pointer to the object</p>
+<p><em>SecurityDescriptor</em> ——Supplies a pointer to the security
+descriptor to be assigned to the object.</p>
+<p><em>PoolType</em> ——Supplies the type of pool memory used to allocate
+the security descriptor.</p>
+<p>Routine Description:</p>
+<p>Takes a pointer to an object and sets the <em>SecurityDescriptor</em>
+field in the object's header. Performs security quota calculations and
+places the security quota for this object into the object's header.</p>
+<h2 id="query-an-objects-security-information">2.23 Query an object's
+Security information</h2>
+<p>This routine will return a copy of the passed object's security
+descriptor, regardless of where the security descriptor is stored.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObGetObjectSecurity</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>OUT</strong> <strong>PSECURITY_DESCRIPTOR</strong>
+<strong>*</strong><em>SecurityDescriptor</em>,</p>
+<p><strong>OUT</strong> <strong>PBOOLEAN</strong>
+<em>MemoryAllocated</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——Supplies the object being queried.</p>
+<p><em>SecurityDescriptor</em> ——Returns a pointer to the object's
+security descriptor.</p>
+<p><em>MemoryAllocated</em> ——indicates whether we had to allocate pool
+memory to hold the security descriptor or not. This should be passed
+back into <strong>ObReleaseObjectSecurity</strong>.</p>
+<p><u>Return Value:</u></p>
+<p>STATUS_SUCCESS ——The operation was successful. Note that the
+operation may be successful and still return a NULL security
+descriptor.</p>
+<p>STATUS_INSUFFICIENT_RESOURCES ——Insufficient memory was available to
+satisfy the request.</p>
+<p>Routine Description:</p>
+<p>Given an object, this routine will find its security descriptor. It
+will do this by calling the object's security method.</p>
+<p>It is possible for an object not to have a security descriptor at
+all. Unnamed objects such as events that can only be referenced by a
+handle are an example of an object that does not have a security
+descriptor.</p>
+<h2 id="release-an-objects-security-information">2.24 Release an
+object's Security information</h2>
+<p>This routine frees the memory allocated by a previous call to
+<strong>ObGetObjectSecurity</strong>.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObReleaseObjectSecurity</strong>(</p>
+<p><strong>IN</strong> <strong>PSECURITY_DESCRIPTOR</strong>
+<em>SecurityDescriptor</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>MemoryAllocated</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>SecurityDescriptor</em> ——Supplies a pointer to the security
+descriptor to be freed.</p>
+<p><em>MemoryAllocated</em> ——Supplies whether or not we should free the
+memory pointed to by <em>SecurityDescriptor</em>.</p>
+<p>Routine Description:</p>
+<p>This function will free up any memory associated with a queried
+security descriptor.</p>
+<h2 id="set-security-quota-charged-for-object">2.25 Set Security Quota
+Charged for object</h2>
+<p>Each object, when it is created, is alloted a certain amount of pool
+memory for security information. The amount is a function of the size of
+the Group and Dacl information in the object's security descriptor. The
+sum of the sizes of these items is passed to this routine, which will
+calculate the amount of pool memory to charge based on that sum, and
+place the resultant quantity into the object's header.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ObSetSecurityQuotaCharged</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PULONG</strong>
+<em>SecurityQuotaCharged</em>,</p>
+<p><strong>IN</strong> <strong>POOL_TYPE</strong> <em>PoolType</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——Supplies the object to be updated.</p>
+<p><em>SecurityQuotaCharged</em> ——Supplies the proposed amount of quota
+to be charged for security information for each handle to this object.
+Will return the actual amount charged.</p>
+<p><em>PoolType</em> ——The type of pool memory that will be allocated to
+hold the security information for this object.</p>
+<p>Routine Description:</p>
+<p>Sets the <em>SecurityQuotaCharged</em> field for the passed object.
+Updates the <em>PagedPoolCharge</em> or <em>NonPagedPoolCharge</em> with
+the new amount, depending on the value of <em>PoolType</em>.</p>
+<h2 id="validate-security-information-against-quota">2.26 Validate
+security information against quota</h2>
+<p>Any attempt to grow the security information on an object must have
+the resulting size checked against the maximum amount of pool memory
+that may be used for the object's security information.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>ObValidateSecurityQuota</strong>(</p>
+<p><strong>IN</strong> <strong>PVOID</strong> <em>Object</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>NewSize</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Object</em> ——Supplies a pointer to the object whose information
+is to be modified.</p>
+<p><em>NewSize</em> ——Supplies the size of the proposed new security
+information.</p>
+<p><u>Return Value:</u></p>
+<p>STATUS_SUCCESS ——New size is within alloted quota.</p>
+<p>STATUS_QUOTA_EXCEEDED ——The desired adjustment would have exceeded
+the permitted security quota for this object.</p>
+<p>Routine Description:</p>
+<p>This routine will check to see if the new security information is
+larger than is allowed by the object's pre-allocated quota.</p>
+<h1 id="object-system-services">3. Object System Services</h1>
+<p>The following routines provide an interface for user mode
+applications to manipulate and query objects.</p>
+<h2 id="create-directory-object">3.1 Create Directory Object</h2>
+<p>Directory objects are created with the
+<strong>NtCreateDirectoryObject</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateDirectoryObject</strong>(</p>
+<p><strong>OUT</strong> <strong>PHANDLE</strong>
+<em>DirectoryHandle</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>DesiredAccess</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_ATTRIBUTES</strong>
+<em>ObjectAttributes</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>DirectoryHandle</em> ——A pointer to a variable that will receive
+the directory object handle.</p>
+<p><em>DesiredAccess</em> ——The desired types of access to the
+directory. The following object type specific access flags can be
+specified in addition to the STANDARD_RIGHTS_REQUIRED flags described in
+the <em>Object</em> <em>Attributes</em> section.</p>
+<p>DesiredAccess Flags:</p>
+<p><em>DIRECTORY_QUERY</em> ——Query access to the directory is
+desired.</p>
+<p><em>DIRECTORY_TRAVERSE</em> ——Name lookup access to the directory is
+desired.</p>
+<p><em>DIRECTORY_CREATE_OBJECT</em> ——Name creation access to the
+directory is desired.</p>
+<p><em>DIRECTORY_CREATE_SUBDIRECTORY</em> ——Subdirectory creation access
+to the directory is desired.</p>
+<p><em>ObjectAttributes</em> ——A pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object</em>
+<em>Attributes</em> discussion for details.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>Directory objects are an integral part of the object management
+functions and as such are manipulated indirectly as a result of other
+operations. For example, when an object is created, its name, if any, is
+"inserted" in a directory object and the <em>PointerCount</em> fields of
+both the directory object and the named object are incremented. The
+named object's header contains a pointer to the directory object which
+contains the name.</p>
+<p>A single mutex is utilized to guard the directory structure. It must
+be acquired any time a directory is accessed for examination or
+manipulation.</p>
+<p>The directory object's body contains the information necessary to
+translate an object name to a pointer to the object. Incrementing the
+<em>PointerCount</em> field in the directory object's header for each
+name in the directory prevents the directory object from being
+"deallocated" with outstanding names.</p>
+<p>If a directory object is temporary and the <em>HandleCount</em>
+becomes zero, then an attempt is made to delete the directory object's
+name by conditionally removing its directory entry. Conditional deletion
+means that the necessary mutexes are released, the directory mutex is
+acquired, the directory entry which contains the directory object is
+located and the <em>HandleCount</em> is checked again. If the count is
+still zero, the directory object's name is deleted. This is done because
+the directory object was declared as temporary and the last handle to
+the object has been closed.</p>
+<p>If the directory's name is deleted, the <em>PointerCount</em> has not
+yet been decremented to account for the lack of a name. Any names which
+still reside within the directory object are deleted. This is
+accomplished by acquiring the directory mutex and finding a valid name
+within the directory. From the valid name, the corresponding object is
+located and its name field and backpointer are removed, its
+<em>PointerCount</em> is decremented, and the permanent flag is set
+false. If the resulting <em>PointerCount</em> of the named object is now
+zero, the directory mutex is released and the object type specific
+delete routine is invoked.</p>
+<p>This procedure is repeated until all valid names within the directory
+have been deleted, at which time the directory mutex is released, and
+the <em>PointerCount</em> for the directory is decremented.</p>
+<p>Even though a directory object's name has been removed, the directory
+object remains until all names contained within it have been removed.
+This means that certain objects which had names will no longer have
+names once the directory object's name has been removed. This condition
+is detected by a NULL backpointer in the path of directory objects.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_ACCESS_VIOLATION ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer or the
+<em>ObjectAttributes</em>-&gt;ObjectName-&gt;Buffer pointer were
+invalid. Or the <em>DirectoryHandle</em> pointer was invalid.</p>
+<p>o STATUS_DATATYPE_MISALIGNMENT ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer were not
+aligned on a 4 byte boundary. Or the <em>DirectoryHandle</em> pointer
+was not aligned on a 4 byte boundary.</p>
+<h2 id="open-object-directory">3.2 Open Object Directory</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtOpenDirectoryObject</strong>(</p>
+<p><strong>OUT</strong> <strong>PHANDLE</strong>
+<em>DirectoryHandle</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>DesiredAccess</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_ATTRIBUTES</strong>
+<em>ObjectAttributes</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>DirectoryHandle</em> ——A pointer to a variable that will receive
+the directory object handle.</p>
+<p><em>DesiredAccess</em> ——The desired types of access to the
+directory. The following object type specific access flags can be
+specified in addition to the STANDARD_RIGHTS_REQUIRED flags described in
+the <em>Object</em> <em>Attributes</em> section.</p>
+<p>DesiredAccess Flags:</p>
+<p><em>DIRECTORY_QUERY</em> ——Query access to the directory is
+desired.</p>
+<p><em>DIRECTORY_TRAVERSE</em> ——Name lookup access to the directory is
+desired.</p>
+<p><em>DIRECTORY_CREATE_OBJECT</em> ——Name creation access to the
+directory is desired.</p>
+<p><em>DIRECTORY_CREATE_SUBDIRECTORY</em> ——Subdirectory creation access
+to the directory is desired.</p>
+<p><em>ObjectAttributes</em> ——A pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object</em>
+<em>Attributes</em> discussion for details.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_ACCESS_VIOLATION ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer or the
+<em>ObjectAttributes</em>-&gt;ObjectName-&gt;Buffer pointer were
+invalid. Or the <em>DirectoryHandle</em> pointer was invalid.</p>
+<p>o STATUS_DATATYPE_MISALIGNMENT ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer were not
+aligned on a 4 byte boundary. Or the <em>DirectoryHandle</em> pointer
+was not aligned on a 4 byte boundary.</p>
+<h2 id="query-object-directory">3.3 Query Object Directory</h2>
+<p>The names in a directory object can be queried using the
+<strong>NtQueryDirectoryObject</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQueryDirectoryObject</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong>
+<em>DirectoryHandle</em>,</p>
+<p><strong>OUT</strong> <strong>PVOID</strong> <em>Buffer</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>Length</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>ReturnSingleEntry</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong>
+<em>RestartScan</em>,</p>
+<p><strong>IN</strong> <strong>OUT</strong> <strong>PULONG</strong>
+<em>Context</em>,</p>
+<p><strong>OUT</strong> <strong>PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>DirectoryHandle</em> ——handle of directory object being
+queried.</p>
+<p><em>Buffer</em> ——pointer to where directory entries are to be
+returned. The format is array of structures containing the following
+fields:</p>
+<p>OBJECT_DIRECTORY_INFORMATION Structure:</p>
+<p><strong>STRING</strong> <em>Name</em> ——<em>Name</em> of an object in
+the directory</p>
+<p><strong>STRING</strong> <em>TypeName</em> ——Type name of the
+object</p>
+<p>The <em>Buffer</em> fields of each name string point to memory
+allocated at the end of the storage pointed to by the <em>Buffer</em>
+parameter. This the array of Directory Entries grows down and the actual
+characters for each string grow up and if they meet in the middle, then
+the operation stops and this function returns to the caller.</p>
+<p><em>Length</em> ——maximum number of bytes that can be stored in the
+location pointed to by the <em>Buffer</em> parameter.</p>
+<p><em>ReturnSingleEntry</em> ——TRUE forces the query to stop after a
+single entry has been returned. Otherwise the query will return as many
+entries as there is room for in the output buffer.</p>
+<p><em>RestartScan</em> ——TRUE forces the query to start with the first
+name in the directory. Otherwise the query picks up with the next name
+after the last name returned by the previous call to
+<strong>NtQueryDirectoryObject</strong> for this directory object.</p>
+<p><em>Context</em> ——A pointer to a context value. This value is used
+by this system service to remember its position within a directory
+object. The input value is ignored if the <em>RestartScan</em> parameter
+is TRUE.</p>
+<p><em>ReturnLength</em> ——optional pointer to a variable that will
+receive the actual number of bytes stored in the location pointed to by
+the <em>Buffer</em> parameter.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function returns one or more entries from the directory object
+specified by the <em>DirectoryHandle</em> parameter.</p>
+<p>This function remembers its current position across calls by storing
+a 32-bit number into the location pointed to by the <em>Context</em>
+parameter. This number is a logical index into the directory. It is not
+a pointer. This will prevent deletions that happen between calls from
+turning a <em>Context</em> value into a garbage quantity. It may become
+inaccurate due to insertions and deletions, but it will not bug check
+the system.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<h2 id="create-symbolic-link">3.4 Create Symbolic Link</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateSymbolicLinkObject</strong>(</p>
+<p><strong>OUT</strong> <strong>PHANDLE</strong>
+<em>LinkHandle</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>DesiredAccess</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_ATTRIBUTES</strong>
+<em>ObjectAttributes</em>,</p>
+<p><strong>IN</strong> <strong>PSTRING</strong> <em>LinkTarget</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>LinkHandle</em> ——Supplies a pointer to a variable that will
+receive the symbolic link object handle.</p>
+<p><em>DesiredAccess</em> ——The desired types of access to the symbolic
+link object. The following object type specific access flags can be
+specified in addition to the STANDARD_RIGHTS_REQUIRED flags described in
+the <em>Object</em> <em>Attributes</em> section.</p>
+<p>DesiredAccess Flags:</p>
+<p><em>SYMBOLIC_LINK_QUERY</em> ——Query access to the symbolic link is
+desired.</p>
+<p><em>ObjectAttributes</em> ——A pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object</em>
+<em>Attributes</em> discussion for details.</p>
+<p><em>LinkTarget</em> ——Supplies the target name for the symbolic link
+object.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function creates a symbolic link object, sets its initial value
+to value specified in the <em>LinkTarget</em> parameter, and opens a
+handle to the object with the specified desired access.</p>
+<p>The symbolic link object type has a parse procedure that implements
+the symbolic link semantics. Basically if the parse procedure is called
+and if the remaining string is not null, then the remaining string value
+is concatenated with the target name string stored in the symbolic link
+object, separated by a path separator character. The result replaces the
+complete string and the OBJ_REPARSE is returned to trigger the
+reparse.</p>
+<p>If the remaining string is null, then it assumes the caller is trying
+to open the symbolic link and returns a pointer to the symbolic link
+object body. This will fail with STATUS_OBJECT_TYPE_MISMATCH if the
+caller did not specify the symbolic link object type.</p>
+<p>Otherwise the symbolic link parse procedure returns NULL to indicate
+an error.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_ACCESS_VIOLATION ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer or the
+<em>ObjectAttributes</em>-&gt;ObjectName-&gt;Buffer pointer were
+invalid. Or the <em>LinkTarget</em>, <em>LinkTarget</em>-&gt;Buffer or
+the <em>LinkHandle</em> pointer were invalid.</p>
+<p>o STATUS_DATATYPE_MISALIGNMENT ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer were not
+aligned on a 4 byte boundary. Or the <em>LinkTarget</em> or
+<em>LinkHandle</em> pointer were not aligned on a 4 byte boundary.</p>
+<h2 id="open-symbolic-link">3.5 Open Symbolic Link</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtOpenSymbolicLinkObject</strong>(</p>
+<p><strong>OUT</strong> <strong>PHANDLE</strong>
+<em>LinkHandle</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>DesiredAccess</em>,</p>
+<p><strong>IN</strong> <strong>POBJECT_ATTRIBUTES</strong>
+<em>ObjectAttributes</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>LinkHandle</em> ——Supplies a pointer to a variable that will
+receive the symbolic link object handle.</p>
+<p><em>DesiredAccess</em> ——The desired types of access to the symbolic
+link object. The following object type specific access flags can be
+specified in addition to the STANDARD_RIGHTS_REQUIRED flags described in
+the <em>Object</em> <em>Attributes</em> section.</p>
+<p>DesiredAccess Flags:</p>
+<p><em>SYMBOLIC_LINK_QUERY</em> ——Query access to the symbolic link is
+desired.</p>
+<p><em>ObjectAttributes</em> ——A pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object</em>
+<em>Attributes</em> discussion for details.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function opens a handle to a symbolic link object with the
+specified desired access.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_ACCESS_VIOLATION ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer or the
+<em>ObjectAttributes</em>-&gt;ObjectName-&gt;Buffer pointer were
+invalid. Or the <em>LinkHandle</em> pointer was invalid.</p>
+<p>o STATUS_DATATYPE_MISALIGNMENT ——Either the <em>ObjectAttributes</em>
+pointer or the <em>ObjectAttributes</em>-&gt;ObjectName pointer were not
+aligned on a 4 byte boundary. Or the <em>LinkHandle</em> pointer was not
+aligned on a 4 byte boundary.</p>
+<h2 id="query-symbolic-link">3.6 Query Symbolic Link</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQuerySymbolicLinkObject</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>LinkHandle</em>,</p>
+<p><strong>OUT</strong> <strong>PSTRING</strong> <em>LinkTarget</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>LinkHandle</em> ——Supplies a handle to a symbolic link
+object.</p>
+<p><em>LinkTarget</em> ——Supplies a pointer to a record that is to
+receive the target name of the symbolic link object.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function queries the state of an symbolic link object and
+returns the requested information in the string pointed to by the
+<em>LinkTarget</em> parameter.</p>
+<h2 id="wait-for-single-object">3.7 Wait For Single Object</h2>
+<p>A wait operation on a waitable object is accomplished with the
+<strong>NtWaitForSingleObject</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtWaitForSingleObject</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handle</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong> <em>Alertable</em>,</p>
+<p><strong>IN</strong> <strong>PTIME</strong> <em>TimeOut</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Handle</em> ——An open handle to a waitable object.</p>
+<p><em>Alertable</em> ——A boolean value that specifies whether the wait
+is alertable.</p>
+<p><em>TimeOut</em> ——An optional pointer to a time-out value that
+specifies the absolute or relative time over which the wait is to be
+completed.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>Waiting on an object checks the current state of the object. If the
+current state of the object allows continued execution, any adjustments
+to the object state are made (for example, decrementing the semaphore
+count for a semaphore object) and the thread continues execution. If the
+current state of the object does not allow continued execution, the
+thread is placed into the wait state pending the change of the object's
+state or time-out.</p>
+<p>This function requires SYNCHRONIZE access to the passed handle.</p>
+<p>This function may return one of the following success status codes
+that indicates how the wait was satisfied:</p>
+<p>o A value of STATUS_TIME_OUT indicates that the wait was terminated
+due to the <em>TimeOut</em> conditions.</p>
+<p>o A value of STATUS_SUCCESS indicates the specified object attained a
+Signaled state thus completing the wait.</p>
+<p>o A value of STATUS_ABANDONED indicates the specified object attained
+a Signaled state but was abandoned.</p>
+<p>This function may return one of the following error status codes if
+the wait was not satisfied:</p>
+<p>o STATUS_ALERTED</p>
+<p>o STATUS_USER_APC</p>
+<p>o STATUS_HANDLE_NOT_WAITABLE</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<p>o STATUS_ACCESS_VIOLATION ——The Timeout pointer was invalid.</p>
+<p>o STATUS_DATATYPE_MISALIGNMENT ——The Timeout pointer was not aligned
+on a 4 byte boundary.</p>
+<h2 id="wait-for-multiple-objects">3.8 Wait for Multiple Objects</h2>
+<p>A wait operation on multiple waitable objects (up to
+MAXIMUM_WAIT_OBJECTS) is accomplished with the
+<strong>NtWaitForMultipleObjects</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtWaitForMultipleObjects</strong>(</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>Count</em>,</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handles</em>[],</p>
+<p><strong>IN</strong> <strong>WAIT_TYPE</strong> <em>WaitType</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong> <em>Alertable</em>,</p>
+<p><strong>IN</strong> <strong>PTIME</strong> <em>TimeOut</em>
+<strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Count</em> ——A count of the number of objects that are to be
+waited on.</p>
+<p><em>Handles</em> ——An array of object handles. An error status is
+returned if more than one of the handles refers to the same object. This
+can occur even if two handle values are different but both refer to the
+same object.</p>
+<p><em>WaitType</em> ——The type of operation that is to be performed
+(WaitAny or WaitAll).</p>
+<p><em>Alertable</em> ——A boolean value that specifies whether the wait
+is alertable.</p>
+<p><em>TimeOut</em> ——An optional pointer to a time-out value that
+specifies the absolute or relative time over which the wait is to be
+completed.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function requires SYNCHRONIZE access to the passed handle.</p>
+<p>This function may return one of the following success status codes
+that indicates how the wait was satisfied:</p>
+<p>o A value of STATUS_TIME_OUT indicates that the wait was terminated
+due to the <em>TimeOut</em> conditions.</p>
+<p>o A value from 0 to MAXIMUM_WAIT_OBJECTS - 1, indicates, in the case
+of wait for any object, the object number which satisfied the wait. In
+the case of wait for all objects, the value only indicates that the wait
+was completed successfully.</p>
+<p>o A value from STATUS_ABANDONED to STATUS_ABANDONED +
+(MAXIMUM_WAIT_OBJECTS - 1), indicates, in the case of wait for any
+object, the object number which satisfied the event, and that the object
+which satisfied the event was abandoned. In the case of wait for all
+objects, the value indicates that the wait was completed successfully
+and at least one of the objects was abandoned.</p>
+<p>This function may return one of the following error status codes if
+the wait was not satisfied:</p>
+<p>o STATUS_ALERTED</p>
+<p>o STATUS_USER_APC</p>
+<p>o STATUS_INVALID_PARAMETER</p>
+<p>o STATUS_HANDLE_NOT_WAITABLE</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<p>o STATUS_QUOTA_EXCEEDED</p>
+<p>o STATUS_NO_MEMORY</p>
+<p>o STATUS_INVALID_PARAMETER_MIX ——One or more of the handle values in
+the <em>Handles</em> array referenced the same object.</p>
+<p>o STATUS_ACCESS_VIOLATION ——The <em>Handles</em> or Timeout pointer
+was invalid.</p>
+<p>o STATUS_DATATYPE_MISALIGNMENT ——The <em>Handles</em> or Timeout
+pointer was not aligned on a 4 byte boundary.</p>
+<h2 id="duplicate-handle">3.9 Duplicate Handle</h2>
+<p>A duplicate handle can be created with the
+<strong>NtDuplicateObject</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtDuplicateObject</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong>
+<em>SourceProcessHandle</em>,</p>
+<p><strong>IN</strong> <strong>HANDLE</strong>
+<em>SourceHandle</em>,</p>
+<p><strong>IN</strong> <strong>HANDLE</strong>
+<em>TargetProcessHandle</em>,</p>
+<p><strong>OUT</strong> <strong>PHANDLE</strong>
+<em>TargetHandle</em>,</p>
+<p><strong>IN</strong> <strong>ACCESS_MASK</strong>
+<em>DesiredAccess</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong>
+<em>HandleAttributes</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>Options</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>SourceProcessHandle</em> ——An open handle to a process object or
+NtCurrentProcess().</p>
+<p><em>SourceHandle</em> ——An open handle valid in the context of the
+source process.</p>
+<p><em>TargetProcessHandle</em> ——An open handle to a process object or
+NtCurrentProcess().</p>
+<p><em>TargetHandle</em> ——A pointer to a variable which receives the
+new handle that points to the same object as <em>SourceHandle</em>
+does.</p>
+<p><em>DesiredAccess</em> ——The access requested to for the new handle.
+This access must be equal to or a proper subset of the granted access
+associated with the <em>SourceHandle</em>. This parameter is ignored if
+the DUPLICATE_SAME_ACCESS option is specified.</p>
+<p><em>HandleAttributes</em> ——The attributes to associated with the new
+handles. Only <em>OBJ_INHERIT</em> is relevant.</p>
+<p><em>Options</em> ——Specifies optional behaviors for the caller.</p>
+<p>Options Flags:</p>
+<p><em>DUPLICATE_CLOSE_SOURCE</em> ——The <em>SourceHandle</em> will be
+closed by this server prior to returning to the caller. This occurs
+regardless of any error status returned.</p>
+<p><em>DUPLICATE_SAME_ACCESS</em> ——The <em>DesiredAccess</em> parameter
+is ignored and instead the <em>GrantedAccess</em> associated with
+<em>SourceHandle</em> is used as the <em>DesiredAccess</em> when
+creating the <em>TargetHandle</em>.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This is a generic function and operates on any type of object.</p>
+<p>This function requires PROCESS_DUP_ACCESS to both the
+<em>SourceProcessHandle</em> and the <em>TargetProcessHandle</em>.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<p>o STATUS_QUOTA_EXCEEDED</p>
+<p>o STATUS_NO_MEMORY</p>
+<p>o STATUS_ACCESS_VIOLATION ——The <em>TargetHandle</em> pointer was
+invalid.</p>
+<p>o STATUS_DATATYPE_MISALIGNMENT ——The <em>TargetHandle</em> pointer
+was not aligned on a 4 byte boundary.</p>
+<h2 id="close-handle">3.10 Close Handle</h2>
+<p>An open handle to any object can be closed with the
+<strong>NtClose</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtClose</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handle</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Handle</em> ——An open handle to an object.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This is a generic function and operates on any type of object.</p>
+<p>Closing an open handle to an object causes the handle to become
+invalid and the <em>HandleCount</em> of the associated object to be
+decremented and object retention checks to be performed.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<h2 id="making-an-object-temporary-1">3.11 Making an Object
+Temporary</h2>
+<p>An object can be made temporary with the
+<strong>NtMakeTemporaryObject</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtMakeTemporaryObject</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handle</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Handle</em> ——An open handle to an object.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This is a generic function and operates on any type of object.</p>
+<p>Making an object temporary causes the permanent flag of the
+associated object to be cleared. A temporary object has a name as long
+as its <em>HandleCount</em> is greater than zero. When the
+<em>HandleCount</em> becomes zero, the name is deleted and the
+<em>PointerCount</em> adjusted appropriately.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<h2 id="query-object">3.12 Query Object</h2>
+<p>Information about an opened object can be obtained with the
+<strong>NtQueryObject</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQueryObject</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handle</em>,</p>
+<p><strong>IN</strong> <strong>OBJECT_INFORMATION_CLASS</strong>
+<em>ObjectInformationClass</em>,</p>
+<p><strong>OUT</strong> <strong>PVOID</strong>
+<em>ObjectInformation</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>Length</em>,</p>
+<p><strong>OUT</strong> <strong>ULONG</strong>
+<strong>*</strong><em>ReturnLength</em> <strong>OPTIONAL</strong></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Handle</em> ——Specifies the object that information is being
+requested from.</p>
+<p><em>ObjectInformationClass</em> ——Specifies the type of information
+to retrieve from the specified object.</p>
+<p>ObjectInformationClass Values:</p>
+<p><em>ObjectBasicInformation</em> ——Returns the basic information about
+the specified object.</p>
+<p><em>ObjectNameInformation</em> ——Returns the complete path name of
+the object referred to by the <em>Object</em>.</p>
+<p><em>ObjectTypeInformation</em> ——Returns the name of the object type
+associated with the object.</p>
+<p><em>ObjectInformation</em> ——A pointer to a buffer which receives the
+specified information. The format and content of the buffer depend on
+the specified object information class.</p>
+<p>ObjectInformation Format by Information Class:</p>
+<p><em>ObjectBasicInformation</em> ——Data type is
+POBJECT_BASIC_INFORMATION</p>
+<p>OBJECT_BASIC_INFORMATION Structure:</p>
+<p><strong>ULONG</strong> <em>Attributes</em> ——The attributes
+associated with this object. Only <em>OBJ_INHERIT</em>,
+<em>OBJ_PERMANENT</em> and <em>OBJ_EXCLUSIVE</em> are relevant after an
+object handle has been created.</p>
+<p><strong>ACCESS_MASK</strong> <em>GrantedAccess</em> ——The access mask
+bits that were granted to the current process with the passed
+handle.</p>
+<p><strong>ULONG</strong> <em>PagedPoolCharge</em> ——How much PagedPool
+is charged against a process when it creates a handle to this
+object.</p>
+<p><strong>ULONG</strong> <em>NonPagedPoolCharge</em> ——How much
+NonPagedPool is charged against a process when it creates a handle to
+this object.</p>
+<p><strong>ULONG</strong> <em>NameInfoSize</em> ——The size needed to
+store a copy of the name associated with this object. Zero if no
+name.</p>
+<p><strong>ULONG</strong> <em>TypeInfoSize</em> ——The size needed to
+store a copy of the type name associated with this object.</p>
+<p><strong>ULONG</strong> <em>SecurityDescriptorSize</em> ——The size
+needed to store a copy of the <em>SecurityDescriptor</em> associated
+with this object. See the <strong>NtQuerySecurityObject</strong> for a
+description of how to get the actual copy of the security
+descriptor.</p>
+<p><em>ObjectNameInformation</em> ——Data type is
+POBJECT_NAME_INFORMATION</p>
+<p>OBJECT_NAME_INFORMATION Structure:</p>
+<p><strong>STRING</strong> <em>Name</em> ——The name associated with this
+object, if any.</p>
+<p><em>ObjectTypeInformation</em> ——Data type is
+POBJECT_TYPE_INFORMATION</p>
+<p>OBJECT_TYPE_INFORMATION Structure:</p>
+<p><strong>STRING</strong> <em>TypeName</em> ——The name of the object
+type associated with this object.</p>
+<p><em>Length</em> ——Specifies the length in bytes of the
+<em>ObjectInformation</em> buffer.</p>
+<p><em>ReturnLength</em> ——An optional parameter that receives the
+number of bytes placed in the <em>ObjectInformation</em> buffer.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function requires READ_CONTROL access to the passed handle.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_INVALID_INFO_CLASS ——The <em>ObjectInformationClass</em>
+parameter did not specify a valid value.</p>
+<p>o STATUS_INFO_LENGTH_MISMATCH ——The value of the
+ObjectInformationLength parameter did not match the length required for
+the information class requested by the <em>ObjectInformationClass</em>
+parameter.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<h2 id="set-security-descriptor-for-an-object">3.13 Set Security
+Descriptor for an Object</h2>
+<p>The function <strong>NtSetSecurityObject</strong> takes a well formed
+Security Descriptor provided by the caller and assigns specified
+portions of it to an object. Based on the flags set in the Security
+Information parameter and the caller's access rights, this procedure
+will replace any or all of the security information associated with an
+object.</p>
+<p>This is the only function available to users and applications for
+changing security information, including the owner ID, group ID, and the
+discretionary and system ACLs of an object. The caller must have
+WRITE_OWNER access to the object to change the owner or primary group of
+the object. The caller must have WRITE_DAC access to the object to
+change the discretionary ACL. The caller must have the
+"SeSecurityPrivilege" privilege to assign a system ACL to an object.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtSetSecurityObject</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handle</em>,</p>
+<p><strong>IN</strong> <strong>SECURITY_INFORMATION</strong>
+<em>SecurityInformation</em>,</p>
+<p><strong>IN</strong> <strong>PSECURITY_DESCRIPTOR</strong>
+<em>SecurityDescriptor</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Handle</em> ——A handle to an existing object.</p>
+<p><em>SecurityInformation</em> ——Indicates which security information
+is to be applied to the object. The value(s) to be assigned are passed
+in the <em>SecurityDescriptor</em> parameter.</p>
+<p>The security information is specified using the following boolean
+flag fields:</p>
+<p><em>SecurityInformation</em>.Owner (Object's Owner SID)
+<em>SecurityInformation</em>.Group (Object's Group SID)
+<em>SecurityInformation</em>.Dacl (Object's Discretionary ACL)
+<em>SecurityInformation</em>.Sacl (Object's System ACL)</p>
+<p><em>SecurityDescriptor</em> ——A pointer to a well formed Security
+Descriptor.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_PRIVILEGE_NOT_HELD</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<h2 id="query-security-descriptor-for-an-object">3.14 Query Security
+Descriptor for an Object</h2>
+<p>The function <strong>NtQuerySecurityObject</strong> returns to the
+caller requested security information currently assigned to an
+object.</p>
+<p>Based on the caller's access rights and privileges this procedure
+will return a security descriptor containing any or all of the object's
+owner ID, group ID, discretionary ACL or system ACL. To read the owner
+ID, group ID, or the discretionary ACL the caller must be granted
+READ_CONTROL access to the object. To read the system ACL the caller
+must have "SeSecurityPrivilege" privilege.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQuerySecurityObject</strong>(</p>
+<p><strong>IN</strong> <strong>HANDLE</strong> <em>Handle</em>,</p>
+<p><strong>IN</strong> <strong>SECURITY_INFORMATION</strong>
+<em>SecurityInformation</em>,</p>
+<p><strong>OUT</strong> <strong>PSECURITY_DESCRIPTOR</strong>
+<em>SecurityDescriptor</em>,</p>
+<p><strong>IN</strong> <strong>ULONG</strong> <em>Length</em>,</p>
+<p><strong>OUT</strong> <strong>PULONG</strong>
+<em>LengthNeeded</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>Handle</em> ——A handle to an existing object.</p>
+<p><em>SecurityInformation</em> ——Supplies a value describing which
+pieces of security information are being queried. The values that may be
+specified are the same as those defined in the
+<strong>NtSetSecurityObject</strong> API section.</p>
+<p><em>SecurityDescriptor</em> ——A pointer to the buffer to receive a
+copy of the requested security information. This information is returned
+in the form of a security descriptor.</p>
+<p><em>Length</em> ——The size, in bytes, of the Security Descriptor
+buffer.</p>
+<p><em>LengthNeeded</em> ——A pointer to the variable to receive the
+number of bytes needed to store the complete security descriptor. If
+<em>LengthNeeded</em> is less than or equal to <em>Length</em> then the
+entire security descriptor is returned in the output buffer, otherwise
+none of the descriptor is returned.</p>
+<p><u>Return Value:</u></p>
+<p>Status code that indicates whether or not the operation was
+successful.</p>
+<p>This function may return one of the following status codes:</p>
+<p>o STATUS_SUCCESS ——normal, successful completion.</p>
+<p>o STATUS_BUFFER_TOO_SMALL ——The value of the <em>Length</em>
+parameter did not specify enough memory for the requested information.
+The <em>LengthNeeded</em> variable will be filled in with the amount of
+memory needed.</p>
+<p>o STATUS_ACCESS_DENIED</p>
+<p>o STATUS_PRIVILEGE_NOT_HELD</p>
+<p>o STATUS_INVALID_HANDLE</p>
+<p>x</p>

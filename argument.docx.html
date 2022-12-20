@@ -1,0 +1,336 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Argument Validation Specification</p>
+<p><strong>Author:</strong> David N. Cutler</p>
+<p>Original Draft, May 4, 1989</p>
+<p>Revision 1.1, May 5, 1989</p>
+<p>Revision 1.2, May 10, 1989</p>
+<p>Revision 1.3, July 15, 1989</p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>2. Requirements 1</p>
+<p>3. Operation 1</p>
+<p>4. Interfaces 3</p>
+<p>4.1 Probe for Readability and Read Argument Value 3</p>
+<p>4.2 Probe for Writeability and Read Argument Value 4</p>
+<p>4.3 Probe for Writeability and Read/Write Argument Value 5</p>
+<p>4.4 Probing An Aggregate Value 7</p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This document describes the argument probing and capture requirements
+to which all system services must adhere.</p>
+<p>System services must be written such that they are robust and provide
+protection against malicious attack and inadvertent program bugs. It
+must not be possible to crash or corrupt the system by passing an
+invalid argument value, a pointer to memory that is not accessible to
+the caller, or by dynamically altering or deleting the memory occupied
+by an argument in a simultaneously executing thread.</p>
+<h1 id="requirements">2. Requirements</h1>
+<p>Every system service must ensure that the arguments on which it
+operates are valid (i.e., values are correct). This is essential to
+robust system operation and involves the capturing of values and the
+probing of argument addresses at appropriate points.</p>
+<p>In general, a system service should capture all arguments on entry to
+the procedure. This ensures that the caller or one of its cohorts (buddy
+threads) cannot dynamically alter the value of the argument after it has
+been read and verified, or delete the memory in which it is
+contained.</p>
+<p>In some cases, it is not necessary to capture the value of an
+argument immediately. Such is the case for I/O buffers and name strings.
+However, all pointers <strong>MUST</strong> be captured and the
+addresses to which they point <strong>MUST</strong> be probed for
+accessibility.</p>
+<p>Fortunately, most arguments do not need explicit capture since they
+are passed in registers. Arguments that are passed in memory are probed
+and captured by the system service dispatcher as necessary.</p>
+<h1 id="operation">3. Operation</h1>
+<p>The address space layout of <strong>Windows NT</strong> contains a
+boundary that delineates user address space from system address space.
+All addresses above the boundary are considered system addresses and all
+addresses below the boundary are considered user addresses.</p>
+<p>Pages in the system part of the address space are owned by kernel
+mode and are not accessible to the user unless they are double mapped
+into the user part of the address space. Pages in the user part of the
+address space are owned by user mode and the access for kernel mode is
+identical to that for user mode.</p>
+<p>The executive <strong>NEVER</strong> creates a page in the user part
+of the address space that is owned by kernel mode. Furthermore, at the
+boundary between user address space and system address space, there are
+<strong>64K</strong> bytes that are inaccessible to all modes. This
+address space layout makes it possible to determine whether an address
+is a valid user address simply by doing a boundary comparison.</p>
+<p>When a system service is called, the trap handler gets control, saves
+state, and transfers control to the system service dispatcher. The
+system service dispatcher determines which system service is being
+called, and obtains the address of the appropriate function and the
+number of in-memory arguments from a dispatch table. If the previous
+processor mode is user mode and there is one or more in-memory
+arguments, then the in-memory argument list is probed and then copied to
+the kernel stack. If an access violation occurs during the copy, then
+the system service is completed with a status of access violation. If an
+access violation does not occur, then the the pointer to the in-memory
+argument list is changed to point to the copy of the arguments on the
+kernel stack. The system service dispatcher sets up a catchall condition
+handler, and then calls the system service function.</p>
+<p>The first thing the system service should do is establish a condition
+handler. This handler should be prepared to handle access violations
+that may occur as argument pointers are dereferenced to read or write
+actual argument values.</p>
+<p>Next, the system service code should obtain the previous processor
+mode. If the previous processor mode was kernel, then there is no need
+to probe any arguments. The executive does not call itself with bad
+arguments.</p>
+<p>If the previous processor mode was user, then any argument values
+that are read or written by dereferencing a pointer must be probed for
+accessibility. Probing is accomplished by first ensuring that the
+address of the variable is within the user's address space and then
+reading or writing the variable as appropriate. The code that actually
+probes pointer-related arguments does not set up a condition handler. It
+merely does the boundary check and then reads or writes the indicated
+location. If the boundary check fails, an access violation condition is
+raised. If the memory is inaccessible, an access violation is raised by
+hardware. Thus probes are extremely cheap.</p>
+<p>The complete code at the beginning of a system service should be
+constructed as follows:</p>
+<p><strong>// set up condition handler to catch access
+violations</strong></p>
+<p><strong>.</strong></p>
+<p><strong>.</strong></p>
+<p><strong>.</strong></p>
+<p><strong>if (GetPreviousMode() != KernelMode) {</strong></p>
+<p><strong>.</strong></p>
+<p><strong>.</strong></p>
+<p><strong>.</strong></p>
+<p><strong>// probe and capture reference arguments</strong></p>
+<p><strong>.</strong></p>
+<p><strong>.</strong></p>
+<p><strong>.</strong></p>
+<p><strong>}</strong></p>
+<p>At this point in the execution of a system service, all input values
+have been captured and all output variables have been probed for
+writeability. The system service performs its function, writes output
+values as necessary, and returns a status that indicates whether the
+service succeeded or failed.</p>
+<p>During the writing of output values, an access violation can occur
+because another thread or user altered the address space of the calling
+thread. Access violations that occur at this time are silent and do not
+cause the service to fail. If this were not the case, then it would be
+very difficult to actually complete a system service since code would
+have to be added to back out and undo the service right up until the
+very last output value is written. If the caller receives a success
+status under such conditions, it is likely that the caller will attempt
+to access one of the output values and get an access violation.</p>
+<h1 id="interfaces">4. Interfaces</h1>
+<p>The following sections describe the interfaces that are provided to
+probe arguments for read and write accessibility.</p>
+<h2 id="probe-for-readability-and-read-argument-value">4.1 Probe for
+Readability and Read Argument Value</h2>
+<p>The following functions provide the capability to probe a primitive
+data type for readability and to read an argument value.</p>
+<p><strong>CHAR</strong></p>
+<p><strong>ProbeAndReadChar (</strong></p>
+<p><strong>IN PCHAR Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>UCHAR</strong></p>
+<p><strong>ProbeAndReadUchar (</strong></p>
+<p><strong>IN PUCHAR Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>SHORT</strong></p>
+<p><strong>ProbeAndReadShort (</strong></p>
+<p><strong>IN PSHORT Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>USHORT</strong></p>
+<p><strong>ProbeAndReadUshort (</strong></p>
+<p><strong>IN PUSHORT Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>LONG</strong></p>
+<p><strong>ProbeAndReadLong (</strong></p>
+<p><strong>IN PLONG Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>ULONG</strong></p>
+<p><strong>ProbeAndReadUlong (</strong></p>
+<p><strong>IN PULONG Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>QUAD</strong></p>
+<p><strong>ProbeAndReadQuad (</strong></p>
+<p><strong>IN PQUAD Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>UQUAD</strong></p>
+<p><strong>ProbeAndReadUquad (</strong></p>
+<p><strong>IN PUQUAD Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong><br />
+HANDLE</strong></p>
+<p><strong>ProbeAndReadHandle (</strong></p>
+<p><strong>IN PHANDLE Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ProbeAndReadBoolean (</strong></p>
+<p><strong>IN PBOOLEAN Address</strong></p>
+<p><strong>);</strong></p>
+<p>The previous functions are used to probe and read a value pointed to
+by a safe pointer. A safe pointer is one that has either been captured
+on procedure entry or which has been previously captured with one of the
+these functions. The functions compare the pointer value to the
+user/system address boundary, read the appropriate data-type value, and
+return the value as the function value. If the value is not of
+consequence, then the function value is simply not assigned to a
+variable. Note that both signed and unsigned data types are
+provided.</p>
+<h2 id="probe-for-writeability-and-read-argument-value">4.2 Probe for
+Writeability and Read Argument Value</h2>
+<p>The following functions provide the capability to probe a primitive
+data type for writeability and read an argument value.</p>
+<p><strong>CHAR</strong></p>
+<p><strong>ProbeForWriteChar (</strong></p>
+<p><strong>IN PCHAR Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>UCHAR</strong></p>
+<p><strong>ProbeForWriteUchar (</strong></p>
+<p><strong>IN PUCHAR Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>SHORT</strong></p>
+<p><strong>ProbeForWriteShort (</strong></p>
+<p><strong>IN PSHORT Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>USHORT</strong></p>
+<p><strong>ProbeForWriteUshort (</strong></p>
+<p><strong>IN PUSHORT Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>LONG</strong></p>
+<p><strong>ProbeForWriteLong (</strong></p>
+<p><strong>IN PLONG Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>ULONG</strong></p>
+<p><strong>ProbeForWriteUlong (</strong></p>
+<p><strong>IN PULONG Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong><br />
+QUAD</strong></p>
+<p><strong>ProbeForWriteQuad (</strong></p>
+<p><strong>IN PQUAD Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>UQUAD</strong></p>
+<p><strong>ProbeForWriteUquad (</strong></p>
+<p><strong>IN PUQUAD Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>HANDLE</strong></p>
+<p><strong>ProbeForWriteHandle (</strong></p>
+<p><strong>IN PHANDLE Address</strong></p>
+<p><strong>);</strong></p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ProbeForWriteBoolean (</strong></p>
+<p><strong>IN PBOOLEAN Address</strong></p>
+<p><strong>);</strong></p>
+<p>The previous functions are used to probe for writeability and read a
+value pointed to by a safe pointer. A safe pointer is one that has
+either been captured on procedure entry or which has been previously
+captured with one of these functions. The functions compare the pointer
+value to the user/system address boundary, read the appropriate data
+type value, write the value that was read back into memory, and return
+the original value as the function value. If the value is not of
+consequence, then the function value is simply not assigned to a
+variable. Note that both signed and unsigned data types are
+provided.</p>
+<h2 id="probe-for-writeability-and-readwrite-argument-value">4.3 Probe
+for Writeability and Read/Write Argument Value</h2>
+<p>The following functions provide the capability to probe a primitive
+data type for writeability, read an argument value, and write a
+specified value.</p>
+<p><strong>CHAR</strong></p>
+<p><strong>ProbeAndWriteChar (</strong></p>
+<p><strong>IN PCHAR Address,</strong></p>
+<p><strong>IN CHAR Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong>UCHAR</strong></p>
+<p><strong>ProbeAndWriteUchar (</strong></p>
+<p><strong>IN PUCHAR Address,</strong></p>
+<p><strong>IN UCHAR Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong>SHORT</strong></p>
+<p><strong>ProbeAndWriteShort (</strong></p>
+<p><strong>IN PSHORT Address,</strong></p>
+<p><strong>IN SHORT Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong><br />
+</strong></p>
+<p><strong>USHORT</strong></p>
+<p><strong>ProbeAndWriteUshort (</strong></p>
+<p><strong>IN PUSHORT Address,</strong></p>
+<p><strong>IN USHORT Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong>LONG</strong></p>
+<p><strong>ProbeAndWriteLong (</strong></p>
+<p><strong>IN PLONG Address,</strong></p>
+<p><strong>IN LONG Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong>ULONG</strong></p>
+<p><strong>ProbeAndWriteUlong (</strong></p>
+<p><strong>IN PULONG Address,</strong></p>
+<p><strong>IN ULONG Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong>QUAD</strong></p>
+<p><strong>ProbeAndWriteQuad (</strong></p>
+<p><strong>IN PQUAD Address,</strong></p>
+<p><strong>IN QUAD Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong>UQUAD</strong></p>
+<p><strong>ProbeAndWriteUquad (</strong></p>
+<p><strong>IN PUQUAD Address,</strong></p>
+<p><strong>IN UQUAD Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong>HANDLE</strong></p>
+<p><strong>ProbeAndWriteHandle (</strong></p>
+<p><strong>IN PHANDLE Address,</strong></p>
+<p><strong>IN HANDLE Value</strong></p>
+<p><strong>);</strong></p>
+<p><strong>BOOLEAN</strong></p>
+<p><strong>ProbeAndWriteBoolean (</strong></p>
+<p><strong>IN PBOOLEAN Address,</strong></p>
+<p><strong>IN BOOLEAN Value</strong></p>
+<p><strong>);</strong></p>
+<p>The previous functions are used to probe a primitive data type for
+writeability and read a value pointed to by a safe pointer. In addition,
+the value that is to be written is specified as an argument to the
+function. A safe pointer is one that has either been captured on
+procedure entry or which has been previously captured with one of these
+functions. The functions compare the pointer value to the user/system
+address boundary, read the appropriate data-type value, write the
+specified value to memory, and return the original memory contents as
+the function value. If the value is not of consequence, then the
+function value is simply not assigned to a variable. Note that both
+signed and unsigned data types are provided.</p>
+<h2 id="probing-an-aggregate-value">4.4 Probing An Aggregate Value</h2>
+<p>The following functions provide the capability to probe aggregate
+data types (i.e., structures, arrays, strings, etc.) for read and write
+accessibility.</p>
+<p><strong>VOID</strong></p>
+<p><strong>ProbeForRead (</strong></p>
+<p><strong>IN PCHAR Address,</strong></p>
+<p><strong>IN ULONG Length</strong></p>
+<p><strong>);</strong></p>
+<p><strong>VOID</strong></p>
+<p><strong>ProbeForWrite (</strong></p>
+<p><strong>IN PCHAR Address,</strong></p>
+<p><strong>IN ULONG Length</strong></p>
+<p><strong>);</strong></p>
+<p>The previous functions are used to probe an aggregate for read or
+write accessibility using a safe pointer. A safe pointer is one that has
+either been captured on procedure entry or which has been previously
+captured with one of the preceding functions. The functions compare the
+starting and ending addresses of the specified aggregate for read or
+write accessibility and then read or write one character from each page
+that is spanned by the aggregate. Note that these functions do not
+capture the aggregate value.</p>
+<p><strong><br />
+Revision History:</strong></p>
+<p>Original Draft 1.0, May 4, 1989</p>
+<p>Revision 1.1, May 5, 1989</p>
+<p>1. Add capturing of reference arguments to sample system service
+code.</p>
+<p>2. Change data type definitions to make Portable System Group
+conventions.</p>
+<p>Revision 1.2, May 10, 1989</p>
+<p>1. Move the capturing and probing of the in-memory argument list into
+the system service dispatcher.</p>
+<p>Revision 1.3, July 15, 1989</p>
+<p>1. Add functions to probe handle and boolean values.</p>

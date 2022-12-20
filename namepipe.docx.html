@@ -1,0 +1,1858 @@
+<p>Portable Systems Group</p>
+<p>NT OS/2 Named Pipe Specification</p>
+<p><strong>Author:</strong> David N. Cutler &amp; Gary D. Kimura</p>
+<p>Original Draft February 16, 1990</p>
+<p>Revision 1.1, March 8, 1990</p>
+<p>Revision 1.2, August 14, 1990</p>
+<p>Revision 1.3, September 27, 1990</p>
+<p>Revision 1.4, October 17, 1990</p>
+<p>Revision 1.5, January 23, 1991</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Goals 1</p>
+<p>3. Overview of OS/2 Named Pipes 1</p>
+<p>4. Overview of NT OS/2 Named Pipes 3</p>
+<blockquote>
+<p>4.1 Implementation Alternatives 3</p>
+<p>4.2 Named Pipe Directories 4</p>
+<p>4.3 Read/Write Buffering Strategy 5</p>
+<p>4.3.1 OS/2 Read/Write Buffering Strategy 5</p>
+<p>4.3.2 NT OS/2 Read/Write Buffering Strategy 8</p>
+<p>4.4 Internal Read/Write Operations 13</p>
+<p>4.4.1 Special Read/Write Buffering 13</p>
+<p>4.5 Named Pipe States 13</p>
+</blockquote>
+<p>5. NT OS/2 Named Pipe I/O Operations 16</p>
+<blockquote>
+<p>5.1 Create Named Pipe 16</p>
+<p>5.2 Create File 20</p>
+<p>5.3 Open File 20</p>
+<p>5.4 Read File 21</p>
+<p>5.5 Write File 22</p>
+<p>5.6 Read Terminal File 22</p>
+<p>5.7 Query Directory Information 22</p>
+<p>5.8 Notify Change Directory 22</p>
+<p>5.9 Query File Information 23</p>
+<p>5.9.1 Basic Information 23</p>
+<p>5.9.2 Standard Information 23</p>
+<p>5.9.3 Internal Information 23</p>
+<p>5.9.4 Extended Attribute Information 23</p>
+<p>5.9.5 Access Information 23</p>
+<p>5.9.6 Name Information 23</p>
+<p>5.9.7 Position Information 24</p>
+<p>5.9.8 Mode Information 24</p>
+<p>5.9.9 Alignment Information 24</p>
+<p>5.9.10 All Information 24</p>
+<p>5.9.11 Pipe Information 24</p>
+<p>5.9.12 Local Pipe Information 24</p>
+<p>5.9.13 Remote Pipe Information 26</p>
+<p>5.10 Set File Information 26</p>
+<p>5.10.1 Basic Information 26</p>
+<p>5.10.2 Disposition Information 26</p>
+<p>5.10.3 Link Information 27</p>
+<p>5.10.4 Position Information 27</p>
+<p>5.10.5 Mode Information 27</p>
+<p>5.10.6 Pipe Information 27</p>
+<p>5.10.7 Remote Pipe Information 27</p>
+<p>5.11 Query Extended Attributes 28</p>
+<p>5.12 Set Extended Attributes 28</p>
+<p>5.13 Lock Byte Range 28</p>
+<p>5.14 Unlock Byte Range 28</p>
+<p>5.15 Query Volume Information 28</p>
+<p>5.16 Set Volume Information 28</p>
+<p>5.17 File Control Operations 28</p>
+<p>5.17.1 External File Control Operations 28</p>
+<p>5.17.1.1 Assign Event 29</p>
+<p>5.17.1.2 Disconnect 29</p>
+<p>5.17.1.3 Listen 30</p>
+<p>5.17.1.4 Peek 31</p>
+<p>5.17.1.5 Query Event Information 32</p>
+<p>5.17.1.6 Transceive 33</p>
+<p>5.17.1.7 Wait For Named Pipe 34</p>
+<p>5.17.1.8 Impersonate 35</p>
+<p>5.17.2 Internal File Control Operations 36</p>
+<p>5.17.2.1 Internal Read 36</p>
+<p>5.17.2.2 Internal Write 36</p>
+<p>5.17.2.3 Internal Transceive 36</p>
+<p>5.18 Flush Buffers 36</p>
+<p>5.19 Set New File Size 36</p>
+<p>5.20 Cancel I/O Operation 37</p>
+<p>5.21 Device Control Operations 37</p>
+<p>5.22 Close Handle 37</p>
+</blockquote>
+<p>6. OS/2 API Emulation 37</p>
+<blockquote>
+<p>6.1 DosCallNmPipe 37</p>
+<p>6.2 DosConnectNmPipe 37</p>
+<p>6.3 DosDisconnectNmPipe 38</p>
+<p>6.4 DosMakeNmPipe 38</p>
+<p>6.5 DosPeekNmPipe 38</p>
+<p>6.6 DosQNmPHandState 39</p>
+<p>6.7 DosQNmPipeInfo 39</p>
+<p>6.8 DosQNmPipeSemState 39</p>
+<p>6.9 DosRawReadNmPipe 39</p>
+<p>6.10 DosRawWriteNmPipe 39</p>
+<p>6.11 DosSetNmPHandState 40</p>
+<p>6.12 DosSetNmPipeSem 40</p>
+<p>6.13 DosTransactNmPipe 40</p>
+<p>6.14 DosWaitNmPipe 40</p>
+</blockquote>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification discusses the named pipe facilities of <strong>NT
+OS/2</strong>. Named pipes provide a full duplex interprocess
+communication (IPC) mechanism that can be used locally or across a
+network to access application servers. Named pipes provide the transport
+medium that is used for the Microsoft remote procedure call (RPC)
+capabilities.</p>
+<p>Named pipes are used extensively by the OS/2 and LAN Manager
+components of the <strong>NT OS/2</strong> system, and therefore, must
+be implemented as efficiently as possible.</p>
+<p>There are two manifestations of named pipes, those that are local to
+a system and those that are remote. This specification addresses both
+types of named pipes.</p>
+<p>In addition to describing the <strong>NT OS/2</strong> named pipe
+facilities, this specification also discusses the way in which the OS/2
+named pipe APIs are emulated.</p>
+<h1 id="goals">2. Goals</h1>
+<p>The major goals for the named pipe capabilities of <strong>NT
+OS/2</strong> are the following:</p>
+<p>1. Provide the basic primitives necessary to compatibly emulate the
+OS/2 named pipe capabilities.</p>
+<p>2. Provide protection and security attributes for named pipes that
+are comparable to the capabilities provided for files and other
+<strong>NT OS/2</strong> objects.</p>
+<p>3. Provide for LAN Manager server and client redirection of named
+pipes without having to enter the OS/2 subsystem.</p>
+<p>4. Provide a fully qualified name space for named pipes that fits
+into the <strong>NT OS/2</strong> name structure in a straightforward
+manner.</p>
+<p>5. Provide a high performance design and implementation of named
+pipes.</p>
+<p>Although it is a major temptation, it is not a goal to "fix" the
+semantics of OS/2 named pipes. Minor discrepancies, however, will exist
+between OS/2 and <strong>NT OS/2</strong> named pipes where OS/2
+capabilities or semantics are incompatible with those of <strong>NT
+OS/2</strong>, e.g., the named pipe naming and the asynchronous I/O
+model.</p>
+<h1 id="overview-of-os2-named-pipes">3. Overview of OS/2 Named
+Pipes</h1>
+<p>A named pipe provides a full duplex channel that can be used to
+implement an interprocess communication (IPC) mechanism between two
+processes. OS/2 uses named pipes to implement location-independent
+remote procedure call (RPC) capabilities and for communicating with
+servers on a remote system.</p>
+<p>Named pipes have two ends: 1) a client end, and 2) a server end. Both
+ends are full duplex——data written from one end can be read from the
+other end and vice versa.</p>
+<p>The server end of a named pipe is created when a new instance of a
+named pipe is created, or when a previously created instance is reused.
+A new instance of a named pipe is created with the
+<strong>DosMakeNmPipe</strong> API in OS/2.</p>
+<p>Before either the client or the server ends of a named pipe can be
+used, the server end must be connected. In OS/2 this is accomplished
+with the <strong>DosConnectNmPipe</strong> API.</p>
+<p>Once an instance of a named pipe is created and the server end is
+connected, then the client end of the named pipe can be created using
+the OS/2 <strong>DosOpen</strong> API.</p>
+<p>When both the server end of a named pipe is connected and the client
+end is opened, information can flow over the pipe using the OS/2
+<strong>DosRead</strong> and <strong>DosWrite</strong> APIs.</p>
+<p>Named pipes are created with five attributes:</p>
+<p>1. A pipe type which is either message or byte stream.</p>
+<p>2. A count that limits the maximum number of simultaneous instances
+of the named pipe that can be created.</p>
+<p>3. An input buffer size that specifies the size of the buffer that is
+used for inbound data on the server side of the named pipe.</p>
+<p>4. An output buffer size that specifies the size of the buffer that
+is used for outbound data from the server side of the named pipe.</p>
+<p>5. A default timeout value that is to be used if a timeout value is
+not specified when the <strong>DosWaitNmPipe</strong> API is
+executed.</p>
+<p>The type of a named pipe determines how information is written into
+the named pipe. If the named pipe is a message pipe, then information is
+written into the pipe in the form of messages which include the byte
+count and the data of the message. If the named pipe is a byte stream
+pipe, then only the data is written into the named pipe.</p>
+<p>The maximum instance count is established when the first instance of
+a specific named pipe is created (i.e., one of a given name) and cannot
+later be modified. Thereafter, up to the maximum instance count of
+simultaneous instances of the named pipe can be created to provide an
+IPC mechanism between any pair of processes.</p>
+<p>The input and output buffer sizes are considered hints to the system
+for the sizes of the buffers that are needed to buffer inbound and
+outbound data. The actual buffer sizes may be either the system default
+or the specified buffer sizes rounded up to the next allocation
+boundary.</p>
+<p>The default timeout value specifies a default for the amount of time
+that a client can wait for an available instance of a named pipe.</p>
+<p>Once the first instance of a named pipe is created subsequent
+instances of an identically named pipe are subject to the maximum
+instances parameter. In addition, the type of pipe and the default
+timeout value are ignored and cannot be set when subsequent instances of
+the named pipe are created.</p>
+<p>In addition to the five attribute parameters, two mode parameters can
+be specified when an instance of a named pipe is created or opened:</p>
+<p>1. The read mode, which can be either message mode or byte stream
+mode, but which must be compatible with the type of the named pipe.</p>
+<p>2. The blocking mode, which can be either blocking or
+nonblocking.</p>
+<p>The read mode of a named pipe determines how data will be read from
+the pipe. If the named pipe is a message pipe, then data can be read in
+either message mode or byte stream mode. However, if the named pipe is a
+byte stream pipe, then data can only be read in byte stream mode.</p>
+<p>The blocking mode determines what happens when a request cannot be
+satisfied immediately. If the mode is blocking, then an implied wait
+occurs until an operation is completed. Otherwise, the operation returns
+immediately with an error status.</p>
+<p>Standard open parameters can also be specified when an instance of a
+named pipe is created or opened which define the access that is desired
+to the named pipe (e.g., read only, write only, or read/write access),
+whether the named pipe handle is inherited when a child process is
+created, and whether write behind is allowed on writes to the named
+pipe.</p>
+<p>The open access parameters also specify the configuration of the
+named pipe when the first instance of a named pipe is created. A named
+pipe can have a full duplex or a simplex configuration. A full duplex
+named pipe allows data to flow in both directions, whereas a simplex
+named pipe only allows data to flow in one direction. The direction of
+data flow and configuration are determined by the read only (outbound),
+write only (inbound), and read/write (full duplex) open access
+parameters specified by the server when the first instance of a named
+pipe is created.</p>
+<p>The server end of a named pipe can be reused by disconnecting the
+client end. In OS/2, this is accomplished using the
+<strong>DosDisconnectNmPipe</strong> API. The server end of a named pipe
+can also be disconnected by closing the respective file handle, but this
+deletes the instance of the named pipe and it cannot be reused.</p>
+<p>The client end of a named pipe is disconnected by simply closing the
+respective file handle.</p>
+<p>OS/2 supplies 14 APIs that are specific to named pipes. These APIs
+are intended mainly for use by a server. In addition, eleven standard
+OS/2 I/O system APIs can be executed using a file handle to a named
+pipe.</p>
+<h1 id="overview-of-nt-os2-named-pipes">4. Overview of NT OS/2 Named
+Pipes</h1>
+<h2 id="implementation-alternatives">4.1 Implementation
+Alternatives</h2>
+<p>Named pipes must be integrated into the <strong>NT OS/2</strong> I/O
+system such that standard read and write requests can be used to read
+data from and write data to a named pipe. It also must be possible to
+accomplish LAN Manager server and client redirection of named pipes
+without having to call the OS/2 subsystem.</p>
+<p>There are several ways of integrating named pipes into <strong>NT
+OS/2</strong> that meet these requirements:</p>
+<p>1. Implement the named pipe capabilities as an installable file
+system and extend <strong>NtCreateFile</strong> so that the named pipe
+attributes required by OS/2 can be specified directly in the <strong>NT
+OS/2</strong> system service call.</p>
+<p>2. Implement the named pipe capabilities as an installable file
+system and use extended attributes as the means of defining the named
+pipe attributes required by OS/2.</p>
+<p>3. Implement named pipes as a separate object that is created with
+its own API, but which can be opened via a pipe driver.</p>
+<p>4. Implement the named pipe capabilities as an installable file
+system and add an <strong>NT OS/2</strong> I/O system API that
+specifically creates an instance of a named pipe.</p>
+<p>The first alternative requires an already complicated API to be
+further extended to accommodate yet another special case.</p>
+<p>The second alternative overloads the use of extended attributes to
+have a special meaning for named pipes. Extended attributes are not the
+most efficient or convenient way of specifying the attribute values and
+would require special rules about when they could be read and
+written.</p>
+<p>The third alternative would create a nonstandard object whose API was
+partly buried in the I/O system and partly in object-specific APIs.</p>
+<p>The fourth alternative adds an additional API to the <strong>NT
+OS/2</strong> I/O system that has special meaning and is only applicable
+to named pipes.</p>
+<p>The fourth alternative has been chosen as the means of implementing
+the named pipe capabilities in <strong>NT OS/2</strong>. Although this
+provides an additional I/O system API that is specific to named pipes,
+it is the most straightforward and efficient implementation.</p>
+<h2 id="named-pipe-directories">4.2 Named Pipe Directories</h2>
+<p>In OS/2, named pipes have a rigid name syntax with the following
+form:</p>
+<p><em>\PIPE\pipe-name</em></p>
+<p>This syntax is recognized by the OS/2 <strong>DosOpen</strong> API
+and is routed to the appropriate system component. The LAN Manager
+redirector is also capable of recognizing names of the following
+form<em>:</em></p>
+<p><em>\\server-name\PIPE\pipe-name</em></p>
+<p>The redirector transforms the request into a tree connection to a
+server and then performs the appropriate SMB generation.</p>
+<p>The <strong>NT OS/2</strong> named pipe driver will also implement a
+flat name space. The syntax for an <strong>NT OS/2</strong> named pipe
+is of the following form:</p>
+<p><em>\Device\NamedPipe\pipe-name</em><a href="#fn1"
+class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
+<p>\The object name space in <strong>NT OS/2</strong> is more general
+and hierarchical, and we would like named pipes to follow that scheme;
+however, because of issues involving persistent named pipes, and
+guaranteeing proper behavior given reparse the first named pipe driver
+will use a flat name space. Once the issues are resolved named pipes can
+be extended to existing file systems as a special file using reparse or
+by maintaining a named pipe database in a system file.\</p>
+<p>The syntax for a remote <strong>NT OS/2</strong> named pipe is of the
+following form:</p>
+<p><em>\Device\LanmanRedirector\server-name\Pipe\pipe-name</em></p>
+<h2 id="readwrite-buffering-strategy">4.3 Read/Write Buffering
+Strategy</h2>
+<h3 id="os2-readwrite-buffering-strategy">4.3.1 OS/2 Read/Write
+Buffering Strategy</h3>
+<p>The OS/2 named pipe capabilities use a two circular buffers for
+buffering inbound and outbound writes to a named pipe. This design is
+dictated by the synchronous I/O model of OS/2 and it controls the amount
+of system buffering space that is consumed. The data is copied twice for
+each write and read of a named pipe. One copy occurs when the data is
+written from a user buffer into a named pipe and another copy occurs
+when the data is read out of the named pipe into a user buffer.</p>
+<p>An OS/2 named pipe can be either a message or byte stream pipe, which
+determines how write data is stored in the pipe buffers. Message pipes
+can be read in either message mode or byte stream mode. Byte stream
+pipes can only be read in byte stream mode. In addition, a blocking mode
+can be specified for each open of an instance of a named pipe. The
+blocking mode determines whether reads from, and writes to the named
+pipe block if sufficient data or space is not available in the named
+pipe.</p>
+<p>A message named pipe stores the size of a message and the data for
+the message. A byte stream named pipe simply stores the data and no
+additional information. Reads from a message named pipe attempt to read
+a complete message from the pipe in either message mode or byte stream
+mode. If the complete message does not fit in the supplied read buffer,
+then a full buffer is returned along with an error status that signifies
+that there is more data in the message. Reads from a byte stream named
+pipe can only be made in byte stream mode and return the data that is
+currently in the pipe up to the size of the supplied buffer.</p>
+<p>Each inbound and outbound buffer for a named pipe has a read lock, a
+write lock, a read semaphore, and a write semaphore. These are used to
+synchronize the reading and writing of data to and from the buffer.</p>
+<p>When a write to a named pipe buffer begins, the write lock is
+acquired to prevent any other writer from writing into the buffer until
+the current write is finished. If the write must block because of a lack
+of available space in the buffer, then the reader semaphore is signaled,
+the writer lock is not released, and the writer waits for a reader to
+signal the write semaphore. The write lock is released at the completion
+of the write operation.</p>
+<p>The following describes the OS/2 named pipe write logic.</p>
+<p>if (message pipe) then</p>
+<p>if (blocking mode) then</p>
+<p>write message to pipe, synchronize with reader</p>
+<p>return size of message written</p>
+<p>else</p>
+<p>if (space for message header plus one byte) and</p>
+<p>(data buffer size greater than pipe buffer size) then</p>
+<p>write data to pipe, synchronize with reader</p>
+<p>return size of message written</p>
+<p>else</p>
+<p>if (space for data buffer and message header) then</p>
+<p>write data to pipe</p>
+<p>return size of message written</p>
+<p>else</p>
+<p>return buffer overflow error</p>
+<p>endif</p>
+<p>endif</p>
+<p>endif</p>
+<p>else</p>
+<p>if (blocking mode) then</p>
+<p>write data to pipe, synchronize with reader</p>
+<p>return count of bytes written</p>
+<p>else</p>
+<p>if (space available in pipe buffer) then</p>
+<p>write data to pipe (minimum data buffer/pipe space)</p>
+<p>return count of bytes written</p>
+<p>else</p>
+<p>return buffer overflow error</p>
+<p>endif</p>
+<p>endif</p>
+<p>endif</p>
+<p>When a read from a named pipe buffer begins, the read lock is
+acquired to prevent any other reader from reading from the buffer until
+the current read is finished. If the read must block because of a lack
+of available data in the buffer, then the writer semaphore is signaled,
+the reader lock is not released, and the reader waits for the read
+semaphore to be signaled. The read lock is released at the completion of
+the read operation.</p>
+<p>The following describes the OS/2 named pipe read logic.</p>
+<p>while (data not available in pipe) do</p>
+<p>if (blocking mode) then</p>
+<p>wait for available data in pipe</p>
+<p>else</p>
+<p>return no data available error</p>
+<p>endif</p>
+<p>endwhile</p>
+<p>if (message pipe) then</p>
+<p>if (data buffer size greater or equal message size) then</p>
+<p>if (message mode) then</p>
+<p>read message from pipe, synchronize with writer</p>
+<p>return size of message read</p>
+<p>else</p>
+<p>read available data or message from pipe</p>
+<p>if (complete message read) then</p>
+<p>return size of message read</p>
+<p>else</p>
+<p>reduce size of message by available data bytes</p>
+<p>return count of data bytes read</p>
+<p>endif</p>
+<p>endif</p>
+<p>else</p>
+<p>if (message mode) then</p>
+<p>read data from pipe, synchronize with writer</p>
+<p>reduce size of message by data buffer size</p>
+<p>return more data error</p>
+<p>else</p>
+<p>read available data from pipe</p>
+<p>reduce size of message by available data bytes</p>
+<p>return count of data bytes read</p>
+<p>endif</p>
+<p>endif</p>
+<p>else</p>
+<p>read available data from pipe</p>
+<p>return count of data bytes read</p>
+<p>endif</p>
+<h3 id="nt-os2-readwrite-buffering-strategy"><br />
+4.3.2 NT OS/2 Read/Write Buffering Strategy</h3>
+<p><strong>NT OS/2</strong> supports an asynchronous I/O model and uses
+the concept of quotas to control the allocation of system buffers. In
+addition, <strong>NT OS/2</strong> supports I/O transfers that are
+buffered by the system rather than requiring buffers to be locked down
+and nonswappable. Therefore, the buffering scheme used for the
+<strong>NT OS/2</strong> implementation of named pipes differs markedly
+from that of OS/2.</p>
+<p>The blocking mode of OS/2 is emulated in <strong>NT OS/2</strong>
+with a completion mode. The completion mode can be specified such that
+read and write operations are completed immediately or they are queued
+and subject to completion when space is available or data is
+present.</p>
+<p>The inbound and outbound buffers for a named pipe are not actually
+allocated to real memory in <strong>NT OS/2</strong>. Instead, the
+creator of an instance of a named pipe is simply charged memory quota
+for these buffers. Writers and readers can use up to the quota charged
+to the creator without having any quota charged against themselves. If
+the quota charged to the creator is exhausted and a write request is
+queued rather than completed immediately, then the writer is charged for
+any additional quota that is required. Likewise, a reader is charged
+quota if no data is available, the quota charged to the creator is
+exhausted, and the read request is queued rather than completed
+immediately.</p>
+<p>The named pipe capabilities of <strong>NT OS/2</strong> requires that
+the data be copied twice. However, reads can "pull" data from write
+buffers and writes can "push" data into read buffers.</p>
+<p>The following is a somewhat simplified discussion of the buffering
+scheme used for named pipes in <strong>NT OS/2</strong>. Boundary
+conditions and differing pipe types and modes are not considered. The
+pipe type is assumed to be message, the read mode is assumed to be
+message, and the completion mode is assumed to be queued operation.</p>
+<p>The exact behavior of the <strong>NT OS/2</strong> named pipe
+buffering depends on whether a read occurs before a write or vice
+versa.</p>
+<p>If a write operation occurs before a read operation, then the
+writer's output buffer is probed for read accessibility in the
+requesting mode. A system buffer is allocated that is the required size
+to hold the write data and memory quota is charged to the writer if and
+only if the quota charged to the creator of the named pipe instance has
+been exhausted (e.g., because of a previous read or write request). A
+buffer header is initialized at the front of the system buffer, the
+write data is copied into the system buffer, and the buffer header is
+inserted into the first-in-first-out list of writers. If quota was not
+charged to the writer, then the writer's I/O request can be completed
+immediately. The system buffer will be deallocated and the creator's
+quota returned when a matching read arrives. Otherwise, the write
+request type is converted to a buffered request so that upon completion,
+the I/O system will deallocate the system buffer and return memory quota
+as appropriate.</p>
+<p>At this point, the I/O operation is either pending or has been
+completed and control is returned to the caller. If another write
+request is received before the first set of write data is read, then the
+same operations are performed and the new request is placed at the end
+of the pending queue.</p>
+<p>At some subsequent point in time, a read request arrives at the read
+end of the pipe and it is determined that write data is available at the
+write end of the pipe. The input buffer is probed for write
+accessibility in the requesting mode. The read then proceeds to "pull"
+(copy) data directly from the system buffer that was previously
+allocated for the write data into the user's input buffer. At the
+completion of the copy, the read I/O request is completed.</p>
+<p>Completion of the read request involves writing the I/O status block
+and setting the completion event. If the original write I/O request was
+completed at the time of the write, then the system buffer is
+deallocated and memory quota is returned for named pipe write buffering.
+However, if the write I/O was not completed at the time of the write,
+then completion of the write requires writing the I/O status block,
+setting the completion event, deallocating the system buffer, and
+returning quota to the writer.</p>
+<p>If an access violation occurs during a copy from the output buffer to
+a system buffer, then the write operation is immediately terminated.
+Previously completed read I/O requests, if any, are not backed out. This
+has no effect on the integrity of the system. A malicious writer could
+easily accomplish the same effect by simply writing a shortened message.
+The write I/O status is set to access violation, the write I/O request
+is completed, and successful completion is returned as the service
+status.</p>
+<p>The following describes the <strong>NT OS/2</strong> named pipe write
+logic.</p>
+<p>probe output buffer for read access</p>
+<p>while (read pending) and (output buffer size not zero) do</p>
+<p>copy data from output buffer to read buffer</p>
+<p>if (read buffer greater or equal output buffer) then</p>
+<p>reduce output buffer size to zero</p>
+<p>set read I/O status to successful completion</p>
+<p>else</p>
+<p>reduce output buffer by read buffer size</p>
+<p>if (message mode read) then</p>
+<p>set read I/O status to buffer overflow</p>
+<p>else</p>
+<p>set read I/O status to successful completion</p>
+<p>endif</p>
+<p>endif</p>
+<p>remove read request from read pending list</p>
+<p>complete read I/O operation, return quota</p>
+<p>endwhile</p>
+<p>if (output buffer size not zero) then</p>
+<p>if (pipe quota available) then</p>
+<p>allocate write buffer, charge quota to pipe</p>
+<p>copy data from output buffer to write buffer</p>
+<p>insert write request in write pending list</p>
+<p>set write I/O status to successful completion</p>
+<p>complete write I/O operation</p>
+<p>return successful completion</p>
+<p>else</p>
+<p>if (queued operation) or ((message pipe) and</p>
+<p>(output buffer not original size)) then</p>
+<p>allocate write buffer, charge quota to writer</p>
+<p>copy data from output buffer to write buffer</p>
+<p>insert write request in write pending list</p>
+<p>return operation pending</p>
+<p>else</p>
+<p>if (output buffer not original size) then</p>
+<p>set write I/O status to successful completion</p>
+<p>complete write I/O request</p>
+<p>return successful completion</p>
+<p>else</p>
+<p>abort write I/O operation</p>
+<p>return no space available</p>
+<p>endif</p>
+<p>endif</p>
+<p>endif</p>
+<p>else</p>
+<p>set write I/O status to successful completion</p>
+<p>complete write I/O request</p>
+<p>return successful completion</p>
+<p>endif</p>
+<p>If a read operation occurs before a write, then the reader's input
+buffer is probed for write accessibility in the requesting mode. A
+system buffer is allocated that is the required size to hold the input
+data and memory quota is charged to the reader if and only if the quota
+charged to the creator of the named pipe instance has been exhausted
+(e.g., because of a previous read or write request). A buffer header is
+initialized at the front of the system buffer and the header is inserted
+in a first-in-first-out list of readers. The read request type is
+converted to a buffered request so that upon completion, the I/O system
+will copy the received data from the system buffer into the reader's
+input buffer, deallocate the system buffer, and return memory quota as
+appropriate.</p>
+<p>At this point, the I/O operation is pending and control is returned
+to the caller. If another read request is received before the first read
+is completed, then the same operations are performed and the new request
+is placed at the end of the pending queue.</p>
+<p>At some subsequent point in time, a write request arrives at the
+write end of the pipe and it is determined that a read is pending at the
+read end of the pipe. The output buffer is probed for read accessibility
+in the requesting mode. The write then proceeds to "push" (copy) data
+directly from the output buffer into the system buffer that was
+previously allocated for the read operation. At the completion of the
+copy, the read and write I/O requests are both completed.</p>
+<p>Completion of the write request involves writing the I/O status block
+and setting the completion event, whereas completion of the read request
+requires copying the read data from the system buffer to the reader's
+input buffer, deallocating the system buffer and returning the memory
+quota as appropriate, writing the I/O status block, and setting the
+completion event.</p>
+<p>If an access violation occurs during a copy from a system buffer to
+the input buffer, then the read operation is immediately terminated.
+Previously completed write I/O requests are not backed out. This has no
+effect on the integrity of the system. A malicious reader could easily
+accomplish the same effect by simply reading and discarding information.
+The read I/O status is set to access violation, the read I/O request is
+completed, and successful completion is returned as the service
+status.</p>
+<p>The following describes the <strong>NT OS/2</strong> named pipe read
+logic.</p>
+<p>probe input buffer for write access</p>
+<p>if (write not pending) then</p>
+<p>if (queued operation) then</p>
+<p>if (pipe quota available) then</p>
+<p>allocate read buffer,charge quota to pipe</p>
+<p>else</p>
+<p>allocate read buffer, charge quota to reader</p>
+<p>endif</p>
+<p>insert read request in read pending list</p>
+<p>return operation pending</p>
+<p>else</p>
+<p>abort read I/O operation</p>
+<p>return no data available</p>
+<p>endif</p>
+<p>else</p>
+<p>set read I/O status to successful completion</p>
+<p>while (write pending) and (input buffer size not zero) do</p>
+<p>copy data from write buffer to input buffer</p>
+<p>if (input buffer greater or equal write buffer) then</p>
+<p>if (message mode read) then</p>
+<p>reduce input buffer size to zero</p>
+<p>else</p>
+<p>reduce input buffer by write buffer size</p>
+<p>endif</p>
+<p>set write I/O status to successful completion</p>
+<p>remove write request from write pending list</p>
+<p>complete write I/O operation, return quota</p>
+<p>else</p>
+<p>reduce write buffer by input buffer size</p>
+<p>reduce input buffer size to zero</p>
+<p>if (message mode read) then</p>
+<p>set read I/O status to buffer overflow</p>
+<p>endif</p>
+<p>endif</p>
+<p>endwhile</p>
+<p>complete read I/O operation</p>
+<p>return successful completion</p>
+<p>endif</p>
+<h2 id="internal-readwrite-operations"><br />
+4.4 Internal Read/Write Operations</h2>
+<h3 id="special-readwrite-buffering">4.4.1 Special Read/Write
+Buffering</h3>
+<p>In addition to the above buffering method provided for local named
+pipe clients and servers, <strong>NT OS/2</strong> provides another
+buffering method that can be used internally by the <strong>NT
+OS/2</strong> LAN Manager server. This method allows read and write
+requests to proceed such that no buffer allocation is needed for either
+the read or the write.</p>
+<p>The <strong>NT OS/2</strong> LAN Manager server supplies the
+necessary system buffers directly and only one copy of the data is
+needed for a read or write operation. Typically, these buffers are the
+buffers that are used to receive and transmit data over the network.
+Thus, server side redirection can be performed with minimal
+overhead.</p>
+<h2 id="named-pipe-states">4.5 Named Pipe States</h2>
+<p>Named pipes can be in one of four states:</p>
+<p>1. Disconnected</p>
+<p>2. Listening</p>
+<p>3. Connected</p>
+<p>4. Closing</p>
+<p>The initial state of a named pipe is <em>disconnected</em>. When the
+pipe is in this state, no client is connected to the pipe and a listen
+operation can be performed.</p>
+<p>Performing a listen operation on a disconnected named pipe causes the
+pipe to transition to the <em>listening</em> state.</p>
+<p>An open request performed by a client causes a named pipe in the
+listening state to enter the <em>connected</em> state. When a named pipe
+is in the connected state, data can flow through the pipe.</p>
+<p>A named pipe that is in the connected state can transition to either
+the <em>disconnected</em> state or the <em>closing</em> state.</p>
+<p>The disconnected state is entered when a disconnect operation is
+performed on the server end of a named pipe and causes both the input
+buffer and the output buffer to be flushed. No further access is allowed
+to the client end of the named pipe; however, the client end must still
+be closed.</p>
+<p>The closing state is entered if a close operation is performed on
+either end of a named pipe and causes the input buffer of the closing
+end to be flushed. Any remaining data in the output buffer can be read
+from the opposite end of the named pipe with a read operation. When no
+data remains in the output buffer, an end of file indication is
+returned.</p>
+<p>A named pipe that is in the closing state because the client end of
+the pipe was closed can transition to the disconnected state by
+performing a disconnect operation on the server end of the pipe.</p>
+<p>A named pipe that is in the closing state because the server end of
+the pipe was closed is deleted when the client end of the pipe is also
+closed.</p>
+<p><strong>Named Pipe State Transition Diagram</strong></p>
+<p>Nonexistent</p>
+<p>│ (make pipe server end)</p>
+<p>┌──────────────────────────&gt;│</p>
+<p>│┌─────────────────────────&gt;│</p>
+<p>││┌────────────────────────&gt;│</p>
+<p>│││ V</p>
+<p>│││ ┌─────────────────────────────┐</p>
+<p>│││ │ │─────────────────────┐</p>
+<p>│││ │ Disconnected │ (server end closed) │</p>
+<p>│││ └──────────────┬──────────────┘ │</p>
+<p>│││ │ │</p>
+<p>│││ │ (listen server end) │</p>
+<p>│││ V │</p>
+<p>│││ ┌─────────────────────────────┐ │</p>
+<p>│││ │ │─────────────────────│</p>
+<p>│││ │ Listening │ (server end closed) │</p>
+<p>│││ └──────────────┬──────────────┘ │</p>
+<p>││└─────────────────────────┤ │</p>
+<p>││(server end disconnected) │ (open client end) │</p>
+<p>││ V │</p>
+<p>││ ┌─────────────────────────────┐ │</p>
+<p>││ │ │ │</p>
+<p>││ │ Connected │ │</p>
+<p>││ └──────────────┬──────────────┘ │</p>
+<p>│└──────────────────────────┤ │</p>
+<p>│ (server end disconnected) │ (close server or client end) │</p>
+<p>│ V │</p>
+<p>│ ┌─────────────────────────────┐ │</p>
+<p>│ │ │ │</p>
+<p>│ │ Closing │ │</p>
+<p>│ └──────────────┬──────────────┘ │</p>
+<p>└───────────────────────────┤ │</p>
+<p>(server end disconnected) │ (server end closed) │</p>
+<p>V │</p>
+<p>│</p>
+<p>Deleted &lt;───────────────────────────────┘</p>
+<h1 id="nt-os2-named-pipe-io-operations"><br />
+5. NT OS/2 Named Pipe I/O Operations</h1>
+<p>The following subsections describe the <strong>NT OS/2</strong> I/O
+operations with respect to named pipes. Additional information can be
+found in the <strong>NT OS/2</strong> I/O System Specification.</p>
+<h2 id="create-named-pipe">5.1 Create Named Pipe</h2>
+<p>The first instance of a specific named pipe or another instance of an
+existing named pipe can be created, and a server end handle opened with
+the <strong>NtCreateNamedPipeFile</strong> function. This function is
+only for creating local named pipes and not remote ones.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateNamedPipeFile</strong> (</p>
+<p><strong>OUT PHANDLE</strong> <em>FileHandle,</em></p>
+<p><strong>IN ULONG</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes,</em></p>
+<p><strong>OUT PIO_STATUS_BLOCK</strong> <em>IoStatusBlock,</em></p>
+<p><strong>IN ULONG</strong> <em>ShareAccess,</em></p>
+<p><strong>IN ULONG</strong> <em>CreateDisposition,</em></p>
+<p><strong>IN ULONG</strong> <em>CreateOptions,</em></p>
+<p><strong>IN ULONG</strong> <em>NamedPipeType,</em></p>
+<p><strong>IN ULONG</strong> <em>ReadMode,</em></p>
+<p><strong>IN ULONG</strong> <em>CompletionMode,</em></p>
+<p><strong>IN ULONG</strong> <em>MaximumInstances,</em></p>
+<p><strong>IN ULONG</strong> <em>InboundQuota,</em></p>
+<p><strong>IN ULONG</strong> <em>OutboundQuota,</em></p>
+<p><strong>IN PTIME</strong> <em>DefaultTimeout</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>FileHandle</em> - A pointer to a variable that receives the file
+handle value.</p>
+<p><em>DesiredAccess</em> - Specifies the type of access that the caller
+requires to the named pipe.</p>
+<p>DesiredAccess Flags:</p>
+<p><em>SYNCHRONIZE</em> - The file handle may be waited on to
+synchronize with the completion of I/O operations.</p>
+<p><em>READ_CONTROL</em> - The ACL and ownership information associated
+with the named pipe may be read.</p>
+<p><em>WRITE_DAC</em> - The discretionary ACL associated with the named
+pipe may be written.</p>
+<p><em>WRITE_OWNER</em> - Ownership information associated with the
+named pipe may be written.</p>
+<p><em>FILE_READ_DATA</em> - Data may be read from the named pipe.</p>
+<p><em>FILE_WRITE_DATA</em> - Data may be written to the named pipe.</p>
+<p><em>FILE_CREATE_PIPE_INSTANCE</em> - This access is needed to create
+subsequent instances of the named pipe.</p>
+<p><em>FILE_READ_ATTRIBUTES</em> - Named pipe attributes flags may be
+read.</p>
+<p><em>FILE_WRITE_ATTRIBUTES</em> - Named pipe attribute flags may be
+written.</p>
+<blockquote>
+<p>The three following values are the generic access types that the
+caller may request along with their mapping to specific access
+rights:</p>
+</blockquote>
+<p><em>GENERIC_READ</em> - Maps to <em>FILE_READ_DATA</em> and
+<em>FILE_READ_ATTRIBUTES</em>.</p>
+<p><em>GENERIC_WRITE</em> - Maps to <em>FILE_WRITE_DATA</em> and
+<em>FILE_WRITE_ATTRIBUTES</em>.</p>
+<p><em>GENERIC_EXECUTE</em> - Maps to <em>SYNCHRONIZE</em>.</p>
+<p><em>ObjectAttributes</em> - A pointer to a structure that specifies
+the object attributes; refer to the I/O System Specification for
+details.</p>
+<p><em>IoStatusBlock</em> - A pointer to a structure that receives the
+final completion status. The actual action taken by the system is
+written into the <em>Information</em> field of this structure. For
+example, it indicates if a new named pipe and instance was created or
+just a new instance.</p>
+<p><em>ShareAccess</em> - Specifies the share access and configuration
+of the named pipe.</p>
+<p>ShareAccess Flags:</p>
+<p><em>FILE_SHARE_READ</em> - Indicates that client end handles can be
+opened for read access to the named pipe.</p>
+<p><em>FILE_SHARE_WRITE</em> - Indicates that client end handles can be
+opened for write access to the named pipe.</p>
+<p><em>CreateDisposition</em> - Specifies the action to be taken if the
+named pipe does or does not already exist.</p>
+<p>CreateDisposition Values:</p>
+<p><em>FILE_CREATE</em> - Indicates that if the named pipe already
+exists, then the operation should fail. If the named pipe does not
+already exist, then the first instance of the named pipe should be
+created.</p>
+<p><em>FILE_OPEN</em> - Indicates that if the named pipe already exists,
+then another instance of the named pipe should be created. If the named
+pipe does not already exist, then the operation should fail.</p>
+<p><em>FILE_OPEN_IF</em> - Indicates that if a named pipe already
+exists, then another instance of the named pipe should be created. If
+the named pipe does not already exist, then the first instance of the
+named pipe should be created.</p>
+<p><em>CreateOptions</em> - Specifies the options that should be used
+when creating the first instance or a subsequent instance of a named
+pipe.</p>
+<p>CreateOptions Flags:</p>
+<p><em>FILE_WRITE_THROUGH</em> - For a locally accessed named pipe, this
+flag is not meaningful and is ignored. For a remotely accessed named
+pipe this flag indicates that services that write data to the named pipe
+must actually write the data through to the remote named pipe before the
+operation is considered to be complete, i</p>
+<p><em>FILE_SYNCHRONOUS_IO_ALERT</em> - Indicates that all operations on
+the named pipe are to be performed synchronously. Any wait that is
+performed on behalf of the caller is subject to premature termination by
+alerts.</p>
+<p><em>FILE_SYNCHRONOUS_IO_NONALERT</em> - Indicates that all operations
+on the named pipe are to be performed synchronously. Any wait that is
+performed on behalf of the caller is not subject to premature
+termination by alerts.</p>
+<p><em>NamedPipeType</em> - Specifies the type of the named pipe. This
+parameter is only meaningful when the first instance of a named pipe is
+created.</p>
+<p>NamedPipeType Values:</p>
+<p><em>FILE_PIPE_MESSAGE_TYPE</em> - Indicates that the named pipe is a
+message pipe. Data written to the pipe is stored such that message
+boundaries are maintained. Message named pipes can be read in message
+mode or in byte stream mode.</p>
+<p><em>FILE_PIPE_BYTE_STREAM_TYPE</em> - Indicates that the named pipe
+is a byte stream pipe. Data written to the pipe is stored as a
+continuous stream of bytes. Byte stream pipes can only be read in byte
+stream mode.</p>
+<p><em>ReadMode</em> - Specifies the mode in which the named pipe is
+read.</p>
+<p>ReadMode Values:</p>
+<p><em>FILE_PIPE_MESSAGE_MODE</em> - Indicates that data is read from
+the named pipe a message at a time. This value may not be specified
+unless the named pipe is a message pipe.</p>
+<p><em>FILE_PIPE_BYTE_STREAM_MODE</em> - Indicates that data is read
+from the named pipe as a continuous stream of bytes. This value may be
+specified regardless of the type of the named pipe.</p>
+<p><em>CompletionMode</em> - Specifies whether I/O operations are to be
+queued or completed immediately when conditions are such that the I/O
+operation cannot be completed without being deferred for subsequent
+processing, e.g., a read operation on a named pipe that contains no
+write data.</p>
+<p>CompletionMode Values:</p>
+<p><em>FILE_PIPE_QUEUE_OPERATION</em> - Indicates that I/O operations
+are to be queued pending completion at a later time if they cannot be
+immediately completed when the I/O operation is issued.</p>
+<p><em>FILE_PIPE_COMPLETE_OPERATION</em> - Indicates that I/O operations
+are not to be queued if they cannot be completed immediately when the
+I/O operation is issued.</p>
+<p><em>MaximumInstances</em> - Specifies the maximum number of
+simultaneous instances of the named pipe. This parameter is only
+meaningful when the first instance of a named pipe is created.</p>
+<p><em>InboundQuota</em> - Specifies the pool quota that is reserved for
+writes to the inbound side of the named pipe.</p>
+<p><em>OutboundQuota</em> - Specifies the pool quota that is reserved
+for writes to the outbound side of the named pipe.</p>
+<p><em>DefaultTimeout</em> - Specifies an optional pointer to a timeout
+value that is to be used if a timeout value is not specified when
+waiting for an instance of a named pipe. This parameter is only
+meaningful when the first instance of a named pipe is created.</p>
+<p>This service either creates the first instance of a specific named
+pipe and establishes its basic attributes or creates a new instance of
+an existing named pipe which inherits the attributes of the first
+instance of the named pipe. If creating a new instance of an existing
+named pipe the user must have <em>FILE_CREATE_PIPE_INSTANCE</em> access
+to the named pipe object.</p>
+<p>If a new named pipe is being created, then the Access Control List
+(ACL) from the object attributes parameter defines the discretionary
+access control for the named pipe. If a new instance of an existing
+named pipe is created, then the ACL is ignored.</p>
+<p>If a new named pipe is created, then the configuration of the named
+pipe is determined from the <em>FILE_SHARE_READ</em> and
+<em>FILE_SHARE_WRITE</em> flags of the share access parameter. If both
+flags are specified, then the named pipe is a full duplex pipe and can
+be read and written by clients. If either one or the other is specified,
+but not both, then the named pipe is a simplex pipe and can only be read
+(outbound) or written (inbound) by clients. If neither one is specified,
+then <em>STATUS_INVALID_PARAMETER</em> is returned. If a new instance of
+an existing named pipe is created, then the share access parameter is
+ignored.</p>
+<p>If a new named pipe is created, then the type of the named pipe, the
+maximum instances, and the default timeout value are taken from their
+corresponding parameters. If a new instance of an existing named pipe is
+created, then these parameters are ignored.</p>
+<p>The create options, completion mode, and read mode are set to their
+specified values.</p>
+<p>The actual pool quota that is reserved for each side of the named
+pipe is either the system default, the system minimum, the system
+maximum, or the specified quota rounded up to the next allocation
+boundary.</p>
+<p>The name of the named pipe is taken from the object attributes
+parameter, which must be specified.</p>
+<p>An instance of a named pipe is always deleted when the last handle to
+the instance of the named pipe is closed.</p>
+<p>If <em>STATUS_SUCCESS</em> is returned as the service status, then a
+new instance of a named pipe was successfully created. The
+<em>Information</em> field of the I/O status block indicates if this is
+the first instance of the named pipe (<em>FILE_CREATED</em>) or a new
+instance of an existing named pipe (<em>FILE_OPENED</em>).</p>
+<p>If <em>STATUS_INVALID_PARAMETER</em> is returned as the service
+status, then an invalid value was specified for one or more of the input
+parameters.</p>
+<p>If <em>STATUS_INSTANCE_NOT_AVAILABLE</em> is returned as the service
+status, the named pipe already exists and creating another instance
+would cause the maximum number of instances to be exceeded.</p>
+<h2 id="create-file">5.2 Create File</h2>
+<p>The <strong>NtCreateFile</strong> function can be used to open a
+client end handle to an instance of a specified named pipe.</p>
+<p>In order to use this function to open a named pipe, the named pipe
+must already exist and the <em>CreateDisposition</em> value must be
+specified as either <em>FILE_OPEN</em> or <em>FILE_OPEN_IF</em>.</p>
+<p>When a named pipe is opened, a search is conducted for an available
+instance of the specified named pipe. If an instance of the named pipe
+is found that has a state of listening, then the state of the named pipe
+is set to connected, the read mode is set to byte stream, the completion
+mode is set to queued operation, and the open I/O request is completed.
+If one or more listen I/O requests are pending for the server end of the
+named pipe, then the listen I/O requests are completed with a status of
+<em>STATUS_SUCCESS</em>.</p>
+<p>If a named pipe of specified name cannot be found, then
+<em>STATUS_OBJECT_NAME_NOT_FOUND</em> is returned as the service
+status.</p>
+<p>If an instance of the named pipe cannot be found with a state of
+listening, then <em>STATUS_PIPE_NOT_AVAILABLE</em> is returned as the
+service status.</p>
+<h2 id="open-file">5.3 Open File</h2>
+<p>The <strong>NtOpenFile</strong> function can be used to open a client
+end handle to an instance of a specified named pipe.</p>
+<p>When a named pipe is opened, a search is conducted for an available
+instance of the specified named pipe. If an instance of the named pipe
+is found that has a state of listening, then the state of the named pipe
+is set to connected, the read mode is set to byte stream, the completion
+mode is set to queued operation, and the open I/O request is completed.
+If one or more listen I/O requests are pending for the server end of the
+named pipe, then the listen I/O requests are completed with a status of
+<em>STATUS_SUCCESS</em>.</p>
+<p>If a named pipe of specified name cannot be found, then
+<em>STATUS_OBJECT_NAME_NOT_FOUND</em> is returned as the service
+status.</p>
+<p>If an instance of the named pipe cannot be found with a state of
+listening, then <em>STATUS_PIPE_NOT_AVAILABLE</em> is returned as the
+service status.</p>
+<h2 id="read-file">5.4 Read File</h2>
+<p>The <strong>NtReadFile</strong> function can be used to read data
+from a named pipe. Data is read according to the read mode of the
+specified named pipe and I/O operations are completed according to the
+completion mode of the specified named pipe.</p>
+<p>The byte offset and key parameters of the <strong>NtReadFile</strong>
+function are ignored by the named pipe file system.</p>
+<p>The specified named pipe must be in the connected or closing state in
+order to read information from the pipe.</p>
+<p>If <em>STATUS_PENDING</em> is returned as the service status, then
+the read I/O operation is pending and its completion must be
+synchronized using the standard <strong>NT OS/2</strong> mechanisms. Any
+other service status indicates that the read I/O operation has already
+been completed. If a success status is returned, then the I/O status
+block contains the I/O completion information. Otherwise, the service
+status determines any error that may have occurred.</p>
+<p>If the specified handle is not open to a named pipe that is in the
+connected or closing state, then <em>STATUS_INVALID_PIPE_STATE</em> is
+returned as the service status.</p>
+<p>If the I/O status <em>STATUS_ACCESS_VIOLATION</em> is returned, then
+part of the read buffer became inaccessible after it was probed for
+write access and the I/O status block contains the number of bytes that
+were read.</p>
+<p>If the I/O status <em>STATUS_END_OF_FILE</em> is returned, then there
+is no data in the pipe and the write end of the pipe has been
+closed.</p>
+<p>The I/O status <em>STATUS_PIPE_EMPTY</em> is returned when there is
+no data in the pipe but the write end of the pipe is still opened and
+the pipe is opened for complete operations.</p>
+<p>If the I/O status <em>STATUS_BUFFER_OVERFLOW</em> is returned, then
+the read I/O operation was completed successfully, but the size of the
+input buffer was not large enough to hold the entire input message. A
+full buffer of data is returned; additional data can be read from the
+message using the <strong>NtReadFile</strong> function. The I/O status
+block contains the number of bytes that were read.</p>
+<p>If the I/O status <em>STATUS_SUCCESS</em> is returned, then the read
+I/O operation was completed successfully and the I/O status block
+contains the number of bytes that were read.</p>
+<p>If an event is associated with the write end of the specified named
+pipe and any data is actually read from the pipe, then the event is set
+to the Signaled state. Writers can use this information to synchronize
+their access to the named pipe.</p>
+<h2 id="write-file">5.5 Write File</h2>
+<p>The <strong>NtWriteFile</strong> function can be used to write data
+to a named pipe. Data is written according to the type of the specified
+named pipe and I/O operations are completed according to the completion
+mode of the specified named pipe.</p>
+<p>The byte offset and key parameters of the
+<strong>NtWriteFile</strong> function are ignored by the named pipe file
+system.</p>
+<p>The specified named pipe must be in the connected state in order to
+write information to the pipe.</p>
+<p>If <em>STATUS_PENDING</em> is returned as the service status, then
+the write I/O operation is pending and its completion must be
+synchronized using the standard <strong>NT OS/2</strong> mechanisms. Any
+other service status indicates that the write I/O operation has already
+been completed. If a success status is returned, then the I/O status
+block contains the I/O completion information. Otherwise, the service
+status determines any error that may have occurred.</p>
+<p>If the specified handle is not open to a named pipe that is in the
+connected state, then <em>STATUS_INVALID_PIPE_STATE</em> is returned as
+the service status.</p>
+<p>If the I/O status <em>STATUS_ACCESS_VIOLATION</em> is returned, then
+part of the write buffer became inaccessible after it was probed for
+read access and the I/O status block contains the number of bytes that
+were written.</p>
+<p>If the I/O status <em>STATUS_SUCCESS</em> is returned, then the write
+I/O operation was completed successfully and the I/O status block
+contains the number of bytes that were written.</p>
+<p>If an event is associated with the read end of the specified named
+pipe and any data is actually written to the pipe, then the event is set
+to the Signaled state. Readers can use this information to synchronize
+their access to the named pipe.</p>
+<p>A zero length write to a message type pipe adds a logical EOF to the
+to the pipe.</p>
+<h2 id="read-terminal-file">5.6 Read Terminal File</h2>
+<p>This function is not supported by named pipes.</p>
+<h2 id="query-directory-information">5.7 Query Directory
+Information</h2>
+<p>The <strong>NtQueryDirectoryFile</strong> function can be used to
+enumerate files within the root named pipe file system directory (i.e.,
+"\Device\NamedPipe\"). All the standard <strong>NT OS/2</strong>
+information classes are supported. <strong>NtOpenFile</strong> is used
+to open the root named pipe directory. This function is not supported
+for remote named pipes.</p>
+<h2 id="notify-change-directory">5.8 Notify Change Directory</h2>
+<p>The <strong>NtNotifyChangeDirectoryFile</strong> function can be used
+to monitor modifications to the root named pipe file system directory.
+The standard <strong>NT OS/2</strong> capabilities are supported. This
+function is not supported for remote named pipes.</p>
+<h2 id="query-file-information">5.9 Query File Information</h2>
+<p>Information about a file can be obtained with the
+<strong>NtQueryInformationFile</strong> function. All information
+classes, with the exception of extended attribute information, are
+supported for named pipes with special interpretation of the returned
+data as appropriate. An additional information class is also provided to
+return information that is specific to named pipes.</p>
+<p>Information is returned by the named pipe file system for named pipes
+and for the named pipe root directory. The following subsections
+describe the information that is returned for named pipe entries. The
+information returned for the root directory is identical to the
+information that is returned by other file systems and is described in
+the <strong>NT OS/2</strong> I/O System Specification.</p>
+<h3 id="basic-information">5.9.1 Basic Information</h3>
+<p>Basic information about a named pipe includes the creation time, the
+time of the last access, the time of the last write, the time of the
+last change, and the attributes of the named pipe. The file attribute
+value for a named pipe is <strong>FILE_ATTRIBUTE_NORMAL</strong>. This
+function is only supported by local named pipes.</p>
+<h3 id="standard-information">5.9.2 Standard Information</h3>
+<p>Standard information about a named pipe includes the allocation size,
+the end of file offset, the device type, the number of hard links,
+whether a delete is pending, and the directory indicator. This function
+is only supported by local named pipes.</p>
+<p>The allocation size is the amount of pool quota charged to the
+creator of an instance of a named pipe. This is the sum of the quota
+charged for the inbound and outbound buffers. The end of file offset is
+the number of bytes that are available in the inbound buffer. The device
+type is <strong>FILE_DEVICE_NAMED_PIPE</strong>, the number of hard
+links is one, delete pending is TRUE, and the directory indicator is
+FALSE.</p>
+<h3 id="internal-information">5.9.3 Internal Information</h3>
+<p>Internal information about a named pipe includes a named pipe
+file-system-specific identifier. This value is unique for each instance
+of a named pipe.</p>
+<h3 id="extended-attribute-information">5.9.4 Extended Attribute
+Information</h3>
+<p>The extended attribute information size is always returned as zero by
+the named pipe file system. This function is only supported by local
+named pipes.</p>
+<h3 id="access-information">5.9.5 Access Information</h3>
+<p>Access information about a named pipe includes the granted access
+flags. This function is only supported by local named pipes.</p>
+<h3 id="name-information">5.9.6 Name Information</h3>
+<p>Name information about a named pipe includes the name of the named
+pipe. This function is only supported by local named pipes.</p>
+<h3 id="position-information">5.9.7 Position Information</h3>
+<p>Position information about a named pipe includes the current byte
+offset. The current byte offset is the number of bytes that are
+available in the input buffer. This function is only supported by local
+named pipes.</p>
+<h3 id="mode-information">5.9.8 Mode Information</h3>
+<p>Mode information about a named pipe includes the I/O mode of the
+named pipe. This function is only supported by local named pipes.</p>
+<h3 id="alignment-information">5.9.9 Alignment Information</h3>
+<p>The alignment information class is not supported by the named pipe
+file system. This function is only supported by local named pipes.</p>
+<h3 id="all-information">5.9.10 All Information</h3>
+<p>The all information class includes information that can be returned
+by all file systems and is described above under each of the individual
+subsections. This function is only supported by local named pipes.</p>
+<h3 id="pipe-information">5.9.11 Pipe Information</h3>
+<p>Pipe information for both local and remote named pipes include the
+read and completion mode for the specified end of the named pipe. An
+access of FILE_READ_ATTRIBUTE is required to query the pipe information
+of a named pipe.</p>
+<p><em>FilePipeQueryInformation</em> - Data type is
+<em>FILE_PIPE_INFORMATION</em>.</p>
+<p>typedef struct <strong>_FILE_PIPE_INFORMATION</strong> {</p>
+<p><strong>ULONG</strong> <em>ReadMode</em>;</p>
+<p><strong>ULONG</strong> <em>CompletionMode</em>;</p>
+<p>} <strong>FILE_PIPE_INFORMATION</strong>;</p>
+<p><u>FILE_PIPE_INFORMATION:</u></p>
+<p><em>ReadMode -</em> The mode in which the named pipe is being read
+(<em>FILE_PIPE_MESSAGE_MODE</em> or
+<em>FILE_PIPE_BYTE_STREAM_MODE</em>).</p>
+<p><em>CompletionMode -</em> The mode in which I/O operations are
+handled (<em>FILE_PIPE_QUEUE_OPERATION</em> or
+<em>FILE_PIPE_COMPLETE_OPERATION</em>).</p>
+<h3 id="local-pipe-information">5.9.12 Local Pipe Information</h3>
+<p>Information for a local named pipe includes the type of the pipe, the
+maximum number of instances of the named pipe that can be created, the
+current number of instances of the named pipe, the quota charged for the
+input buffer, the number of bytes of data available in the input buffer,
+the quota charged for the output buffer, the quota available for writing
+into the output buffer, the state of the named pipe, and the end of the
+named pipe. An access of FILE_READ_ATTRIBUTE is required to query the
+local pipe information of a named pipe. This function is only supported
+by local named pipes.</p>
+<p><em>FilePipeQueryInformation</em> - Data type is
+<em>FILE_PIPE_LOCAL_INFORMATION</em>.</p>
+<p>typedef struct <strong>_FILE_PIPE_LOCAL_INFORMATION</strong> {</p>
+<p><strong>ULONG</strong> <em>NamedPipeType</em>;</p>
+<p><strong>ULONG</strong> <em>NamedPipeConfiguration</em>;</p>
+<p><strong>ULONG</strong> <em>MaximumInstances</em>;</p>
+<p><strong>ULONG</strong> <em>CurrentInstances</em>;</p>
+<p><strong>ULONG</strong> <em>InboundQuota</em>;</p>
+<p><strong>ULONG</strong> <em>ReadDataAvailable</em>;</p>
+<p><strong>ULONG</strong> <em>OutboundQuota</em>;</p>
+<p><strong>ULONG</strong> <em>WriteQuotaAvailable</em>;</p>
+<p><strong>ULONG</strong> <em>NamedPipeState</em>;</p>
+<p><strong>ULONG</strong> <em>NamedPipeEnd</em>;</p>
+<p>} <strong>FILE_PIPE_LOCAL_INFORMATION</strong>;</p>
+<p><u>FILE_PIPE_LOCAL_INFORMATION:</u></p>
+<p><em>NamedPipeType -</em> The type of the named pipe
+(<em>FILE_PIPE_MESSAGE_TYPE</em> or
+<em>FILE_PIPE_BYTE_STREAM_TYPE</em>).</p>
+<p><em>NamedPipeConfiguration</em> - The configuration of the named pipe
+(<em>FILE_PIPE_INBOUND</em>, <em>FILE_PIPE_OUTBOUND</em>,
+<em>FILE_PIPE_FULL_DUPLEX</em>).</p>
+<p><em>MaximumInstances -</em> The maximum number of simultaneous
+instances of the named pipe that are allowed.</p>
+<p><em>CurrentInstances -</em> The current number of instances of the
+named pipe. For a remote named pipe this field is set to
+<strong>MAXULONG</strong>.</p>
+<p><em>InboundQuota -</em> The amount of pool quota that is reserved for
+buffering writes to the inbound side of the named pipe. For a remote
+named pipe this field is set to <strong>MAXULONG</strong>.</p>
+<p><em>ReadDataAvailable -</em> The number of bytes of read data that
+are available in the input buffer. For a remote named pipe this field is
+set to <strong>MAXULONG</strong>.</p>
+<p><em>OutboundQuota -</em> The amount of pool quota that is reserved
+for buffering writes to the outbound side of the named pipe. For a
+remote named pipe this field is set to <strong>MAXULONG</strong>.</p>
+<p><em>WriteQuotaAvailable -</em> The number of bytes of pool quota that
+are available for writing data. For a remote named pipe this field is
+set to <strong>MAXULONG</strong>.</p>
+<p><em>NamedPipeState -</em> The current state of the named pipe
+(<em>FILE_PIPE_DISCONNECTED_STATE</em>,
+<em>FILE_PIPE_LISTENING_STATE</em>, <em>FILE_PIPE_CONNECTED_STATE</em>,
+or <em>FILE_PIPE_CLOSING_STATE</em>).</p>
+<p><em>NamedPipeEnd -</em> The end of the pipe that is referred to by
+the specified open file handle (<em>FILE_PIPE_CLIENT_END</em> or
+<em>FILE_PIPE_SERVER_END</em>).</p>
+<h3 id="remote-pipe-information">5.9.13 Remote Pipe Information</h3>
+<p>Information for a remote named pipe includes the collect data time
+and the maximum collection count for the specified named pipe. An access
+of FILE_READ_ATTRIBUTE is required to query the pipe information of a
+named pipe. This function is only supported by remote named pipes.</p>
+<p><em>FilePipeQueryInformation</em> - Data type is
+<em>FILE_PIPE_REMOTE_INFORMATION</em>.</p>
+<p>typedef struct <strong>_FILE_PIPE_REMOTE_INFORMATION</strong> {</p>
+<p><strong>TIME</strong> <em>CollectDataTime</em>;</p>
+<p><strong>ULONG</strong> <em>MaximumCollectionCount</em>;</p>
+<p>} <strong>FILE_PIPE_REMOTE_INFORMATION</strong>;</p>
+<p><u>FILE_PIPE_REMOTE_INFORMATION:</u></p>
+<p><em>CollectDataTime</em> - Specifies the amount of time that the
+workstation collects data to send to the remote named pipe before it
+sends it.</p>
+<p><em>MaximumCollectionCount</em> - Specifies the maximum number of
+bytes that the workstation stores before it sends data to the remote
+named pipe.</p>
+<h2 id="set-file-information">5.10 Set File Information</h2>
+<p>Information about a file can be changed with the
+<strong>NtSetInformationFile</strong> function. Most information classes
+are supported for local named pipes with the exception of link and
+position information.</p>
+<p>Information can be set for named pipes. The following subsections
+describe the information that can be set for named pipes.</p>
+<h3 id="basic-information-1">5.10.1 Basic Information</h3>
+<p>Basic information about a named pipe that can be set includes the
+creation time, the time of the last access, the time of the last write,
+the time of the last change, and the attributes of the named pipe. This
+function is only supported by local named pipes.</p>
+<p>The associated times included in this class can be set to any
+appropriate value. The file attribute field can only be set to
+<strong>FILE_ATTRIBUTE_NORMAL</strong>.</p>
+<h3 id="disposition-information">5.10.2 Disposition Information</h3>
+<p>The disposition information class is not supported by named
+pipes.</p>
+<p>Named pipes are always considered temporary and are deleted when the
+last handle is closed (i.e., when the last instance of a named pipe is
+closed and deleted the named pipe, itself, is also deleted.</p>
+<h3 id="link-information">5.10.3 Link Information</h3>
+<p>This information class is not supported by named pipes.</p>
+<h3 id="position-information-1">5.10.4 Position Information</h3>
+<p>This information class is not supported by named pipes.</p>
+<h3 id="mode-information-1">5.10.5 Mode Information</h3>
+<p>Mode information about a named pipe that can be set includes the I/O
+mode of the named pipe.</p>
+<h3 id="pipe-information-1">5.10.6 Pipe Information</h3>
+<p>Pipe information about a named pipe that can be set includes the read
+mode and completion mode of the named pipe. No special access is
+required to set the pipe information.</p>
+<p><em>FilePipeSetInformation</em> - Data type is
+<em>FILE_PIPE_INFORMATION</em>.</p>
+<p>typedef struct <strong>_FILE_PIPE_INFORMATION</strong> {</p>
+<p><strong>ULONG</strong> <em>ReadMode</em>;</p>
+<p><strong>ULONG</strong> <em>CompletionMode</em>;</p>
+<p>} <strong>FILE_PIPE_INFORMATION</strong>;</p>
+<p><u>FILE_PIPE_INFORMATION:</u></p>
+<p><em>ReadMode -</em> The mode in which the named pipe is to be read
+(<em>FILE_PIPE_MESSAGE_MODE</em> or
+<em>FILE_PIPE_BYTE_STREAM_MODE</em>).</p>
+<p><em>CompletionMode -</em> The mode in which I/O operations are to be
+handled (<em>FILE_PIPE_QUEUE_OPERATION</em> or
+<em>FILE_PIPE_COMPLETE_OPERATION</em>).</p>
+<p>If the type of the specified named pipe is a byte stream pipe and the
+new read mode is message mode, then <em>STATUS_INVALID_PARAMETER</em> is
+returned as the service status.</p>
+<p>If the new completion mode for the specified named pipe is complete
+operations, the current completion mode is queue operations, and one or
+more I/O operations are currently queued to the specified end of the
+named pipe, then <em>STATUS_PIPE_BUSY</em> is returned as the service
+status and no pipe information is changed.</p>
+<p>If the new read mode and the new completion mode are compatible with
+the current state of the specified named pipe, then the set information
+I/O request is completed with a status of <em>STATUS_SUCCESS</em> and
+<em>STATUS_SUCCESS</em> is returned as the service status.</p>
+<h3 id="remote-pipe-information-1">5.10.7 Remote Pipe Information</h3>
+<p>Information about a remote named pipe that can be set includes the
+collect data time and the maximum collection count. No special access is
+required to set the pipe information.</p>
+<p><em>FilePipeSetInformation</em> - Data type is
+<em>FILE_PIPE_REMOTEINFORMATION</em>.</p>
+<p>typedef struct <strong>_FILE_PIPE_REMOTE_INFORMATION</strong> {</p>
+<p><strong>TIME</strong> <em>CollectDataTime</em>;</p>
+<p><strong>ULONG</strong> <em>MaximumCollectionCount</em>;</p>
+<p>} <strong>FILE_PIPE_REMOTE_INFORMATION</strong>;</p>
+<p><u>FILE_PIPE_REMOTE_INFORMATION:</u></p>
+<p><em>CollectDataTime</em> - Sets the amount of time that the
+workstation can collect before sending it to the remote named pipe.</p>
+<p><em>MaximumCollectionCount</em> - Sets the maximum number of bytes
+that the workstation stores before sending data to the remote named
+pipe.</p>
+<h2 id="query-extended-attributes">5.11 Query Extended Attributes</h2>
+<p>This function is not supported by named pipes.</p>
+<h2 id="set-extended-attributes">5.12 Set Extended Attributes</h2>
+<p>This function is not supported by named pipes.</p>
+<h2 id="lock-byte-range">5.13 Lock Byte Range</h2>
+<p>This function is not supported by named pipes.</p>
+<h2 id="unlock-byte-range">5.14 Unlock Byte Range</h2>
+<p>This function is not supported by named pipes.</p>
+<h2 id="query-volume-information">5.15 Query Volume Information</h2>
+<p>This function is not supported by named pipes.</p>
+<h2 id="set-volume-information">5.16 Set Volume Information</h2>
+<p>This function is not supported by named pipes.</p>
+<h2 id="file-control-operations">5.17 File Control Operations</h2>
+<p>The following subsections describe file control operations that can
+be performed using a handle that is open to an instance of a named pipe.
+Certain functions can only be executed using a handle that is open to
+the server end of a named pipe. These functions are not legal for a
+handle that is open to the client end of a named pipe. The wait for
+named pipe instance function and the query event information function
+both require a handle that is open to the named pipe file system
+itself.</p>
+<h3 id="external-file-control-operations">5.17.1 External File Control
+Operations</h3>
+<p>External file control operations can be executed by all users of the
+<strong>NT OS/2</strong> named pipe facilities and do not require any
+special privileges.</p>
+<h4 id="assign-event">5.17.1.1 Assign Event</h4>
+<p>The assign event file control operation associates or disassociates
+an event object with either the client or server end of a named pipe.
+This function is only supported by local named pipes.</p>
+<p>The control code for this operation is
+<em>FSCTL_PIPE_ASSIGN_EVENT</em>. The input buffer parameter specifies
+the event handle and key value that are to be associated with the
+respective end of the named pipe. The input buffer has the following
+format:</p>
+<p>typedef struct <strong>_FILE_PIPE_ASSIGN_EVENT_BUFFER</strong> {</p>
+<p><strong>HANDLE</strong> <em>EventHandle</em>;</p>
+<p><strong>ULONG</strong> <em>KeyValue</em>;</p>
+<p>} <strong>FILE_PIPE_ASSIGN_EVENT_BUFFER</strong>;</p>
+<p><u>FILE_PIPE_ASSIGN_EVENT_BUFFER:</u></p>
+<p><em>EventHandle</em> - A handle to an event object that is to be
+associated with the respective end of the named pipe, or null if the
+currently associated event object is to be disassociated.</p>
+<p><em>KeyValue</em> - The key value that is to be associated with the
+respective end of the named pipe. If the event handle is null, then this
+parameter is ignored.</p>
+<p>If the event handle is null, then any event object that is currently
+associated with the respective end of the named pipe is disassociated
+and the key value is ignored.</p>
+<p>If the event handle is not null, then <strong>WRITE</strong> access
+to the event is required. Any previously associated event object is
+disassociated and the specified event and key value are associated with
+the respective end of the named pipe.</p>
+<p>This operation is always completed immediately and never causes an
+I/O operation to be queued.</p>
+<p>Assigning an event object to either the client or server end of a
+named pipe provides additional synchronization capabilities when I/O
+operations are completed immediately rather than being queued.</p>
+<p>Once an event object is assigned, the event will be set to the
+Signaled state every time information is read from, or written to, the
+opposite end of the named pipe, or the opposite end of the named pipe is
+closed. The event object associated with the client end of the named
+pipe is also set to the Signaled state when a disconnect operation is
+performed on the server end of the pipe.</p>
+<h4 id="disconnect">5.17.1.2 Disconnect</h4>
+<p>The disconnect file control operation disconnects an instance of a
+named pipe from a client and causes the named pipe to enter the
+disconnected state. Disconnecting a named pipe causes all data in the
+pipe to be discarded and no further access to the named pipe is allowed
+until a listen operation is performed. The function is only valid from
+the server end of a named pipe.</p>
+<p>The control code for this operation is
+<em>FSCTL_PIPE_DISCONNECT</em>. The input and output parameter buffers
+are not used.</p>
+<p>If the specified handle is not open to the server end of a named
+pipe, then <em>STATUS_ILLEGAL_FUNCTION</em> is returned as the service
+status.</p>
+<p>If the named pipe associated with the specified handle is in the
+disconnected state, then <em>STATUS_PIPE_DISCONNECTED</em> is returned
+as the service status.</p>
+<p>If the named pipe associated with the specified handle is in the
+listening state, then the state of the named pipe is set to
+disconnected. If one or more listen I/O requests are waiting for a
+companion client open request, then the listen I/O requests are
+completed with a status of <em>STATUS_PIPE_DISCONNECTED</em>. The
+disconnect I/O request is completed with a status of
+<em>STATUS_SUCCESS</em> and <em>STATUS_SUCCESS</em> is returned as the
+service status.</p>
+<p>If the named pipe associated with the specified handle is in the
+connected state, then the state of the named pipe is set to
+disconnected, all data in the input and output buffers is discarded, and
+outstanding client and server read and write I/O requests are completed
+with a status of <em>STATUS_PIPE_DISCONNECTED</em>. If an event object
+is associated with the client end of the named pipe, then the event is
+set to the Signaled state. The disconnect I/O request is completed with
+a status of <em>STATUS_SUCCESS</em> and <em>STATUS_SUCCESS</em> is
+returned as the service status.</p>
+<p>If the named pipe associated with the specified handle is in the
+closing state, then the state of the named pipe is set to disconnected,
+all data in the input buffer is discarded, and outstanding server read
+I/O requests are completed with a status of
+<em>STATUS_PIPE_DISCONNECTED</em>. The disconnect I/O request is
+completed with a status of <em>STATUS_SUCCESS</em> and
+<em>STATUS_SUCCESS</em> is returned as the service status.</p>
+<h4 id="listen">5.17.1.3 Listen</h4>
+<p>The listen file control operation is used to transition a named pipe
+from a disconnected state to a listening state. When a named pipe is in
+the listening state, client open requests can be satisfied and cause the
+named pipe to transition to the connected state. This function is only
+supported by local named pipes.</p>
+<p>The control code for this operation is <em>FSCTL_PIPE_LISTEN</em>.
+The input and output parameter buffers are not used.</p>
+<p>If the specified handle is not open to the server end of a named
+pipe, then <em>STATUS_ILLEGAL_FUNCTION</em> is returned as the service
+status.</p>
+<p>If the named pipe associated with the specified handle is in the
+closing state, then <em>STATUS_PIPE_CLOSING</em> is returned as the
+service status.</p>
+<p>If the named pipe associated with the specified handle is in the
+connected state, then <em>STATUS_PIPE_CONNECTED</em> is returned as the
+service status.</p>
+<p>If the named pipe associated with the specified handle is in the
+listening state and the completion mode associated with the server end
+handle is queue operations, then the listen I/O request is queued
+awaiting a companion client open request and <em>STATUS_PENDING</em> is
+returned as the service status. Otherwise (the completion mode is
+complete operations), <em>STATUS_PIPE_LISTENING</em> is returned as the
+service status.</p>
+<p>If the named pipe associated with the specified handle is in the
+disconnected state, then the state of the pipe is set to listening and
+any outstanding wait for named pipe I/O requests are completed with a
+status of <em>STATUS_SUCCESS</em>.</p>
+<p>If the completion mode associated with the server end handle is
+complete operations, then the listen I/O request is completed with an
+I/O status of <em>STATUS_PIPE_LISTENING</em> and <em>STATUS_SUCCESS</em>
+is returned as the service status.</p>
+<p>If the completion mode associated with the server end handle is queue
+operations, then the listen I/O request is queued awaiting a companion
+client open request and <em>STATUS_PENDING</em> is returned as the
+service status. When a client open is performed, the listen I/O request
+is completed with an I/O status of <em>STATUS_PIPE_CONNECTED</em>.</p>
+<h4 id="peek">5.17.1.4 Peek</h4>
+<p>The peek file control operation reads data from a named pipe in
+either byte stream or message mode, but does not actually remove the
+data from the pipe.</p>
+<p>The control code for this operation is <em>FSCTL_PIPE_PEEK</em>. The
+output buffer parameter specifies the read buffer for the peek
+operation. The output buffer has the following format:</p>
+<p>typedef struct <strong>_FILE_PIPE_PEEK_BUFFER</strong> {</p>
+<p><strong>ULONG</strong> <em>NamedPipeState</em>;</p>
+<p><strong>ULONG</strong> <em>ReadDataAvailable</em>;</p>
+<p><strong>ULONG</strong> <em>NumberOfMessages</em>;</p>
+<p><strong>ULONG</strong> <em>MessageLength</em>;</p>
+<p><strong>CHAR</strong> <em>Data</em>[];</p>
+<p>} <strong>FILE_PIPE_PEEK_BUFFER</strong>;</p>
+<p><u>FILE_PIPE_PEEK_BUFFER:</u></p>
+<p><em>NamedPipeState -</em> The current state of the named pipe
+(<em>FILE_PIPE_DISCONNECTED_STATE, FILE_PIPE_LISTENING_STATE,
+FILE_PIPE_CONNECTED_STATE</em>, or
+<em>FILE_PIPE_CLOSING_STATE</em>).</p>
+<p><em>ReadDataAvailable</em> - The number of bytes of read data that
+are available in the input buffer.</p>
+<p><em>NumberOfMessages</em> - The number of messages that are currently
+in the named pipe. If the named pipe is a message pipe, then this field
+contains the number of messages. Otherwise, this field contains
+zero.</p>
+<p><em>MessageLength</em> - The number of bytes that are contained in
+the first message in the named pipe. If the named pipe is a message type
+pipe, then this field contains the size of the first message. Otherwise,
+this field contains zero.</p>
+<p><em>Data</em> - A buffer that receives data read from the named pipe.
+The number of bytes of data that were read from the named pipe can be
+calculated from the I/O status block.</p>
+<p>The specified named pipe must be in the connected or closing state in
+order to read information from the pipe.</p>
+<p>This function is nearly identical to the <strong>NtReadFile</strong>
+function for a named pipe; however, no data is actually removed from the
+pipe and the operation is always completed immediately, i.e., it never
+causes an I/O operation to be queued.</p>
+<p>If the specified handle is not open to a named pipe that is in the
+connected or closing state, then <em>STATUS_INVALID_PIPE_STATE</em> is
+returned as the service status.</p>
+<p>If the I/O status <em>STATUS_ACCESS_VIOLATION</em> is returned, then
+part of the output buffer became inaccessible after it was probed for
+write access and the I/O status block contains the number of bytes that
+were read.</p>
+<p>If the I/O status <em>STATUS_END_OF_FILE</em> is returned, then there
+is no data in the pipe and the write end of the pipe has been
+closed.</p>
+<p>If the I/O status <em>STATUS_BUFFER_OVERFLOW</em> is returned, then
+the peek I/O operation was completed successfully, but the size of the
+output buffer was not large enough to hold the entire input message. A
+full buffer of data is returned; the actual message size can be
+determined from information placed in the output buffer. The I/O status
+block contains the number of bytes that were read including the named
+pipe information.</p>
+<p>If the I/O status <em>STATUS_SUCCESS</em> is returned, then the peek
+I/O operation was completed successfully and the I/O status block
+contains the number of bytes that were read including the named pipe
+information.</p>
+<h4 id="query-event-information">5.17.1.5 Query Event Information</h4>
+<p>The query event information file control operation returns
+information about each named pipe that a specified event object is
+associated with in the current process. It does not return information
+about named pipes that are associated with the specified event object in
+other processes. This function can only be executed using a handle that
+is open to the named pipe file system itself. This function is only
+supported by local named pipes.</p>
+<p>The control code for this operation is
+<em>FSCTL_PIPE_QUERY_EVENT</em>. The input buffer specifies the handle
+for the event object that is to be queried. The output buffer parameter
+specifies the information buffer for the query operation. Each entry
+returned in the output buffer has the following format:</p>
+<p>typedef struct <strong>_FILE_PIPE_EVENT_BUFFER</strong> {</p>
+<p><strong>ULONG</strong> <em>NamedPipeState</em>;</p>
+<p><strong>ULONG</strong> <em>EntryType</em>;</p>
+<p><strong>ULONG</strong> <em>ByteCount</em>;</p>
+<p><strong>ULONG</strong> <em>KeyValue</em>;</p>
+<p><strong>ULONG</strong> <em>NumberRequests</em>;</p>
+<p>} <strong>FILE_PIPE_EVENT_BUFFER</strong>;</p>
+<p><u>FILE_PIPE_EVENT_BUFFER:</u></p>
+<p><em>NamedPipeState -</em> The current state of the named pipe
+(<em>FILE_PIPE_DISCONNECTED_STATE, FILE_PIPE_LISTENING_STATE,
+FILE_PIPE_CONNECTED_STATE</em>, or
+<em>FILE_PIPE_CLOSING_STATE</em>).</p>
+<p><em>EntryType</em> - The type of entry (<em>FILE_PIPE_READ_DATA</em>
+or <em>FILE_PIPE_WRITE_SPACE</em>).</p>
+<p><em>ByteCount</em> - The number of bytes of read data that are
+available (entry type is <em>FILE_PIPE_READ_DATA</em>) or the number of
+bytes of available write space (entry type is
+<em>FILE_PIPE_WRITE_SPACE</em>).</p>
+<p><em>KeyValue</em> - The key value that is associated with the named
+pipe.</p>
+<p><em>NumberRequests</em> - The number of read I/O requests that are
+queued (entry type is <em>FILE_PIPE_WRITE_SPACE</em>) or the number of
+write I/O requests that are queued (entry type is
+<em>FILE_PIPE_READ_DATA</em>) to the opposite end of the named pipe.</p>
+<p>This operation is always completed immediately and never causes an
+I/O operation to be queued.</p>
+<p>If a named pipe that is associated with the specified event has both
+read data available and write space available, then two entries are
+returned in the output buffer.</p>
+<p>If the specified handle is not an event object, then
+<em>STATUS_INVALID_PARAMETER</em> is returned as the service status.</p>
+<p>If the I/O status <em>STATUS_ACCESS_VIOLATION</em> is returned, then
+part of the information buffer became inaccessible after it was probed
+for write access and the I/O status block contains the number of bytes
+of information that were returned.</p>
+<p>If the I/O status <em>STATUS_SUCCESS</em> is returned, then the query
+event I/O operation was completed successfully and the I/O status block
+contains the number of bytes of information that were returned.</p>
+<h4 id="transceive">5.17.1.6 Transceive</h4>
+<p>The transceive file control operation performs a write operation
+followed by a read operation on a named pipe such that no other
+operation can occur between the write and read operations on the
+corresponding end of the pipe.</p>
+<p>The control code for this operation is
+<em>FSCTL_PIPE_TRANSCEIVE</em>. The output buffer parameter specifies
+the read buffer and the input buffer parameter specifies the data to be
+written.</p>
+<p>The specified named pipe must be in the connected state in order to
+perform a transceive operation on the pipe. The named pipe must also be
+a message pipe, and the read mode of the named pipe must be message
+mode. The completion mode is ignored for the transceive operation and
+operations are always queued.</p>
+<p>If <em>STATUS_PENDING</em> is returned as the service status, then
+the transceive I/O operation is pending and its completion must be
+synchronized using standard <strong>NT OS/2</strong> mechanisms. Any
+other service status indicates that the transceive I/O operation has
+already been completed. If a success status is returned, then the I/O
+status block contains the I/O completion information. Otherwise, the
+service status determines any error that may have occurred.</p>
+<p>If the specified handle is not open to a named pipe that is in the
+connected state, then <em>STATUS_INVALID_PIPE_STATE</em> is returned as
+the service status.</p>
+<p>If the read mode associated with the specified handle is not message
+mode, then <em>STATUS_INVALID_READ_MODE</em> is returned as the service
+status.</p>
+<p>If a read I/O operation is already pending for the inbound side of
+the specified named pipe, or there is currently available data in the
+inbound side of the named pipe, then <em>STATUS_PIPE_BUSY</em> is
+returned as the service status.</p>
+<p>If the I/O status <em>STATUS_ACCESS_VIOLATION</em> is returned, then
+part of the read buffer or the write buffer became inaccessible after it
+was probed for write access (read buffer) or read access (write buffer)
+and the I/O status block contains the number of bytes that were
+read.</p>
+<p>If the I/O status <em>STATUS_BUFFER_OVERFLOW</em> is returned, then
+the transceive I/O operation was completed successfully, but the size of
+the output buffer was not large enough to hold the entire input message.
+A full buffer of data is returned; additional data can be read from the
+message using the <strong>NtReadFile</strong> function. The I/O status
+block contains the number of bytes that were read.</p>
+<p>If the I/O status <em>STATUS_SUCCESS</em> is returned, then the
+transceive I/O operation was completed successfully and the I/O status
+block contains the number of bytes that were read.</p>
+<p>If an event is associated with the opposite end of the specified
+named pipe, then the event is set to the Signaled state when the write
+part of the transceive operation is completed and when the read part of
+the transceive operation is completed. Readers and writers can use this
+information to synchronize their access to the named pipe.</p>
+<h4 id="wait-for-named-pipe">5.17.1.7 Wait For Named Pipe</h4>
+<p>The wait for named pipe file control operation waits for an instance
+of a named pipe with a specified name to attain a state of listening.
+This function can only be executed using a handle that is open to the
+named pipe file system root directory (i.e., "\Device\NamedPipe\") or
+redirector (i.e., "\Device\LanmanRedirector").</p>
+<p>The control code for this operation is <em>FSCTL_PIPE_WAIT</em>. The
+input buffer parameter specifies the device relative name of the named
+pipe, and an optional timeout value. The input buffer has the following
+format:</p>
+<p>typedef struct <strong>_FILE_PIPE_WAIT_FOR_BUFFER</strong> {</p>
+<p><strong>TIME</strong> <em>Timeout</em>;</p>
+<p><strong>ULONG</strong> <em>NameLength</em>;</p>
+<p><strong>BOOLEAN</strong> <em>TimeoutSpecified</em>;</p>
+<p><strong>CHAR</strong> <em>Name[]</em></p>
+<p>} <strong>FILE_PIPE_WAIT_FOR_BUFFER</strong>;</p>
+<p><u>FILE_PIPE_WAIT_FOR_BUFFER:</u></p>
+<p><em>Timeout</em> - Supplies a new timeout value is use other than the
+default timeout for the named pipe. This value is only read if
+TimeoutSpecified is TRUE. A minimum large integer value (i.e.,
+0x8000000000000000) means to wait indefinitely.</p>
+<p><em>NameLength</em> - Supplies the length of the name of the named
+pipe found in this buffer.</p>
+<p><em>TimeoutSpecified</em> - Indicates if an overriding timeout value
+has been specified.</p>
+<p><em>Name</em> - Supplies the name of the named pipe. The name does
+not include the "\Device\NamedPipe\" or "\Device\LanmanRedirector\"
+prefix.</p>
+<p>If an instance of a named pipe with the specified name is currently
+in the listening state, then the wait for named pipe I/O function is
+completed with a status of <em>STATUS_SUCCESS</em> and
+<em>STATUS_SUCCESS</em> is returned as the service status. Otherwise,
+the wait for named pipe I/O request is placed in the wait queue of the
+specified named pipe and <em>STATUS_PENDING</em> is returned as the
+service status.</p>
+<p>If an instance of the specified named pipe does not attain a
+listening state within the specified timeout period (either the optional
+one supplied in this function or the default timeout period specified
+when the original instance of the named pipe was created). then the wait
+for named pipe I/O request is completed with a status of
+<em>STATUS_PIPE_WAIT_TIMEOUT</em>.</p>
+<h4 id="impersonate">5.17.1.8 Impersonate</h4>
+<p>The impersonate file control operation allows the server end of the
+pipe to impersonate the client end. Whenever this function is called the
+named pipe file system changes the caller's thread to start
+impersonating the context of the last message read from the pipe. Only
+the server end of the pipe is allowed to invoke this function. This
+function is only supported by local named pipes.</p>
+<p>The control code for this operation is
+<em>FSCTL_PIPE_IMPERSONATE</em>. The output and input parameter buffers
+are not used.</p>
+<p>If the specified handle is not open to the server end of a named
+pipe, then <em>STATUS_ILLEGAL_FUNCTION</em> is returned as the service
+status.</p>
+<p>If the named pipe associated with the specified handle is in the
+disconnected state, then <em>STATUS_PIPE_DISCONNTECTED</em> is returned
+as the service status.</p>
+<p>If a read operation has never been completed to the server end of the
+named pipe, then <em>STATUS_CANNOT_IMPERSONATE</em> is returned as the
+service status.</p>
+<p>If the impersonation is successful then the I/O function is completed
+with a status of <em>STATUS_SUCCESS</em> and <em>STATUS_SUCCESS</em> is
+returned as the service status.</p>
+<h3 id="internal-file-control-operations">5.17.2 Internal File Control
+Operations</h3>
+<p>Internal file control operations can only be executed by components
+that execute in kernel mode and directly build and submit I/O requests
+to the named pipe file system. These functions are only supported by
+local named pipes.</p>
+<h4 id="internal-read">5.17.2.1 Internal Read</h4>
+<p>The internal read file control operation provides the capability to
+perform a read operation directly into a system buffer. No quota is
+charged nor are any buffers allocated by the named pipe file system.</p>
+<p>The control code for this operation is
+<em>FSCTL_PIPE_INTERNAL_READ</em>. The output buffer parameter specifies
+the system buffer into which information is to be read</p>
+<p>\This output structure is probably going to change to have a
+preceding longword containing the number of remaining bytes in the
+queue. -- Note. DaveC said NO to this idea.\</p>
+<h4 id="internal-write">5.17.2.2 Internal Write</h4>
+<p>The internal write file control operation provides the capability to
+perform a write operation directly from a system buffer. No quota is
+charged nor are any buffers allocated by the named pipe file system.</p>
+<p>The control code for this operation is
+<em>FSCTL_PIPE_INTERNAL_WRITE</em>. The input buffer parameter specifies
+the system buffer from which information is to be written.</p>
+<h4 id="internal-transceive">5.17.2.3 Internal Transceive</h4>
+<p>The internal transceive control operation provides the capability to
+perform a transceive operation directly into a system buffer. No quota
+is charged nor are any buffers allocated by the named pipe file
+system.</p>
+<p>The control code for this operation is
+<em>FSCTL_PIPE_INTERNAL_TRANSCIEVE</em>. The input buffer parameter
+specifies the buffer from which information is to be written, while the
+output buffer parameter specifies the system buffer into which
+information is to be read.</p>
+<h2 id="flush-buffers">5.18 Flush Buffers</h2>
+<p>The <strong>NtFlushBuffersFile</strong> function can be used to wait
+until all currently buffered write data is read from the opposite end of
+the specified named pipe.</p>
+<h2 id="set-new-file-size">5.19 Set New File Size</h2>
+<p>This function is not supported by named pipes.</p>
+<h2 id="cancel-io-operation">5.20 Cancel I/O Operation</h2>
+<p>The <strong>NtCancelIoFile</strong> function can be used to cancel
+all I/O operations that were issued by the subject thread for the
+specified named pipe. Both read and write operations initiated by the
+subject thread are canceled.</p>
+<h2 id="device-control-operations">5.21 Device Control Operations</h2>
+<p>No device control operations are supported by the named pipe file
+system.</p>
+<h2 id="close-handle">5.22 Close Handle</h2>
+<p>The <strong>NtClose</strong> function can be used to close a handle
+to the specified named pipe.</p>
+<p>If the specified handle is the last handle that is open to the
+corresponding end of the specified named pipe, then the state of the
+named pipe is set to closing. Read and write operations that are pending
+for the inbound side of the named pipe are completed with an I/O status
+of <em>STATUS_PIPE_CLOSED</em>. Write operations that are pending for
+the outbound side of the named pipe are allowed to complete and cause
+the close operation to remain pending until the opposite end of the
+named pipe is closed, disconnected, or the information is read from the
+pipe.</p>
+<p>If an event is associated with the opposite end of the specified
+named pipe, then the event is set to the Signaled state. Readers and
+writers can use this information to synchronize their access to the
+named pipe.</p>
+<h1 id="os2-api-emulation">6. OS/2 API Emulation</h1>
+<p>The following subsections discuss the emulation of the OS/2 named
+pipe facilities using the capabilities provided by <strong>NT
+OS/2</strong>. Only those OS/2 functions which require special handling
+with respect to named pipes are included.</p>
+<h2 id="doscallnmpipe">6.1 DosCallNmPipe</h2>
+<p>This OS/2 API combines the function of an open, write, read, and a
+close of a named pipe.</p>
+<p>This service can be emulated with the <strong>NtOpen</strong>,
+<strong>NtFsControlFile</strong> (<em>FSCTL_PIPE_TRANSCEIVE</em>), and
+<strong>NtClose</strong> services. There is no <strong>NT OS/2</strong>
+facility that will perform this function in a single operation.</p>
+<h2 id="dosconnectnmpipe">6.2 DosConnectNmPipe</h2>
+<p>This OS/2 API causes an instance of a named pipe that is in the
+disconnected state to transition to the listening state and continues
+the execution of any clients that are waiting for an available instance
+of the specified named pipe. This function can only be executed using a
+handle that is associated with the server end of a named pipe.</p>
+<p>This API can be emulated with the <strong>NtFsControlFile</strong>
+service by specifying a function code of <em>FSCTL_PIPE_LISTEN</em>. The
+OS/2 subsystem or client DLL issues the listen I/O request. If the
+completion mode associated with the specified named pipe handle is queue
+operations and the request cannot be immediately satisfied, then
+<em>STATUS_PENDING</em> is returned. For this case, the OS/2 subsystem
+or client DLL must wait for the I/O operation to complete.</p>
+<h2 id="dosdisconnectnmpipe">6.3 DosDisconnectNmPipe</h2>
+<p>This OS/2 API causes an instance of a named pipe to enter the
+disconnected state. All data in the input and output buffers of the pipe
+are discarded and any outstanding read or write I/O requests are
+completed with an error status. This function can only be executed using
+a handle that is associated with the server end of a named pipe.</p>
+<p>This API can be emulated with the <strong>NtFsControlFile</strong>
+service by specifying a function code of <em>FSCTL_PIPE_DISCONNECT</em>.
+The OS/2 subsystem or client DLL issues the disconnect I/O request.</p>
+<h2 id="dosmakenmpipe">6.4 DosMakeNmPipe</h2>
+<p>This OS/2 API creates an instance of a named pipe and opens a server
+side handle to the newly created instance. If the newly created instance
+is the first instance of the named pipe, then the attributes of the
+named pipe are also defined.</p>
+<p>This API can be emulated with the
+<strong>NtCreateNamedPipeFile</strong> service.</p>
+<p>The OS/2 inheritance bit of the open mode is the same as the
+<strong>NT OS/2</strong> handle attributes field of the object
+attributes parameter.</p>
+<p>The OS/2 write-behind bit of the open mode is the opposite of the
+<strong>NT OS/2</strong> <em>FILE_WRITE_THROUGH</em> flag of the create
+options parameter. Therefore, a particular OS/2-compatible behavior can
+be specified with the <strong>NT OS/2</strong> parameter.</p>
+<p>The OS/2 access bits of the open mode are the same as the <strong>NT
+OS/2</strong> desired access parameter.</p>
+<p>The <strong>NT OS/2</strong> share access flags are used to determine
+the configuration of the named pipe (i.e., full duplex or simplex).</p>
+<p>The OS/2 wait bit of the pipe mode is the same as the <strong>NT
+OS/2</strong> completion mode parameter.</p>
+<p>The OS/2 read bit of the pipe mode is the same as the <strong>NT
+OS/2</strong> read mode parameter.</p>
+<p>The OS/2 pipe type bit of the pipe mode is the same as the <strong>NT
+OS/2</strong> pipe type parameter.</p>
+<p>The OS/2 maximum instances field of the pipe mode is the same as the
+<strong>NT OS/2</strong> maximum instances parameter.</p>
+<p>The OS/2 outbound buffer size is the same as the <strong>NT
+OS/2</strong> outbound quota parameter.</p>
+<p>The OS/2 inbound buffer size is the same as the <strong>NT
+OS/2</strong> inbound quota parameter.</p>
+<p>The OS/2 default timeout is the same as the <strong>NT OS/2</strong>
+default timeout parameter.</p>
+<h2 id="dospeeknmpipe">6.5 DosPeekNmPipe</h2>
+<p>This OS/2 API allows information to be read from a named pipe without
+actually removing the data from the pipe.</p>
+<p>This API can be emulated with <strong>NtFsControlFile</strong>
+service by specifying a function code of <em>FSCTL_PIPE_PEEK</em>. The
+OS/2 subsystem or client DLL issues the peek I/O request. The request is
+completed immediately and the information returned in the output buffer
+and I/O status block can be used to generate the output values required
+by the OS/2 API.</p>
+<h2 id="dosqnmphandstate">6.6 DosQNmPHandState</h2>
+<p>This OS/2 API returns information about the instance of a named pipe
+that is open to the specified handle.</p>
+<p>This API can be emulated with the
+<strong>NtQueryInformationFile</strong> service by specifying the
+<em>FilePipeQueryInformation</em> information class.</p>
+<h2 id="dosqnmpipeinfo">6.7 DosQNmPipeInfo</h2>
+<p>This OS/2 API returns information about the instance of a named pipe
+that is open to the specified handle.</p>
+<p>This API can be emulated with the
+<strong>NtQueryInformationFile</strong> service by specifying the
+<em>FilePipeQueryInformation</em> and <em>FileNameInformation</em>
+information classes.</p>
+<h2 id="dosqnmpipesemstate">6.8 DosQNmPipeSemState</h2>
+<p>This OS/2 API returns information about all named pipes that are
+associated with a specified semaphore handle.</p>
+<p>This API can be emulated with <strong>NtFsControlFile</strong>
+service by specifying a function code of
+<em>FSCTL_PIPE_QUERY_EVENT</em>. The OS/2 subsystem or client DLL issues
+the query event I/O request. The request is completed immediately and
+the information returned in the output buffer and I/O status block can
+be used to generate the output values required by the OS/2 API.</p>
+<h2 id="dosrawreadnmpipe">6.9 DosRawReadNmPipe</h2>
+<p>This OS/2 API provides the capability to read all the available data,
+including message headers, from a named pipe.</p>
+<p>This is an undocumented function in OS/2 and will not be implemented
+as a user-visible function by the OS/2 subsystem.</p>
+<p>There seems to be no real use for this function.</p>
+<h2 id="dosrawwritenmpipe">6.10 DosRawWriteNmPipe</h2>
+<p>This OS/2 API provides the capability to write data, including
+message headers, to a named pipe.</p>
+<p>This is an undocumented function in OS/2 and will not be implemented
+as a user-visible function by the OS/2 subsystem.</p>
+<p>The only known user-level need for this function is to enable the
+writing of a zero length message to a message pipe. This capability will
+be provided in a different manner by the <strong>NT OS/2</strong> name
+pipe file system.</p>
+<h2 id="dossetnmphandstate">6.11 DosSetNmPHandState</h2>
+<p>This OS/2 API sets information about the instance of a named pipe
+that is open to the specified handle.</p>
+<p>This API can be emulated with the
+<strong>NtSetInformationFile</strong> service by specifying the
+<em>FilePipeSetInformation</em> information class.</p>
+<h2 id="dossetnmpipesem">6.12 DosSetNmPipeSem</h2>
+<p>This API associates a semaphore and key value with a named pipe.</p>
+<p>This API can be emulated with <strong>NtFsControlFile</strong>
+service by specifying a function code of
+<em>FSCTL_PIPE_ASSIGN_EVENT</em>.</p>
+<h2 id="dostransactnmpipe">6.13 DosTransactNmPipe</h2>
+<p>This OS/2 API combines the function of a write operation and a read
+operation on a named pipe. The transact operation is performed on the
+named pipe such that no other operation can occur between the write and
+read operations.</p>
+<p>This API can be emulated with the <strong>NtFsControlFile</strong>
+service by specifying a function code of <em>FSCTL_PIPE_TRANSCEIVE</em>
+and then waiting for the I/O request to complete.</p>
+<h2 id="doswaitnmpipe">6.14 DosWaitNmPipe</h2>
+<p>This OS/2 API provides the ability for a client to wait until an
+instance of a named pipe with a specified name attains a state of
+listening.</p>
+<p>This API can be emulated with the <strong>NtFsControlFile</strong>
+service by specifying a function code of <em>FSCTL_PIPE_WAIT</em> and
+then waiting for the I/O request to complete.</p>
+<p>The I/O request will automatically be completed if the default
+timeout interval that was specified when the original instance of the
+named pipe was created is exceeded. If a timeout value is specified by
+the user, then the overriding timeout period should be used in the FSCTL
+pipe wait call.</p>
+<p><strong>Revision History:</strong></p>
+<p>Original Draft, February 16, 1990</p>
+<p>Revision 1.1, March 8, 1990</p>
+<p>1. Incorporate technical and editorial changes from internal
+review.</p>
+<p>Revision 1.2, August 14, 1990</p>
+<p>1. Removed directory hierarchy.</p>
+<p>2. Removed raw mode read and write.</p>
+<p>3. Added optionally timeout parameter to wait for named pipe.</p>
+<p>4. Removed all references to EAs and symbolic links.</p>
+<p>5. Minor editoral changes.</p>
+<p>Revision 1.3, September 27, 1990</p>
+<p>1. Removed owner information query/set operation.</p>
+<p>2. Changed unbuffered read/write to internal read/write.</p>
+<p>3. Added internal transceive operation.</p>
+<p>4. Minor editoral changes.</p>
+<p>Revision 1.4, October 17, 1990</p>
+<p>1. Added impersonation.</p>
+<p>Revision 1.5, January 23, 1991</p>
+<p>1. Clarify that NtCreateNamedPipeFile and directory query are for
+local pipes only.</p>
+<p>2. In query Pipe information state which fields remote pipes returns
+as <strong>MAXULONG</strong>.</p>
+<p>3. Remove FILE_WRITE_THROUGH option in NtCreateNamedPipeFile.</p>
+<p>4. Change wait for named pipe to take a handle to the root directory
+and not the file system itself.</p>
+<p>5. Add remote named pipes.</p>
+<section id="footnotes" class="footnotes footnotes-end-of-document"
+role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p><sup>1</sup>The string "\Device\NamedPipe" refers to the
+named pipe driver, while the string "\Device\NamedPipe\" represents the
+root directory of the named pipe file system.<a href="#fnref1"
+class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>

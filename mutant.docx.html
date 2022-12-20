@@ -1,0 +1,181 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Mutant Specification</p>
+<p><strong>Author:</strong> David N. Cutler</p>
+<p>Original Draft 1.0, October 19, 1989</p>
+<p>Revision 1.1, November 12, 1989</p>
+<p>Revision 1.2, November 28, 1989</p>
+<p>Revision 1.3, January 5, 1990</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>1.1 Create Mutant Object 1</p>
+<p>1.2 Open Mutant Object 2</p>
+<p>1.3 Query Mutant Object 3</p>
+<p>1.4 Release Mutant Object 3</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes the <strong>Windows NT</strong>
+<em>mutant object</em> which is used to emulate OS/2 2.0 Semaphore
+Mutexes. Although <strong>Windows NT</strong> provides other, more
+straightforward, capabilites to synchronize access to critical sections,
+this object has been included to enable more efficient emulation of the
+OS/2 2.0 capabilities.</p>
+<p>Threads acquire ownership of a mutant object using the
+<strong>Windows NT</strong> wait services. Only one thread can own a
+mutant object at a time; however, the owner thread can recursively
+acquire the mutant object after first gaining ownership. If a thread
+terminates without releasing ownership of a mutant object, then the
+mutant object enters the <em>abandoned</em> state. The next thread that
+gains ownership of the mutant object will receive a return status that
+indicates that the mutant object was previously abandoned. Assigning
+ownership of an abandoned mutant object to another thread also clears
+the abandoned state of the mutant object.</p>
+<p>Waiting for a mutant object causes the execution of the subject
+thread to be suspended until the thread can gain ownership of the mutant
+object. Satisfying the wait for a mutant object assigns ownership to the
+subject thread.</p>
+<p>The following APIs are supported for the mutant object:</p>
+<p><strong>NtCreateMutant</strong> - Create mutant object and open
+handle</p>
+<p><strong>NtOpenMutant</strong> - Open handle to existing mutant
+object</p>
+<p><strong>NtQueryMutant</strong> - Get information about mutant
+object</p>
+<p><strong>NtReleaseMutant</strong> - Release ownership of a mutant
+object</p>
+<h2 id="create-mutant-object">1.1 Create Mutant Object</h2>
+<p>A mutant object can be created and a handle opened for access to the
+object with the <strong>NtCreateMutant</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateMutant</strong> (</p>
+<p><strong>OUT PHANDLE</strong> <em>MutantHandle,</em></p>
+<p><strong>IN ULONG</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN BOOLEAN</strong> <em>InitialOwner</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>MutantHandle</em> - A pointer to a variable that receives the
+mutant object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the mutant
+object. The following object type specific access flags can be specified
+in addition to the <em>STANDARD_ACCESS_REQUIRED</em> flags described in
+the Object Management Specification.</p>
+<p>DesiredAccess Flags</p>
+<p><em>MUTANT_QUERY_STATE</em> - Query access to the mutant object is
+desired.</p>
+<p><em>SYNCHRONIZE</em> - Synchronization access (wait or release) to
+the mutant object is desired.</p>
+<p><em>MUTANT_ALL_ACCESS</em> - All possible types of access to the
+mutant object are desired.</p>
+<p><em>ObjectAttributes</em> - An optional pointer to a structure that
+specifies the object attributes; refer to Object Management
+Specification for details.</p>
+<p><em>InitialOwner</em> - A boolean value that determines whether the
+creator of the object desires immediate ownership of the mutant
+object.</p>
+<p>If the <em>OBJ_OPENIF</em> flag is specified and a mutant object with
+the specified name already exists, then a handle to the existing object
+is opened and the <em>InitialOwner</em> parameter is ignored, provided
+the desired access can be granted. Otherwise, a new mutant object is
+created and a handle opened to the object with ownership as determined
+by the <em>InitialOwner</em> parameter. The status of the newly created
+mutant object is set to not abandoned.</p>
+<h2 id="open-mutant-object">1.2 Open Mutant Object</h2>
+<p>A handle can be opened to an existing mutant object with the
+<strong>NtOpenMutant</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtOpenMutant</strong> <em>(</em></p>
+<p><strong>OUT PHANDLE</strong> <em>MutantHandle,</em></p>
+<p><strong>IN ULONG</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em></p>
+<p><em>)</em>;</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>MutantHandle</em> - A pointer to a variable that receives the
+mutant object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the mutant
+object. The following object type specific access flags can be specified
+in addition to the <em>STANDARD_ACCESS_REQUIRED</em> flags described in
+the Object Management Specification.</p>
+<p>DesiredAccess Flags</p>
+<p><em>MUTANT_QUERY_STATE</em> - Query access to the mutant object is
+desired.</p>
+<p><em>SYNCHRONIZE</em> - Synchronization access (wait or release) to
+the mutant object is desired.</p>
+<p><em>MUTANT_ALL_ACCESS</em> - All possible types of access to the
+mutant object are desired.</p>
+<p><em>ObjectAttributes</em> - A pointer to a structure that specifies
+the object attributes; refer to Object Management Specification for
+details.</p>
+<p>If the desired types of access can be granted, then a handle is
+opened to the specified mutant object.</p>
+<h2 id="query-mutant-object">1.3 Query Mutant Object</h2>
+<p>The state of a mutant object can be queried with the
+<strong>NtQueryMutant</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQueryMutant</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>MutantHandle,</em></p>
+<p><strong>IN MUTANTINFOCLASS</strong>
+<em>MutantInformationClass,</em></p>
+<p><strong>OUT PVOID</strong> <em>MutantInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>MutantInformationLength,</em></p>
+<p><strong>OUT PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>MutantHandle</em> - An open handle to a mutant object.</p>
+<p><em>MutantInformationClass</em> - The mutant information class for
+which information is to be returned.</p>
+<p><em>MutantInformation</em> - A pointer to a buffer that receives the
+specified information. The format and content of the buffer depend on
+the specified information class.</p>
+<p>MutantInformation Format by Information Class:</p>
+<p><em>MutantBasicInformation</em> - Data type is
+<em>MUTANTBASICINFO</em>.</p>
+<p>MUTANTBASICINFO Structure</p>
+<p><strong>LONG</strong> <em>CurrentCount</em> - The current ownership
+count of the mutant object.</p>
+<p><strong>BOOLEAN</strong> <em>AbandonedState</em> - The current
+abandoned state of the mutant object.</p>
+<p><em>MutantInformationLength</em> - Specifies the length in bytes of
+the mutant information buffer.</p>
+<p><em>ReturnLength</em> - An optional pointer to a variable that
+receives the number of bytes placed in the mutant information
+buffer.</p>
+<p>This function provides the capability to determine the ownership and
+abandoned state of a mutant object.</p>
+<h2 id="release-mutant-object">1.4 Release Mutant Object</h2>
+<p>Ownership of a mutant object can be released with the
+<strong>NtReleaseMutant</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtReleaseMutant</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>MutantHandle,</em></p>
+<p><strong>OUT PLONG</strong> <em>PreviousCount</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>MutantHandle</em> - An open handle to a mutant object.</p>
+<p><em>PreviousCount</em> - An optional pointer to a variable that
+receives the previous ownership count of the mutant object.</p>
+<p>A mutant object can only be released by a thread that currently owns
+the mutant object. When the mutant is released, the current count of the
+mutant object is incremented by one. If the resultant count is one, then
+the mutant object is no longer owned. Any threads that are waiting for
+the mutant object are examined to see if their wait can be
+satisfied.</p>
+<p><strong><br />
+Revision History:</strong></p>
+<p>Original Draft 1.0, October 18, 1989</p>
+<p>Revision 1.1, November 12, 1989</p>
+<p>1. Added initial ownership parameter to NtCreateMutant.</p>
+<p>Revision 1.2, November 28, 1989</p>
+<p>1. Change access right required for wait access to be only
+<em>SYNCHRONIZE</em> access.</p>
+<p>Revision 1.3, January 5, 1990</p>
+<p>1. Change type name of object attributes parameter and refer to the
+Object Management Specification for the definition of this
+parameter.</p>
+<p>2. Change the description of the desired access flags to include
+standard rights, object specific rights, and generic rights.</p>
+<p>3. Delete the handle flags and object names parameters from the
+<strong>NtOpenMutant</strong> service and replace with a pointer to an
+object attributes structure.</p>

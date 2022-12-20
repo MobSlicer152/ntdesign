@@ -1,0 +1,233 @@
+<p>Portable Systems Group</p>
+<p>Interlocked Support Routines Specification</p>
+<p><strong>Author:</strong> David N. Cutler</p>
+<p>Original Draft 1.0, June 7, 1989</p>
+<p>Revision 1.1, June 8, 1989</p>
+<p>Revision 1.2, July 15, 1989</p>
+<p>Revision 1.3, January 15, 1990</p>
+<p>Revision 1.4, June 9, 1990</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>1.1 Interlocked Add Functions 1</p>
+<p>1.1.1 Interlocked Add Unsigned Large Integer 1</p>
+<p>1.1.2 Interlocked Add Unsigned Long 1</p>
+<p>1.2.3 Interlocked Add Unsigned Short 2</p>
+<p>1.2 Interlocked Doubly Linked List Functions 2</p>
+<p>1.2.1 Interlocked Insert Head Doubly Linked List 3</p>
+<p>1.2.2 Interlocked Insert Tail Doubly Linked List 3</p>
+<p>1.2.3 Interlocked Remove Doubly Linked List 4</p>
+<p>1.3 Interlocked Singly Linked List Functions 4</p>
+<p>1.3.1 Interlocked Insert Head Singly Linked List 4</p>
+<p>1.3.2 Interlocked Remove Singly Linked List 5</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes the interlocked support routines that
+are available for general use within the <strong>Windows NT</strong>
+executive. These routines can be used to provide properly synchronized
+access to nonpaged shared variables in a multiprocessor system.</p>
+<p>These routines execute in kernel mode, raise IRQL to the highest
+level, synchronize with other processors using a spin lock, perform
+their operation, release the spin lock, and lower IRQL to its original
+value.</p>
+<p>These routines cannot operate on paged data and are
+noninterruptable.</p>
+<h2 id="interlocked-add-functions">1.1 Interlocked Add Functions</h2>
+<p>Interlock add functions are provided to add unsigned short, long, and
+large integer values.</p>
+<p>The addition is performed using a lock sequence so that access to the
+<em>Addend</em> variable is synchronized in a multiprocessor system.</p>
+<h3 id="interlocked-add-unsigned-large-integer">1.1.1 Interlocked Add
+Unsigned Large Integer</h3>
+<p>An interlocked add operation can be performed on an integer of type
+<strong>ULARGE_INTEGER</strong> with the
+<strong>ExInterlockedAddUlargeInteger</strong> function:</p>
+<p><strong>ULARGE_INTEGER</strong></p>
+<p><strong>ExInterlockedAddUlargeInteger</strong> (</p>
+<p><strong>IN PULARGE_INTEGER</strong> <em>Addend</em>,</p>
+<p><strong>IN ULARGE_INTEGER</strong> <em>Increment</em>,</p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Addend</em> - A pointer to a variable whose value is to be
+adjusted by the specified <em>Increment</em> value.</p>
+<p><em>Increment</em> - The increment value to be added to the specified
+<em>Addend</em> variable.</p>
+<p><em>Lock</em> - A pointer to a spin lock to be used to synchronize
+access to the <em>Addend</em> variable.</p>
+<p>This function performs an interlocked add of an <em>Increment</em>
+value to an <em>Addend</em> variable, and stores the result in the
+<em>Addend</em> variable. The initial value of the <em>Addend</em>
+variable is returned as the function value.</p>
+<h3 id="interlocked-add-unsigned-long">1.1.2 Interlocked Add Unsigned
+Long</h3>
+<p>An interlocked add operation can be performed on an integer of type
+<strong>ULONG</strong> with the <strong>ExInterlockedAddUlong</strong>
+function:</p>
+<p><strong>ULONG</strong></p>
+<p><strong>ExInterlockedAddUlong</strong> (</p>
+<p><strong>IN PULONG</strong> <em>Addend</em>,</p>
+<p><strong>IN ULONG</strong> <em>Increment</em>,</p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Addend</em> - A pointer to a variable whose value is to be
+adjusted by the specified <em>Increment</em> value.</p>
+<p><em>Increment</em> - The increment value to be added to the specified
+<em>Addend</em> variable.</p>
+<p><em>Lock</em> - A pointer to a spin lock to be used to synchronize
+access to the <em>Addend</em> variable.</p>
+<p>This function performs an interlocked add of an <em>Increment</em>
+value to an <em>Addend</em> variable, and stores the result in the
+<em>Addend</em> variable. The initial value of the <em>Addend</em>
+variable is returned as the function value.</p>
+<h3 id="interlocked-add-unsigned-short">1.2.3 Interlocked Add Unsigned
+Short</h3>
+<p>An interlocked add operation can be performed on an integer of type
+<strong>USHORT</strong> with the <strong>ExInterlockedAddUshort</strong>
+function:</p>
+<p><strong>USHORT</strong></p>
+<p><strong>ExInterlockedAddUshort</strong> (</p>
+<p><strong>IN PUSHORT</strong> <em>Addend</em>,</p>
+<p><strong>IN USHORT</strong> <em>Increment</em>,</p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p>);</p>
+<p><u>Parameters:</u></p>
+<p><em>Addend</em> - A pointer to a variable whose value is to be
+adjusted by the specified <em>Increment</em> value.</p>
+<p><em>Increment</em> - The increment value to be added to the specified
+<em>Addend</em> variable.</p>
+<p><em>Lock</em> - A pointer to a spin lock to be used to synchronize
+access to the <em>Addend</em> variable.</p>
+<p>This function performs an interlocked add of an <em>Increment</em>
+value to an <em>Addend</em> variable, and stores the result in the
+<em>Addend</em> variable. The initial value of the <em>Addend</em>
+variable is returned as the function value.</p>
+<h2 id="interlocked-doubly-linked-list-functions">1.2 Interlocked Doubly
+Linked List Functions</h2>
+<p>Interlocked functions are provided to insert at the head of a doubly
+linked list, to insert at the tail of a doubly linked list, and to
+remove from the head of a doubly linked list. The list head for an
+interlocked doubly linked list can be initialized with the standard
+<strong>InitializeListHead</strong> function.</p>
+<h3 id="interlocked-insert-head-doubly-linked-list">1.2.1 Interlocked
+Insert Head Doubly Linked List </h3>
+<p>An entry can be inserted at the head of an interlocked doubly linked
+list with the <strong>ExInterlockedInsertHeadList</strong> function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>ExInterlockedInsertHeadList</strong> <strong>(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong> <em>ListHead</em>,</p>
+<p><strong>IN PLIST_ENTRY</strong> <em>ListEntry</em>,</p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>);</strong></p>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> - A pointer to the head of the doubly linked list
+into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> - A pointer to the list entry to be inserted at
+the head of the list.</p>
+<p><em>Lock</em> - A pointer to a spin lock to be used to synchronize
+access to the interlocked list.</p>
+<p>This function inserts an entry at the head of a doubly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+<h3 id="interlocked-insert-tail-doubly-linked-list">1.2.2 Interlocked
+Insert Tail Doubly Linked List</h3>
+<p>An entry can be inserted at the tail of an interlocked doubly linked
+list with the <strong>ExInterlockedInsertTailList</strong> function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>ExInterlockedInsertTailList</strong> <strong>(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong> <em>ListHead</em>,</p>
+<p><strong>IN PLIST_ENTRY</strong> <em>ListEntry</em>,</p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>);</strong></p>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> - A pointer to the head of the doubly linked list
+into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> - A pointer to the list entry to be inserted at
+the tail of the list.</p>
+<p><em>Lock</em> - A pointer to a spin lock to be used to synchronize
+access to the interlocked list.</p>
+<p>This function inserts an entry at the tail of a doubly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+<h3 id="interlocked-remove-doubly-linked-list">1.2.3 Interlocked Remove
+Doubly Linked List </h3>
+<p>An entry can be removed from the head of an interlocked doubly linked
+list with the <strong>ExInterlockedRemoveHeadList</strong> function:</p>
+<p><strong>PLIST_ENTRY</strong></p>
+<p><strong>ExInterlockedRemoveHeadList</strong> <strong>(</strong></p>
+<p><strong>IN PLIST_ENTRY</strong> <em>ListHead</em>,</p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>);</strong></p>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> - A pointer to the head of the doubly linked list
+from which an entry is to be removed.</p>
+<p><em>Lock</em> - A pointer to a spin lock to be used to synchronize
+access to the interlocked list.</p>
+<p>This function removes an entry from the head of a doubly linked list
+so that access to the list is synchronized in a multiprocessor system.
+If there are no entries in the list, then a value of NULL is returned.
+Otherwise, the address of the entry that is removed from the list is
+returned as the function value.</p>
+<h2 id="interlocked-singly-linked-list-functions">1.3 Interlocked Singly
+Linked List Functions</h2>
+<p>Interlocked functions are provided to insert and remove from the head
+of a singly linked list. The list head for an interlocked singly linked
+list can be initialized by simply placing a value of NULL in the link
+pointer.</p>
+<h3 id="interlocked-insert-head-singly-linked-list">1.3.1 Interlocked
+Insert Head Singly Linked List </h3>
+<p>An entry can be inserted at the head of an interlocked singly linked
+list with the <strong>ExInterlockedPushEntryList</strong> function:</p>
+<p><strong>VOID</strong></p>
+<p><strong>ExInterlockedPushEntryList</strong> <strong>(</strong></p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong> <em>ListHead</em>,</p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong> <em>ListEntry</em>,</p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>);</strong></p>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> - A pointer to the head of the singly linked list
+into which an entry is to be inserted.</p>
+<p><em>ListEntry</em> - A pointer to the list entry to be inserted at
+the head of the list.</p>
+<p><em>Lock</em> - A pointer to a spin lock to be used to synchronize
+access to the interlocked list.</p>
+<p>This function inserts an entry at the head of a singly linked list so
+that access to the list is synchronized in a multiprocessor system.</p>
+<h3 id="interlocked-remove-singly-linked-list">1.3.2 Interlocked Remove
+Singly Linked List </h3>
+<p>An entry can be removed from the head of an interlocked singly linked
+list with the <strong>ExInterlockedPopEntryList</strong> function:</p>
+<p><strong>PSINGLE_LIST_ENTRY</strong></p>
+<p><strong>ExInterlockedPopEntryList</strong> <strong>(</strong></p>
+<p><strong>IN PSINGLE_LIST_ENTRY</strong> <em>ListHead</em>,</p>
+<p><strong>IN PKSPIN_LOCK</strong> <em>Lock</em></p>
+<p><strong>);</strong></p>
+<p><u>Parameters:</u></p>
+<p><em>ListHead</em> - A pointer to the head of the singly linked list
+from which an entry is to be removed.</p>
+<p><em>Lock</em> - A pointer to a spin lock to be used to synchronize
+access to the interlocked list.</p>
+<p>This function removes an entry from the head of a singly linked list
+so that access to the list is synchronized in a multiprocessor system.
+If there are no entries in the list, then a value of NULL is returned.
+Otherwise, the address of the entry that is removed from the list is
+returned as the function value.</p>
+<p><strong>Revision History:</strong></p>
+<p>Original Draft 1.0, June 7, 1989</p>
+<p>Revision 1.1, June 8,1989</p>
+<p>1. Added comments about nonpageability of data to the
+introduction.</p>
+<p>2. Clarified functions as operating on singly or doubly linked
+lists.</p>
+<p>3. Added section on the manipulation of singly linked interlocked
+lists.</p>
+<p>Revision 1.2, July 15, 1989</p>
+<p>1. Add interlocked add short routine.</p>
+<p>Revision 1.3, January 15, 1990</p>
+<p>2. Remove restriction that page faults cannot be taken during
+interlocked sequences.</p>
+<p>Revision 1.4, June 9, 1990</p>
+<p>1. Change the operation of the interlocked add long and short
+functions to be unsigned and change the names as appropriate.</p>
+<p>2. Add a function to perform an interlocked add unsigned large
+integer operation.</p>
+<p>3. Add text to warn users of these routines that page faults can not
+be tolerated.</p>

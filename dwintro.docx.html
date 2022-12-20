@@ -1,0 +1,294 @@
+<p>Portable Systems Group</p>
+<p>NT OS/2 Design Workbook Introduction</p>
+<p><strong>Author:</strong> Lou Perazzoli</p>
+<p>Original Draft 1.0, March 31, 1989</p>
+<p>Revision 2.0, May 5, 1989</p>
+<p>Revision 3.0, August 17, 1989</p>
+<p>Revision 4.0, October 15, 1989</p>
+<p>Revision 5.0, January 15, 1990</p>
+<p>Revision 6.0, July 25, 1990</p>
+<p>Keep this hidden text for spacing.</p>
+<p><em><strong>Hardcopy released to The Smithsonian
+Institute.</strong></em></p>
+<p><em><strong>Digital copy released to Universities for non-commercial
+academic use under the Windows Research Kernel License.Keep this hidden
+text for spacing.</strong></em></p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Project Goals 1</p>
+<p>3. NT OS/2 Components 2</p>
+<p>4. Functional Specifications 3</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>The <strong>NT OS/2</strong> system is a portable implementation of
+OS/2 developed in a high-level language. The initial release of
+<strong>NT OS/2</strong> is targeted for Intel 860-based hardware, which
+includes both personal computers (<em>Frazzle</em>) and servers
+(<em>Dazzle</em>).</p>
+<p>The first systems based on a RISC microprocessor will be available
+for testing in the fall of 1990.</p>
+<h1 id="project-goals">2. Project Goals</h1>
+<p>The ultimate goal of the <strong>NT OS/2</strong> project is to
+develop a portable implementation of OS/2 executing on the Intel 860 and
+to establish this combination of hardware and software as the standard
+for high-performance personal computers and server systems.</p>
+<p><strong>NT OS/2</strong> has the following overall project goals
+(though not all these goals will be attained by the first implementation
+of <strong>NT OS/2</strong>):</p>
+<p>o Portability to a variety of hardware architectures. Though the
+first implementation is targeted to the Intel 860, the overall system
+design isolates the machine-dependent portions for portability to other
+architectures.</p>
+<p>o Support for multiple processors with shared memory via symmetric
+multiprocessing. This provides performance improvements for
+multiprocessor workstations and servers.</p>
+<p>o Compatibility with the OS/2 V2.0 32-bit application programming
+interface (API). Because the initial target system is not an Intel x86
+architecture, all applications will have to be recompiled and relinked.
+In addition, any assembly language code will have to be rewritten or
+converted to a higher level language such as C.</p>
+<p>o Security at the C2 level with future versions achieving higher
+levels of security. This includes login/logout options on the personal
+computer and the server system, and declaration and enforcement of
+protection attributes for shareable resources (files, IPC, memory
+objects, etc.).</p>
+<p>o Support for a POSIX-compliant API interface that passes the POSIX
+validation suites.</p>
+<p>o Support for internationalization.</p>
+<p>o Support for LANMAN networking and management of personal computers
+and servers.</p>
+<p>o Support for the current Presentation Manager API running in both
+the OS/2 environment and the POSIX environment.</p>
+<p>o Support for distributed applications. The network is integrated
+into the system to allow transparent distribution of applications and
+services within a network.</p>
+<p>o Support for object-oriented file systems and object-oriented
+presentation manager.</p>
+<p>o Easy extensibility by layering new features on the existing system
+without modifying the underlying system.</p>
+<p>o Simultaneous execution by multiple users, each with a unique
+security profile.</p>
+<p>o Interoperability and data interchange between OS/2 and POSIX
+applications.</p>
+<p>o High reliability that prevents errant user programs from causing a
+system crash or exhausting system-wide resources. Resource quotas, a
+protected kernel, and protected objects are used to improve
+reliability.</p>
+<h1 id="nt-os2-components">3. NT OS/2 Components</h1>
+<p><strong>NT OS/2</strong> consists of a highly integrated kernel /
+executive that executes in kernel mode. It provides the necessary
+services to allow the emulation of OS/2 and POSIX APIs via protected
+subsystems executing in user mode. Both the OS/2 and POSIX subsystems
+provide these services through remote procedure calls from a client to
+the server subsystem. The server subsystem, in turn, emulates the
+desired operation locally or by calling the executive, and returns the
+results to the caller. The following diagram illustrates the structure
+of <strong>NT OS/2</strong>.</p>
+<p>Ö‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ì Ö‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ì</p>
+<p>° OS/2 ° ° POSIX °</p>
+<p>° Processes ° ° Processes °</p>
+<p>Û‑‑‑‑‑‑‑‑‑‑‑‑‑‑ì Û‑‑‑‑‑‑‑‑‑‑‑‑‑‑ì</p>
+<p>° ° ° °</p>
+<p>V ° ° V</p>
+<p>Ö‑‑‑‑‑‑‑‑‑Ì ° ° Ö‑‑‑‑‑‑‑‑‑Ì</p>
+<p>°OS/2 ° ° ° °POSIX °</p>
+<p>°Subsystem° ° ° °Subsystem°</p>
+<p>Û‑‑‑‑‑‑‑‑‑ì ° ° Û‑‑‑‑‑‑‑‑‑ì</p>
+<p>° ° ° ° ° °</p>
+<p>° V V V V °</p>
+<p>Ö‑‑‑‑‑‑‑‑‑Ì ° Ö‑‑‑‑‑‑‑‑‑‑‑‑‑Ì ° Ö‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ì</p>
+<p>° Session ° ° °Presentation ° ° ° Security °</p>
+<p>° Manager °‑&gt; ° °Manager ° ° &lt;‑ ° Authenticator °</p>
+<p>Û‑‑‑‑‑‑‑‑‑ì ° Û‑‑‑‑‑‑‑‑‑‑‑‑‑ì ° Û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑ì</p>
+<p>° ° ° ° °</p>
+<p>V V V V V</p>
+<p>User Mode</p>
+<p>====================================================================</p>
+<p>Kernel Mode</p>
+<p><strong>NT OS/2 Executive</strong></p>
+<p>Ö‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ì</p>
+<p>° NT OS/2 APIs °</p>
+<p>û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ú‑‑‑‑‑‑‑‑‑‑‑‑Ú‑‑‑‑‑‑‑‑‑‑‑‑Ú‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ú‑‑‑‑‑‑‑‑‑‑À</p>
+<p>° I/O ° Object ° Memory °Interprocess ° Process °</p>
+<p>° System ° Management ° Management °Communication ° Structure°</p>
+<p>û‑‑‑‑‑‑‑‑‑Ì ° ° ° ° °</p>
+<p>° File ° ° ° ° ° °</p>
+<p>° System ° û‑‑‑‑‑‑‑‑‑‑‑‑Ù‑‑‑‑‑‑‑‑‑‑‑‑Ù‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ù‑‑‑‑‑‑‑‑‑‑À</p>
+<p>° Devices ° ° Executive Support Routines °</p>
+<p>û‑‑‑‑‑‑‑‑‑Ù‑‑‑‑‑Ù‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ú‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑À</p>
+<p>° Device Drivers ° °</p>
+<p>° Ö‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑ì °</p>
+<p>° ° Kernel °</p>
+<p>Û‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ù‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑‑ì</p>
+<p><strong>Block Diagram of NT OS/2</strong>:</p>
+<h1 id="functional-specifications">4. Functional Specifications</h1>
+<p>The following specifications are contained within this design
+workbook. Each specification contains an abstract of the component it
+describes, how that component fits into the system, the various APIs
+that are used to access the functionality, and enough detail to ensure
+the defined capability can be implemented.</p>
+<p>The goal of the specifications is to allow someone to understand the
+functionality provided by a particular piece of the system. It is NOT a
+goal to describe the actual implementation.</p>
+<p>Each specification addresses Cruiser and POSIX compatibility, if
+appropriate. The following is a list of design specifications included
+in this version of the workbook:</p>
+<p>1. Kernel - Describes the function of the kernel, the objects
+implemented, and the various interfaces provided to manipulate these
+objects. This specification contains implementation details, where
+necessary, to reveal how multiprocessing and processor dispatching take
+place. This specification also describes synchronization,
+scheduling/dispatching, and Asynchronous Procedure Calls (APCs).</p>
+<p>2. Object Management - Describes how the executive deals with
+objects, what they are for, how they are protected, how they are named,
+how they are allocated, how they are accounted for, and how they are
+deleted. This specification also addresses object directories and how to
+access them using the file system directory operations.</p>
+<p>3. Process Structure - Describes the process and thread objects and
+the operations that can be performed on them. This specification also
+explains signals and how OS/2 compatibility and POSIX compliance are
+addressed.</p>
+<p>4. Virtual Memory - Describes the virtual memory objects and the
+operations that can be performed on these objects.</p>
+<p>5. I/O Management - Describes the APIs and objects available for I/O
+operations.</p>
+<p>6. Security - Describes how security is provided in the system, the
+ACL format, ACL access checking rules, login/logout, the authorization
+file, and the partial closure of covert channels. This specification
+also describes audit and alarm logging.</p>
+<p>7. Local Process Communication - Describes the client/server
+protected subsystem model, client impersonation, port objects, and
+connection/disconnection operations.</p>
+<p>8. Remote Procedure Call - Describes a transport-independent
+interface to remote procedure calls.</p>
+<p>9. Session Manager - Describes how the subsystems for OS/2 and POSIX
+are created, and how they interact with each other.</p>
+<p>10. File System - Describes the file systems, how they are put
+together, the functions they perform, and how they accomplish the tasks
+that they are given.</p>
+<p>11. Semaphores and Events - Describes the APIs and objects available
+for synchronization.</p>
+<p>12. Argument Validation - Describes the argument probing and capture
+requirements for system services.</p>
+<p>13. Timers - Describes the timer object, which is used to mark time,
+and the functions available to manipulate it.</p>
+<p>14. Coding Guidelines - Describes the naming and structure of
+<strong>NT OS/2</strong> code.</p>
+<p>15. LAN Manager Software - Describes the network capabilities of the
+system, how network drivers fit together, and how the protocol stacks
+are managed.</p>
+<p>16. Exceptions - Describes the dispatching of hardware exceptions to
+the condition dispatcher and the arguments that accompany each
+exception. It also explains guard page handling, automatic stack
+expansion, and access violations on the user stack, as well as how
+signals are handled at the user level.</p>
+<p>17. OS/2 Emulation Subsystem - Describes the requirements and methods
+used to design and build the OS/2 emulation subsystem.</p>
+<p>18. Status values - Describes the format for status values return by
+<strong>NT OS/2</strong> APIs.</p>
+<p>19. Subsystem Design Rational - Describes the rationale for designing
+OS/2 and POSIX emulation as subsystems as opposed to supporting the APIs
+directly in the executive.</p>
+<p>20. Shared Resource Specification - Describes the routines that
+implement multiple-readers, single-writer access to a share
+resource.</p>
+<p>21. Executive Support Routines - Describes executive support routines
+which are available in kernel mode and not documented in other
+chapters.</p>
+<p>22. Driver Model - Describes the device driver model, how I/O is
+managed throughout the system, how the file system and network
+capabilities fit into the system, and the objects and operations that
+are available to help manage the I/O system. It also presents I/O
+validation, queueing, page lockdown, double mapping, I/O completion, and
+error logging.</p>
+<p>23. POSIX Emulation Subsystem - Describes the requirements and
+methods used to design and build the POSIX emulation subsystem.</p>
+<p>24. Time Conversion Specification - Describes the APIs available for
+viewing time and converting to and from different formats.</p>
+<p>25. Mutant Specification - Describes the mutant object and services
+which operate upon the object.</p>
+<p>26. Transport Driver Interface - Describes the interface for the
+network transport layer.</p>
+<p>27. Network Driver Interface Specification - Describes the interface
+for the network physical layer.</p>
+<p>28. Lan Manager Server - Describes the design of the Lan Manager
+server and the operations supported.</p>
+<p>29. C Structured Exception Handling - Describes the extensions to C
+in the MS 860 compiler to support structured exception handling.</p>
+<p>30. NT C User's Guide - Describes the command syntax and language
+issues for the MS 860 C compiler.</p>
+<p>31. Prefix Table - Describes the prefix table package.</p>
+<p>32. System Startup Design Note - Describes system startup after phase
+one initialization.</p>
+<p>33. Debug Architecture - Describes the debug architecture for NT
+OS/2.</p>
+<p>34. Linker/Librarian - Describes the NT OS/2 linker, librarian, and
+image format.</p>
+<p>35. Caching Design Note - Describes the system-wide file caching
+implementation.</p>
+<p>36. Utility Design Specification - Describes the basic support
+routines for NT OS/2 utilities.</p>
+<p>37. OS/2 Environment Subsection Security - Describes the security
+features of the OS/2 environment subsystem.</p>
+<p>38. Security Account Manager Protected Server - Describes the
+security account manager which maintains user and group account
+information.</p>
+<p><strong>Revision History:</strong></p>
+<p>Original Draft 1.0, March 31, 1989</p>
+<p>Revision 2.0, May 5, 1989</p>
+<p>1. The following specifications were added to the design
+workbook:</p>
+<p>o Local Process Communication</p>
+<p>o File Systems</p>
+<p>o Session Manager</p>
+<p>o Semaphores and Events</p>
+<p>o Argument Validation</p>
+<p>o Timers</p>
+<p>o Coding Guidelines</p>
+<p>2. The in-progress specification list was changed to add the OS
+Emulation Environment specification.</p>
+<p>3. The block diagram was modified.</p>
+<p>Revision 3.0, August 17, 1989</p>
+<p>1. The following specifications were added to the design
+workbook:</p>
+<p>o Subsystem Design Rationale</p>
+<p>o Status Codes</p>
+<p>o Shared Resources</p>
+<p>o Executive Support Routines</p>
+<p>o User-mode Interlocked and Fast Lock Routines</p>
+<p>o OS/2 Subsystem Emulation</p>
+<p>Revision 4.0, October 15, 1989</p>
+<p>1. The following specifications were added to the design
+workbook:</p>
+<p>o POSIX Subsystem Emulation</p>
+<p>o Time Conversion Specification</p>
+<p>2. The User-mode Interlocked and Fast Lock Routines Specification was
+dropped because the APIs were non-portable.</p>
+<p>3. The specification list was revised to match the actual
+specifications in the workbook.</p>
+<p>4. The File System Specification was replaced by the File System
+Design Note.</p>
+<p>5. The I/O System Specification was broken into two separate
+specifications:</p>
+<p>o I/O System Specification - Documents I/O system API</p>
+<p>o Driver Model Specification - Documents drivers and I/O system
+internals</p>
+<p>Revision 5.0, January 15, 1990.</p>
+<p>1. The following specifications were added to the design
+workbook:</p>
+<p>o Mutant Specification</p>
+<p>o Transport Driver Interface</p>
+<p>o Physical Driver Interface</p>
+<p>o Lan Manager Server</p>
+<p>o C Structured Exception Handling</p>
+<p>o NT C User's Guide</p>
+<p>Revision 6.0, July 25, 1990.</p>
+<p>1. The following specifications were added to the design
+workbook:</p>
+<p>o System Startup Design Note</p>
+<p>o Debug Architecture</p>
+<p>o OS/2 Linker/Librarian/Image Format Specification</p>
+<p>o Caching Design Note</p>
+<p>o Utility Design Specification</p>
+<p>o OS/2 Environment Subsystem Security</p>
+<p>o Security Account Manager Protected Server</p>

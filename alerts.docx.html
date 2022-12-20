@@ -1,0 +1,306 @@
+<p><strong>Portable Systems Group</strong></p>
+<p><strong>Windows NT Alerts Design Note</strong></p>
+<p><strong>Author</strong>: <em>David N. Cutler</em></p>
+<p><em>Original Draft 1.0, February 9, 1989</em></p>
+<p><em>Revision 1.2, March 30, 1989</em></p>
+<p>This design note discusses a proposal to implement alerts in both
+kernel and user mode. The alert capability can be used to interrupt
+thread execution in either processor mode at well defined points. A
+companion design note on <strong>APC</strong>'s contains information and
+algorithms that are pertinent to this design.</p>
+<p>There are three alert specific kernel services;
+<em>TestAlertThread</em>, <em>AlertThread</em>, and
+<em>AlertResumeThread</em>. In addition, the kernel <em>Wait</em>
+functions take a mode and an alertable flag as arguments.</p>
+<p>Each thread has an alerted flag for each of the processor modes user
+and kernel. These flags are set by calling the AlertThread function and
+specifying the thread and the mode which are to be alerted.</p>
+<p>If AlertThread is called and the target thread is in a wait state,
+then several additional tests are performed to determine the correct
+action to take.</p>
+<p>If the mode of the wait is user, the alertable flag is set, and the
+alert mode is user, then a thread specific <strong>APC</strong> is
+queued to user mode which will raise the condition "alerted", the user
+<strong>APC</strong> pending flag is set, and the thread is unwaited
+with a completion status of "alerted".</p>
+<p>If the mode of the wait is kernel or user, the alertable flag is set,
+and the alert mode is kernel, then the thread is unwaited with a status
+of "alerted". There is no <strong>APC</strong> queued for kernel
+mode.</p>
+<p>The following pseudo code describes the logic of AlertThread:</p>
+<p><strong>PROCEDURE</strong> AlertThread (</p>
+<p><strong>IN</strong> Mode : KtProcessorMode;</p>
+<p><strong>IN</strong> Tcb : <strong>POINTER</strong> KtThread;</p>
+<p>);</p>
+<p><strong>BEGIN</strong></p>
+<p>Acquire dispatcher database lock;</p>
+<p><strong>IF</strong> Tcb.State == Waiting <strong>THEN</strong></p>
+<p><strong>IF</strong> Tcb.WaitMode &gt;= Mode <strong>AND</strong>
+Tcb.Alertable <strong>THEN</strong></p>
+<p><strong>IF</strong> Mode == User <strong>THEN</strong></p>
+<p>Queue Tcb.AlertAcb;</p>
+<p>Tcb.UserApcPending = True;</p>
+<p><strong>END IF</strong>;</p>
+<p>Unwait thread with a status of Alerted;</p>
+<p><strong>ELSE</strong></p>
+<p>Tcb.Alerted[Mode] = True;</p>
+<p><strong>END IF;</strong></p>
+<p><strong>ELSE</strong></p>
+<p>Tcb.Alerted[Mode] = True;</p>
+<p><strong>END IF</strong>;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>END</strong> AlertThread;</p>
+<p>When the user mode alerted flag gets set, it remains set until either
+a TestAlert or a Wait alertable is performed which clears the flag.</p>
+<p>The kernel mode alerted flag is treated somewhat differently in that
+it is cleared on each system service entry to the system. The reasoning
+behind this is that a kernel mode alert should only persist for the
+duration of time that execution continues in kernel mode. As soon as
+execution leaves kernel mode, the alerted flag is no longer significant.
+This is a very important feature which allows the conditional aborting
+of native system services by protected subsystems which provide system
+services for other operating system <strong>API's</strong>. This subject
+is discussed in more detail at the end of this document.</p>
+<p>The kernel service <em>AlertResumeThread</em> allows a thread to be
+alerted and then resumed in a single operation. This operation is really
+a kernel mode AlertThread followed by a ResumeThread, but is provided as
+a kernel service so that is can be executed without any race
+conditions.</p>
+<p>The following pseudo code describes the logic of
+AlertResumeThread:</p>
+<p><strong>PROCEDURE</strong> AlertResumeThread (</p>
+<p><strong>IN</strong> Tcb : <strong>POINTER</strong> KtThread;</p>
+<p>) <strong>RETURNS</strong> integer;</p>
+<p><strong>VARIABLE</strong></p>
+<p>OldCount : integer;</p>
+<p><strong>BEGIN</strong></p>
+<p>Acquire dispatcher database lock;</p>
+<p><strong>IF</strong> Tcb.State == Waiting <strong>THEN</strong></p>
+<p><strong>IF</strong> Tcb.Alertable <strong>THEN</strong></p>
+<p>Unwait thread with a status of Alerted;</p>
+<p><strong>ELSE</strong></p>
+<p>Tcb.Alerted[Kernel] = True;</p>
+<p><strong>END</strong> <strong>IF</strong>;</p>
+<p><strong>ELSE</strong></p>
+<p>Tcb.Alerted[kernel] = True;</p>
+<p><strong>END</strong> <strong>IF</strong>;</p>
+<p>OldCount = Tcb.SuspendCount;</p>
+<p><strong>IF</strong> Tcb.SuspendCount &lt;&gt; 0
+<strong>THEN</strong></p>
+<p>Tcb.SuspendCount = Tcb.SuspendCount - 1;</p>
+<p><strong>IF</strong> Tcb.SuspendCount == 0 <strong>THEN</strong></p>
+<p>Release Tcb.SuspendSemaphore;</p>
+<p><strong>END IF;</strong></p>
+<p><strong>END IF;</strong></p>
+<p>Release dispatcher database lock;</p>
+<p><strong>RETURN</strong> OldCount;</p>
+<p><strong>END</strong> AlertResumeThread;</p>
+<p>TestAlertThread tests the alerted flag for a specified processor mode
+and returns a status value of "alerted" if the flag was set and "normal"
+if the flag was clear. If the alerted flag was set, then it is cleared,
+and if the specified mode is user, then an alert <strong>APC</strong> is
+queued to user mode and user <strong>APC</strong> pending is set in the
+calling thread's <strong>TCB</strong>.</p>
+<p>In addition, TestAlertThread also tests whether a user
+<strong>APC</strong> should be delivered. If the specified mode is user
+and the user <strong>APC</strong> queue contains an entry, then
+<strong>APC</strong> pending is set in the calling thread's
+<strong>TCB</strong>.</p>
+<p>The following pseudo code describes the logic of TestAlert:</p>
+<p><strong>PROCEDURE</strong> TestAlertThread (</p>
+<p><strong>IN</strong> Mode : KtProcessorMode;</p>
+<p>) <strong>RETURNS</strong> KtStatus;</p>
+<p><strong>BEGIN</strong></p>
+<p>Acquire dispatcher database lock;</p>
+<p>Get current TCB address;</p>
+<p><strong>IF</strong> Tcb.Alerted[Mode] <strong>THEN</strong></p>
+<p>Tcb.Alerted[Mode] = False;</p>
+<p><strong>IF</strong> Mode == User <strong>THEN</strong></p>
+<p>Queue Tcb.AlertAcb;</p>
+<p>Tcb.UserApcPending = True;</p>
+<p><strong>END IF</strong>;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>RETURN</strong> Alerted;</p>
+<p><strong>ELSE</strong></p>
+<p><strong>IF</strong> Mode == User <strong>AND</strong>
+Tcb.ApcQueue[User] &lt;&gt; NIL <strong>THEN</strong></p>
+<p>Tcb.UserApcPending = True;</p>
+<p><strong>END IF;</strong></p>
+<p>Release dispatcher database lock;</p>
+<p><strong>RETURN</strong> Normal;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>END</strong> TestAlertThread;</p>
+<p>Wait tests the alerted flags for the specified and all more
+privileged processor modes if the alertable argument value is true. If
+an alerted flag is set, then a status value of "alerted" is
+returned.</p>
+<p>In addition, Wait also tests whether a user <strong>APC</strong>
+should be delivered if the alertable argument value is true and the
+specified mode is user. For this case, if the user <strong>APC</strong>
+queue contains an entry, then <strong>APC</strong> pending is set in the
+calling thread's <strong>TCB</strong> and a status value of "UserApc" is
+returned.</p>
+<p>The following pseudo code describes the logic of Wait:</p>
+<p><strong>PROCEDURE</strong> Wait (</p>
+<p><strong>IN</strong> Mode : KtProcessorMode;</p>
+<p><strong>IN</strong> Alertable : boolean;</p>
+<p><strong>IN</strong> WaitObject : POINTER KtDispatcherObject;</p>
+<p><strong>IN</strong> Timeout : POINTER integer;</p>
+<p>) <strong>RETURNS</strong> KTStatus;</p>
+<p><strong>BEGIN</strong></p>
+<p>Repeat:</p>
+<p>Acquire dispatcher database lock;</p>
+<p>Get current TCB address;</p>
+<p><strong>IF</strong> Alertable <strong>THEN</strong></p>
+<p><strong>IF</strong> Tcb.Alerted[Mode] <strong>THEN</strong></p>
+<p>Tcb.Alerted[Mode] = False;</p>
+<p><strong>IF</strong> Mode == User <strong>THEN</strong></p>
+<p>Queue Tcb.AlertAcb;</p>
+<p>Tcb.UserApcPending = True;</p>
+<p><strong>END IF</strong>;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>RETURN</strong> Alerted;</p>
+<p><strong>ELSEIF</strong> Mode == User <strong>THEN</strong></p>
+<p><strong>IF</strong> Tcb.UserApcQueue &lt;&gt; NIL
+<strong>THEN</strong></p>
+<p>Tcb.UserApcPending = True;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>RETURN</strong> UserApc;</p>
+<p><strong>ELSEIF</strong> Tcb.Alerted[Kernel] <strong>THEN</strong></p>
+<p>Tcb.Alerted[Kernel] = False;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>RETURN</strong> Alerted;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>IF</strong> WaitObject.Signal <strong>THEN</strong></p>
+<p>Satisfy wait for WaitObject;</p>
+<p>Release dispatcher database lock;</p>
+<p>RETURN Tcb.WaitStatus;</p>
+<p><strong>ELSE</strong></p>
+<p>Tcb.Alertable = Alertable;</p>
+<p>Construct wait control block for WaitObject;</p>
+<p>Initialize Tcb.Timer with time out value;</p>
+<p>Insert wait control block in wait queue;</p>
+<p>Insert Tcb.Timer in timer queue;</p>
+<p>Select new thread to run;</p>
+<p>Swap context to new thread;</p>
+<p><strong>IF</strong> Tcb.WaitStatus == KernelApc
+<strong>THEN</strong></p>
+<p>Goto Repeat;</p>
+<p><strong>ELSE</strong></p>
+<p><strong>RETURN</strong> Tcb.WaitStatus;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>END IF;</strong></p>
+<p><strong>END</strong> Wait;</p>
+<p>It is the responsibility of the executive to test for the "alerted"
+return status from TestAlert and Wait and perform the correct operation
+(e.g. cleaning up data structure, unwinding, etc).</p>
+<p>Wait and AlertThread both allow a thread that is waiting user mode
+alertable to be awakened by a kernel mode alert. If this were not done,
+then it would not be possible to abort the Wait system service.</p>
+<p>The interesting combinations of initial conditions and the resultant
+action when a Wait system service is executed are given below.</p>
+<p>Case 1</p>
+<p>Wait Mode = Kernel</p>
+<p>Tcb.Alerted[User] = True</p>
+<p>Tcb.Alerted[Kernel] = False</p>
+<p>Alertable = True</p>
+<p>Action - Put thread in wait state</p>
+<p>Case 2</p>
+<p>Wait Mode = Kernel</p>
+<p>Tcb.Alerted[User] = x</p>
+<p>Tcb.Alerted[Kernel] = True</p>
+<p>Alertable = True</p>
+<p>Action - Clear Tcb.Alerted[Kernel] and return Alerted</p>
+<p>Case</p>
+<p>Wait Mode = User</p>
+<p>Tcb.Alerted[User] = True</p>
+<p>Tcb.Alerted[Kernel] = x</p>
+<p>Alertable = True</p>
+<p>Action - Clear Tcb.Alerted[User], queue Tcb.AlertAcb,</p>
+<p>and set Tcb.UserApcPending</p>
+<p>Case 4</p>
+<p>Wait Mode = User</p>
+<p>Tcb.Alerted[User] = False</p>
+<p>Tcb.Alerted[Kernel] = True</p>
+<p>Alertable = True</p>
+<p>Action - Clear Tcb.Alerted[Kernel] and return Alerted</p>
+<p>Case 5</p>
+<p>Wait Mode = User</p>
+<p>Tcb.Alerted[User] = False</p>
+<p>Tcb.Alerted[Kernel] = False</p>
+<p>Alertable = True</p>
+<p>Action - Put thread in wait state</p>
+<p>Kernel mode alerts can be used to implement the semantics necessary
+to abort native system services. The following discussion describes how
+this can be implemented in <strong>Windows NT</strong>.</p>
+<p>In <strong>Mach</strong> the operations necessary to abort a native
+system service are suspend, abort service, and resume. This capability
+is used to get a thread out of a possible wait state in the system and
+deliver a signal, terminate execution, etc.</p>
+<p>A similar set of primitives can be provided in <strong>Windows
+NT</strong> using the kernel alert capability.</p>
+<p><strong>Windows NT</strong> suspends a thread by sending it a normal
+kernel <strong>APC</strong> that causes the thread to wait on an
+semaphore that is built into the thread object. The resume operation
+simply releases the builtin semaphore which continues thread
+execution.</p>
+<p>The suspend wait operation is nonalertable to ensure that the alert
+and resume operation functions properly; see below.</p>
+<p>If a thread is in a wait state when it is suspended, then the wait
+completion status is set to "kernel <strong>APC</strong>". This is done
+so the wait can be repeated when the <strong>APC</strong> returns.</p>
+<p>Implementing the primitives to abort native system services does not
+quite solve the whole problem. Each native service that can result in a
+long wait must be written such that it is responsive to kernel alerts.
+This means that a native service should wait alertable in kernel mode
+when it does a wait that could take a long time. Also, if very long
+algorithms are being performed, then TestAlert should also be called at
+appropriate points.</p>
+<p>It is preferable that a native service either complete successfully
+or be entirely aborted. For those cases where there are really two parts
+to the service such as an operation followed by a wait, the service
+should be broken into two parts. Each part should be executed separately
+from the calling mode.</p>
+<p>A protected subsystem that is a system service server can stop,
+alter, and a resume a thread by performing the sequence of operations
+suspend, get state, set state, and alert and resume.</p>
+<p>If a native service is active when the suspend operation takes place,
+then the kernel alerted flag will remain set for the duration of the
+service after the thread is resumed. The alerted flag can be tested by
+the service using the TestAlert function.</p>
+<p>A more interesting case is when the native service is waiting kernel
+mode alertable. The suspend service causes a normal kernel
+<strong>APC</strong> to be sent to the target thread which completes its
+wait with a status of "kernel <strong>APC</strong>". The target thread
+then waits nonalertable on its builtin suspend semaphore.</p>
+<p>When the subsystem executes the alert and resume service, the kernel
+alerted flag is set in the target thread and the target thread's suspend
+semaphore is released. This causes the target thread to be unwaited with
+a status that is the key value of the semaphore.</p>
+<p>Unwaiting the thread causes it to continue execution in the suspend
+<strong>APC</strong> routine which simply returns to the kernel
+<strong>APC</strong> delivery code. The kernel <strong>APC</strong>
+delivery code restores the state of the thread and resumes execution at
+the point of interruption which is in the wait code. The wait code tests
+the wait completion status and determines that the wait was satisfied to
+deliver a kernel <strong>APC</strong>. The wait is repeated and finds
+that the kernel alerted flag is set and that the wait is alertable. Thus
+it returns immediately with a wait completion status of "alerted".</p>
+<p>Note that the kernel <strong>APC</strong> delivery code must save and
+restore the wait completion status in the <strong>TCB</strong> so that
+the subsequent suspend wait does not destroy it.</p>
+<p><strong><br />
+Revision History:</strong></p>
+<p>Original Draft 1.0, February 9, 1989</p>
+<p>Revision 1.1, February 10, 1989</p>
+<blockquote>
+<p>1. Include tests for nonempty user <strong>APC</strong> queue in
+TestAlert and Wait algorithm descriptions.</p>
+</blockquote>
+<p>Revision 1.2, March 30, 1989</p>
+<blockquote>
+<p>1. Minor edits to conform to standard format.</p>
+</blockquote>
+<p>[end of alerts]</p>

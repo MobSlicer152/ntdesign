@@ -1,0 +1,1734 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Virtual Memory Specification</p>
+<p><strong>Author:</strong> Lou Perazzoli</p>
+<p>Original Draft 1.0, December 15, 1988</p>
+<p>Revision 4.0 April 28, 1993</p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>1.1 Object Orientation 1</p>
+<p>1.2 Virtual Memory 1</p>
+<p>1.3 Page Protections 2</p>
+<p>1.4 Page File Quota and Commitment 3</p>
+<p>2. Virtual Memory Operations 3</p>
+<p>2.1 Create Section 4</p>
+<p>2.2 Open Section 7</p>
+<p>2.3 Map View Of Section 8</p>
+<p>2.4 Extend Size Of Section 12</p>
+<p>2.5 Unmap View Of Section 13</p>
+<p>2.6 Allocate Virtual Memory 14</p>
+<p>2.7 Free Virtual Memory 17</p>
+<p>2.8 Read Virtual Memory 19</p>
+<p>2.9 Write Virtual Memory 20</p>
+<p>2.10 Flush Virtual Memory 21</p>
+<p>2.11 Lock Virtual Memory 22</p>
+<p>2.12 Unlock Virtual Memory 23</p>
+<p>2.13 Protect Virtual Memory 24</p>
+<p>2.14 Query Virtual Memory 26</p>
+<p>2.15 Query Section Information 29</p>
+<p>2.16 Create Paging File 31</p>
+<p>2.17 Flush Instruction Cache 31</p>
+<p>2.18 Flush Write Buffer 32</p>
+<p>2.19 Close Handle 32</p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This specification describes the virtual memory component for the
+portable New Technology (<strong>Windows NT</strong>) system.
+<strong>Windows NT</strong> virtual memory includes the following:</p>
+<p>o Virtual memory support for the <strong>POSIX</strong> <em>fork</em>
+and <em>exec</em> operations, which enable compliance with the
+<strong>POSIX</strong> standard.</p>
+<p>o Mapping of files into virtual memory and paging directly to/from
+those files. Files larger than 2 Gb are mapped via partial views of the
+file.</p>
+<p>o Protection of shared memory and mapped files via Access Control
+Lists (<strong>ACL</strong>s), which is required to achieve a
+<strong>DOD</strong> security rating of <strong>C2</strong> or
+higher.</p>
+<p>o Application control of virtual address space allocation and the
+mapping of shared memory.</p>
+<p>o Copy-on-write pages with the ability to establish guard pages and
+set page protection.</p>
+<p>o Creation of committed and/or reserved private memory without
+creating any kind of memory object.</p>
+<h2 id="object-orientation">1.1 Object Orientation</h2>
+<p>The basic architecture of the <strong>Windows NT</strong> system is
+object based. This means that all operating system abstractions
+presented at the API level are in the form of objects and a set of
+operations on those objects. This allows a stylized set of operations
+for each object, uniform naming across objects, uniform protection of
+objects, and uniform sharing of objects.</p>
+<p>Typically there is an operation to create a new instance of an object
+(<strong>NtCreate_</strong><em>object)</em> and to establish access
+(create a handle) for an existing object
+(<strong>NtOpen_</strong><em>object)</em>. These basic operations are
+generally augmented by a set of object-specific operations. A handle is
+closed with a generic close operation (<strong>NtClose</strong>).</p>
+<p>The treatment of objects here is minimal. A separate specification,
+<em>Windows NT Object Management,</em> more fully covers the object
+orientation of <strong>Windows NT</strong>.</p>
+<h2 id="virtual-memory">1.2 Virtual Memory</h2>
+<p>Virtual memory is supported in the <strong>Windows NT</strong> system
+by section objects, a set of operations that may be performed on section
+objects, and various other services that directly manipulate the process
+virtual address space. In addition to section objects and their
+corresponding services, a set of operations are also provided to reserve
+and commit virtual memory private to a process.</p>
+<p>A section object is a shareable entity that can be mapped into the
+virtual address space of a process. It can be backed by a paging file
+(e.g., demand zero pages) or by a file (mapped file).</p>
+<p>Mapping a section into the virtual address space creates a
+process-private <em>view</em> of the section. The view can be partial or
+complete. Several different views of a section can be concurrently
+mapped within the same or different processes. When a view of a section
+is created, the corresponding process virtual address space is reserved
+and optionally committed.</p>
+<p>Views are allocated on a hardware dependent <strong>Allocation
+Granularity</strong> (64kb on x86 and MIPS) virtual address boundary.
+The allocation granularity is determined by cache coherency issues and
+the desire to support larger page sizes in a compatible manner.</p>
+<p>In general, it is not desirable for programs to directly control the
+allocation of the process virtual address space. However, the system has
+a need for this capability when a program is activated (i.e., the
+program file is mapped into the address space when the image is
+started), and some applications that use tag bits in pointers also want
+to control placement so that certain address bits are guaranteed to be
+zero. Thus the proposed interface provides for placement control, but it
+is optional.</p>
+<p>Each section can have an optional name and Access Control List
+(<strong>ACL</strong>). This provides the basis whereby a section can be
+shared in a controlled manner. An unnamed section is a private section
+and can only be shared with another process via inheritance (i.e., the
+fork mechanism required to support <strong>POSIX</strong> compliance).
+Named sections can be shared by any other process that has access to the
+section.</p>
+<p>The operating system does not use views as protection domains, and
+therefore never checks to ensure that an argument data structure resides
+within a single view. Thus an argument to a <strong>Windows NT</strong>
+service may span one or more views or private pages.</p>
+<p>The default base address of all program images is the
+<strong>Allocation Granularity</strong> (zero-based program images do
+not allow uninitialized pointers to manifest themselves as access
+violations and are more difficult to debug). However, the base may be
+explicitly set to any desired value.</p>
+<h2 id="page-protections">1.3 Page Protections</h2>
+<p>The virtual memory services allow the specification of
+<em>execute</em> access for page protections. On hardware which does not
+support execute access, the page protections for execute access will be
+treated as read. Therefore execute-only access would be treated as
+read-only, execute-read-write would be treated as read-write, etc.
+However, in the query operations, the actual set page protection would
+be returned.</p>
+<h2 id="page-file-quota-and-commitment">1.4 Page File Quota and
+Commitment</h2>
+<p>The memory management system keeps track of page file usage on a
+global basis, termed <em>commitment</em>, and on a per process basis as
+<em>page file quota</em>. Commitment and page file quota are charged
+whenever virtual memory is created which requires backing store from the
+paging file.</p>
+<p>The following explains the actions for each service which potentially
+creates pages destined for the paging file:</p>
+<p>NtCreateSection (mapping file) __No commitment or page file quota is
+charged.</p>
+<p>NtCreateSection (paging file) __Charge commitment for any committed
+pages within the section. The commitment is returned when the section is
+deleted.</p>
+<p>NtAllocateVirtualMemory (reserve) __Charge commitment and page file
+quota for the page table pages required to map the potentially committed
+pages.</p>
+<p>NtAllocateVirtualMemory (reserve &amp; commit) __Charge commitment
+and page file quota for both the page table pages required to map the
+virtual memory and committed pages.</p>
+<p>NtAllocateVirtualMemory (commit private pages) __Charge commitment
+and page file quota for each page of memory committed.</p>
+<p>NtAllocateVirtualMemory (commit shared pages) __Charge page file
+quota and commitment if page protection is write-copy. Charge commitment
+if the page is within a view of a paging file backed section.</p>
+<p>NtMapViewOfSection (mapping file) __Charge commitment and page file
+quota for the page table pages required to map the virtual memory. If
+the protection of the section is write-copy, charge page file quota and
+commitment for all pages in the view.</p>
+<p>NtMapViewOfSection (paging file) __Charge page file quota as though
+all pages in the section are committed. Charge commitment and page file
+quota for the page table pages required to map the virtual memory. If
+the protection of the section is write-copy, charge page file quota and
+commitment for all pages in the view.</p>
+<p>NtProtectVirtualMemory (within a view) __If the page protection is
+write-copy, charge commitment and page file quota for each newly
+protected page which is not already write-copy or private. If the page
+protection is not write-copy, and the previous page protection was
+write-copy, return the commitment and page file quota for that page.</p>
+<p>NtFreeVirtualMemory __Returned the charged commitment and page file
+quota.</p>
+<h1 id="virtual-memory-operations">2. Virtual Memory Operations</h1>
+<p>The following subsections describe the virtual memory operations that
+can be performed in the <strong>Windows NT</strong> system. A definition
+and an explanation of each operation is given.</p>
+<p>The <strong>API</strong>s described include:</p>
+<p><strong>NtCreateSection</strong> - Create section and open handle</p>
+<p><strong>NtOpenSection</strong> - Open handle to existing section</p>
+<p><strong>NtMapViewOfSection</strong> - Map view of section</p>
+<p><strong>NtExtendSection -</strong> Extend the size of section</p>
+<p><strong>NtUnmapViewOfSection</strong> - Unmap view of section</p>
+<p><strong>NtAllocateVirtualMemory</strong> - Commit/reserve region</p>
+<p><strong>NtFreeVirtualMemory</strong> - Decommit/release region</p>
+<p><strong>NtReadVirtualMemory</strong> - Read memory from specified
+process</p>
+<p><strong>NtWriteVirtualMemory</strong> - Write memory to specified
+process</p>
+<p><strong>NtFlushVirtualMemory</strong> - Flush modified pages to
+file</p>
+<p><strong>NtLockVirtualMemory</strong> - Lock region process/system</p>
+<p><strong>NtUnlockVirtualMemory</strong> - Unlock region
+process/system</p>
+<p><strong>NtProtectVirtualMemory</strong> - Protect region</p>
+<p><strong>NtQueryVirtualMemory</strong> - Get information about
+region</p>
+<p><strong>NtQuerySection</strong> - Get information about section</p>
+<p><strong>NtCreatePagingFile</strong> - Create a paging file</p>
+<p><strong>NtFlushInstructionCache</strong> - Flushes the instruction
+cache.</p>
+<p><strong>NtFlushWriteBuffer</strong> - Flushes the write buffer on the
+current processor.</p>
+<p><strong>NtClose</strong> - Close handle</p>
+<p>Each <strong>API</strong> returns a status value (error code) that
+signifies the success or failure of the operation.</p>
+<h2 id="create-section">2.1 Create Section</h2>
+<p>A section object can be created and a handle opened for access to the
+section with the <strong>NtCreateSection</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateSection</strong> (</p>
+<p><strong>OUT PHANDLE</strong> <em>SectionHandle,</em></p>
+<p><strong>IN ACCESS_MASK</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN PLARGE_INTEGER</strong> <em>MaximumSize</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN ULONG</strong> <em>SectionPageProtection,</em></p>
+<p><strong>IN ULONG</strong> <em>AllocationAttributes,</em></p>
+<p><strong>IN HANDLE</strong> <em>FileHandle</em>
+<strong>OPTIONAL,</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>SectionHandle</em> - A pointer to a variable that will receive
+the section object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access for the section.
+The following object type specific access flags can be specified in
+addition to the <em>STANDARD_ACCESS_REQUIRED</em> flags described in the
+Object Management Specification.</p>
+<p>DesiredAccess Flags</p>
+<p><em>SECTION_MAP_EXECUTE</em> - Execute access to the section is
+desired.</p>
+<p><em>SECTION_MAP_READ</em> - Read access to the section is
+desired.</p>
+<p><em>SECTION_MAP_WRITE</em> - Write and read access to the section is
+desired.</p>
+<p><em>SECTION_QUERY</em> - Query access to the section is desired.</p>
+<p><em>SECTION_EXTEND_SIZE</em> - The ability to extend the size of the
+section is desired.</p>
+<p><em>ObjectAttributes</em> - An optional pointer to a structure that
+specifies the object's attributes. Refer to the <em>Object Management
+Specification</em> for details.</p>
+<p><em>MaximumSize</em> - A pointer to the maximum size of the section
+in bytes. For page file backed sections, this value is rounded up to the
+host page size. If this argument is unspecified or the value is
+specified as zero, and a file handle is specified, the section size is
+set to the size of the file.</p>
+<p><em>SectionPageProtection</em> - Specifies the underlying page
+protection for the section. For files mapped as images, this parameter
+is ignored and the underlying page protection is taken from the mapped
+file's image header.</p>
+<p>Section Page Protection Values</p>
+<p><em>PAGE_READONLY</em> - Read access to the committed region of pages
+is allowed. An attempt to write or execute the committed region results
+in an access violation.</p>
+<p><em>PAGE_READWRITE</em> - Read, and write access to the region of
+committed pages are allowed. If write access to the underlying section
+is allowed, then a single copy of the pages is shared. Otherwise the
+pages are shared read-only/copy-on-write.</p>
+<p><em>PAGE_WRITECOPY</em> - Read and write access to the region of
+committed pages is allowed. The pages are shared
+read-only/copy-on-write.</p>
+<p><em>PAGE_EXECUTE</em> - Execute access to the committed region of
+pages is allowed. An attempt to read or write the committed region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READ</em> - Execute and read access to the region of
+committed pages is allowed. An attempt to write the committed region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READWRITE</em> - Execute, read and write access to
+the region of committed pages is allowed.</p>
+<p><em>PAGE_EXECUTE_WRITECOPY</em> - Read, execute, and write access to
+the region of committed pages is allowed. The pages are shared
+read-only/copy-on-write.</p>
+<p><em>AllocationAttributes</em> - A set of flags that describes the
+allocation attributes of the section. One of <em>SEC_RESERVE,
+SEC_COMMIT</em> or <em>SEC_IMAGE</em> must be supplied. If
+<em>SEC_IMAGE</em> is specified the only other valid option is
+<em>SEC_BASED</em>.</p>
+<p>AllocationAttributes Flags</p>
+<p><em>SEC_BASED</em> - The section is a based section. Attempt to find
+a location that allows mapping in the current process which does not
+conflict with other SEC_BASED sections. If a view to a SEC_BASED section
+cannot be mapped at the specified address in the process and error is
+returned. <strong>NOTE: SEC_BASED does not prevent other mappings or
+allocations from colliding with the based section, it merely guarantees
+that either the section is mapped at the based address or an error is
+returned.</strong></p>
+<p><em>SEC_RESERVE</em> - All pages of the section are set to the
+reserved state.</p>
+<p><em>SEC_COMMIT</em> - All pages of the section are set to the commit
+state.</p>
+<p><em>SEC_IMAGE</em> - The file specified by the file handle is an
+executable image file.</p>
+<p><em>SEC_NOCACHE</em> - All pages of the section are to be set as
+non-cacheable.</p>
+<p><em>FileHandle</em> - An optional handle of an open file object. If
+the value of this handle is NULL, then the section is backed by a paging
+file. Otherwise, the section is backed by the specified data file.</p>
+<p>Creating a section creates an object that describes a region of
+potentially shareable memory and opens a handle for access to the
+section object. The section can be backed by a paging file or a
+specified data file. An open section handle can be used to map a view of
+the section into the virtual address space of the subject process.</p>
+<p>If the section is given a name, then it can be shared at any virtual
+address with other processes that can open the section (see
+<strong>NtOpenSection</strong> below). The section can also be specified
+as "based" in which case it can also be shared at a fixed address in all
+processes that map a view of the section.</p>
+<p>If the section is shareable (i.e., it is given a name), then the
+Access Control List (<strong>ACL</strong>) specifies which users can
+access the section. If the section is not given a name, then only the
+creating process and its descendants can access the section.</p>
+<p>Various object attributes can be chosen for the section such that
+access to the section can be inherited by the child process when a new
+process is created. This capability is required to support the
+<strong>POSIX</strong> standard.</p>
+<p>The <em>OBJ_OPENIF</em> object attribute allows the section to be
+created if a section object with the specified name doesn't already
+exist. This is useful when two or more processes dynamically create a
+temporary section to hold shared data while one or more processes that
+operate on the shared data are active. If this option is specified and a
+section object with the same name already exists, then the desired
+access to the section object by the subject process is verified and an
+open handle is returned for the existing object.</p>
+<p>A section can be specified as temporary or permanent. A temporary
+object is deleted when the last open handle to the object is closed.
+This can result from closing the handle (see <strong>NtClose</strong>
+below) or by terminating a process. A permanent object is deleted by
+first opening a handle to the object, marking it temporary, and then
+closing the handle. The object then behaves much like a temporary object
+and is deleted when the last open handle is closed.</p>
+<p>If the section is mapped by a file, then the <strong>ACL</strong> on
+the file is used to control access to the section unless the user ID of
+the subject process is the owner of the file, in which case the
+specified <strong>ACL</strong> is used. The desired access types must be
+allowed by the section <strong>ACL</strong> and must be compatible with
+the open mode of the file (i.e., write access is not allowed to a file
+that is opened for read-only access).</p>
+<p>If the file is open for read-write access, then the file acts as
+backing store for both reads and writes of pages in the section.
+Otherwise, the file is used for inpaging and no outpaging to the file
+occurs (i.e., any modified pages are written to a paging file).</p>
+<p>In addition to quota errors and object management errors associated
+with creating objects, the following status values may be returned by
+the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_INVALID_PAGE_PROTECTION</em> - Error, an invalid page
+protection was specified.</p>
+<p>o <em>STATUS_INVALID_FILE</em> - Error, an invalid file handle was
+specified.</p>
+<p>o <em>STATUS_NOT_IMAGE</em> - Error, an attempt to map file as an
+image which is not an image file.</p>
+<p>o <em>STATUS_SECTION_TOO_BIG</em> - Error, an attempt to map create a
+section which is bigger than the file which it backs.</p>
+<h2 id="open-section">2.2 Open Section</h2>
+<p>A handle can be opened for access to an existing section object with
+the <strong>NtOpenSection</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtOpenSection</strong>(</p>
+<p><strong>OUT PHANDLE</strong> <em>SectionHandle,</em></p>
+<p><strong>IN ACCESS_MASK</strong> <em>DesiredAccess</em>,</p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>Sectionhandle</em> - A pointer to a variable that will receive
+the section object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access for the section.
+The following object type specific access flags can be specified in
+addition to the <em>STANDARD_ACCESS_REQUIRED</em> flags described in the
+Object Management Specification.</p>
+<p>DesiredAccess Flags</p>
+<p><em>SECTION_MAP_EXECUTE</em> - Execute access to the section is
+desired.</p>
+<p><em>SECTION_MAP_READ</em> - Read access to the section is
+desired.</p>
+<p><em>SECTION_MAP_WRITE</em> - Write and read access to the section is
+desired.</p>
+<p><em>SECTION_QUERY</em> - Query access to the section is desired.</p>
+<p><em>SECTION_EXTEND_SIZE</em> - The ability to extend the size of the
+section is desired.</p>
+<p><em>ObjectAttributes</em> - A pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object Management
+Specification</em> for details.</p>
+<p>Opening a section causes a handle for the object to be opened so that
+a view of the section can be mapped into the virtual address space of
+the subject process.</p>
+<p>A process cannot open a section object unless the desired access
+types are allowed by the section object <strong>ACL</strong>, and, if
+the section is backed by a data file, are also compatible with the open
+mode of the associated data file.</p>
+<p>In addition to quota errors and object management errors associated
+with opening objects, the following status values may be returned by the
+function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<h2 id="map-view-of-section">2.3 Map View Of Section</h2>
+<p>A view of a section can be mapped into the virtual address space of a
+subject process with the <strong>NtMapViewOfSection</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtMapViewOfSection</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>SectionHandle,</em></p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN OUT PVOID</strong> <em>*BaseAddress,</em></p>
+<p><strong>IN ULONG</strong> <em>ZeroBits,</em></p>
+<p><strong>IN ULONG</strong> <em>CommitSize,</em></p>
+<p><strong>IN OUT PLARGE_INTEGER</strong> <em>SectionOffset</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN OUT PULONG</strong> <em>ViewSize,</em></p>
+<p><strong>IN SECTION_INHERIT</strong> <em>InheritDisposition,</em></p>
+<p><strong>IN ULONG</strong> <em>AllocationType,</em></p>
+<p><strong>IN ULONG</strong> <em>Protect</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>SectionHandle</em> - An open handle to a section object.</p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - A pointer to a variable that will receive the
+base address of the view. If the initial value of this argument is not
+NULL, then the view is allocated starting at the specified virtual
+address must be a multiple of the allocation granularity. If the initial
+value of this argument is NULL, then the operating system determines
+where to allocate the view using the information specified by the
+<em>ZeroBits</em> argument value and the section allocation attributes
+(i.e., SEC_BASED).</p>
+<p><em>ZeroBits</em> - The number of high-order address bits that must
+be zero in the base address of the section view. The value of this
+argument must be less than 21 and is only used when the operating system
+determines where to allocate the view (i.e., when <em>BaseAddress</em>
+is NULL).</p>
+<p><em>CommitSize</em> - The size of the initially committed region of
+the view in bytes. <em>CommitSize</em> is only meaningful for page-file
+backed sections, mapped sections, both data and image are always
+committed at section creation time and is ignored for mapped files. This
+value is rounded up to the next host-page-size boundary.</p>
+<p><em>SectionOffset</em> - Optionally supplies a pointer to the offset
+from the beginning of the section to the view in bytes. This value must
+be a multiple of allocation granularity. If the section was created with
+the <em>SEC_IMAGE</em>, this argument must be NULL.</p>
+<p><em>ViewSize</em> - A pointer to a variable that will receive the
+actual size in bytes of the view. If the value of this argument is zero,
+then a view of the section will be mapped starting at the specified
+section offset and continuing to the end of the section. Otherwise the
+initial value of this argument specifies the size of the view in bytes
+and is rounded up to the next host page size boundary.</p>
+<p><em>InheritDisposition</em> - A value that specifies how the view is
+to be shared by a child process created with a create process
+operation.</p>
+<p>InheritDisposition Values</p>
+<p><em>ViewCopy</em> - Inherit view and copy the committed pages to a
+child process using the current protection value. (If the underlying
+section is not writable, then a copy of the pages need not actually be
+made.)</p>
+<p><em>ViewShare</em> - Inherit view and share a single copy of the
+committed pages with a child process using the current protection
+value.</p>
+<p><em>ViewUnmap</em> - Do not map the view into a child process.</p>
+<p><em>AllocationType</em> - A set of flags that describes the type of
+allocation that is to be performed for the specified region of
+pages.</p>
+<p>AllocationType Flags</p>
+<p><em>MEM_TOP_DOWN</em> - The specified region is to be allocated from
+the highest portion of the address space possible based on the
+<em>ZeroBits</em> argument.</p>
+<p><em>MEM_LARGE_PAGES</em> - Only valid with physical memory mappings.
+The specified view should be mapped with the largest page size
+possible.</p>
+<p><em>MEM_DOS_LIM</em> - Only valid on x86, provided for DOS/VDM
+compatibility. Allows views to be mapped on 4kb boundaries rather than
+allocation granularity.</p>
+<p><em>Protect</em> - The protection desired for the region of initially
+committed pages.</p>
+<p>Protect Values</p>
+<p><em>PAGE_NOACCESS</em> - No access to the committed region of pages
+is allowed. An attempt to read, write, or execute the committed region
+results in an access violation (i.e., a GP fault).</p>
+<p><em>PAGE_READONLY</em> - Read access to the committed region of pages
+is allowed. An attempt to write or execute the committed region results
+in an access violation.</p>
+<p><em>PAGE_READWRITE</em> - Read, and write access to the region of
+committed pages are allowed. If write access to the underlying section
+is allowed, then a single copy of the pages is shared. Otherwise the
+pages are shared read-only/copy-on-write.</p>
+<p><em>PAGE_WRITECOPY</em> - Read and write access to the region of
+committed pages is allowed. The pages are shared
+read-only/copy-on-write.</p>
+<p><em>PAGE_EXECUTE</em> - Execute access to the committed region of
+pages is allowed. An attempt to read or write the committed region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READ</em> - Execute and read access to the region of
+committed pages is allowed. An attempt to write the committed region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READWRITE</em> - Execute, read and write access to
+the region of committed pages is allowed.</p>
+<p><em>PAGE_EXECUTE_WRITECOPY</em> - Read, execute and write access to
+the region of committed pages is allowed. The pages are shared
+read-only/copy-on-write.</p>
+<p><em>PAGE_GUARD</em> - Protect the page with the underlying page
+protection, however, access to the region causes a "<em>guard page
+entered</em>" condition to be raised in the subject process. This value
+is only valid with one of the page protections except PAGE_NOACCESS.</p>
+<p>Mapping a view of a section into the virtual address space of a
+subject process causes a region of the virtual address space to be
+reserved and, optionally, committed. The issuing process must have
+<em>PROCESS_VM_OPERATION</em> access to the subject process, and the
+following access to the section:</p>
+<p><strong>Protect Value Section Access Required</strong></p>
+<p><em>PAGE_NOACCESS SECTION_MAP_READ</em></p>
+<p><em>PAGE_READONLY SECTION_MAP_READ</em></p>
+<p><em>PAGE_READWRITE SECTION_MAP_WRITE, SECTION_MAP_READ</em></p>
+<p><em>PAGE_WRITECOPY SECTION_MAP_READ</em></p>
+<p><em>PAGE_EXECUTE SECTION_MAP_EXECUTE</em></p>
+<p><em>PAGE_EXECUTE_READ SECTION_MAP_READ, SECTION_MAP_EXECUTE</em></p>
+<p><em>PAGE_EXECUTE_READWRITE SECTION_MAP_EXECUTE, SECTION_MAP_READ,
+SECTION_MAP_WRITE</em></p>
+<p><em>PAGE_EXECUTE_WRITECOPY SECTION_MAP_EXECUTE,
+SECTION_MAP_READ</em></p>
+<p>In addition to the section access, the specified page protection must
+be compatible with the <em>SectionPageProtection</em> specified when the
+section was created.</p>
+<p><strong>Desired View Protection Section Protection
+Required</strong></p>
+<p><em>PAGE_NOACCESS</em> Any</p>
+<p><em>PAGE_READONLY</em> Any except <em>PAGE_NOACCESS</em> and
+<em>PAGE_EXECUTE</em></p>
+<p><em>PAGE_READWRITE PAGE_READWRITE, PAGE_EXECUTE_READWRITE</em></p>
+<p><em>PAGE_WRITECOPY</em> Any except <em>PAGE_NOACCESS</em> and
+<em>PAGE_EXECUTE</em></p>
+<p><em>PAGE_EXECUTE PAGE_EXECUTE, PAGE_EXECUTE_READ,
+PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY</em></p>
+<p><em>PAGE_EXECUTE_READ PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE,
+PAGE_EXECUTE_WRITECOPY</em></p>
+<p><em>PAGE_EXECUTE_READWRITE PAGE_EXECUTE_READWRITE</em></p>
+<p><em>PAGE_EXECUTE_WRITECOPY PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE,
+PAGE_EXECUTE_WRITECOPY</em></p>
+<p>The view size and section offset determine the region of the section
+that is mapped into the virtual address space of the subject process.
+The commit size determines how much of the view is initially committed.
+The committed pages, if any, start at the beginning of the view and
+extend upward.</p>
+<p>Several different views of a section can be concurrently mapped into
+the virtual address space of a process. Likewise, several different
+views of a section can also be concurrently mapped into the virtual
+address space of several processes.</p>
+<p>If the operating system determines the virtual address allocation for
+the view (i.e. <em>BaseAddress</em> is NULL) and the section is based,
+then the region chosen is the one that was reserved when the section was
+created.</p>
+<p>If the operating system determines the virtual address allocation for
+the view and the section is not based, then the allocation is such that
+the specified number of high-order address bits are zero in the base
+address of the view. This capability is provided so that applications
+that use address bits for tag bits need not explicitly manage the
+virtual-address-space allocation themselves.</p>
+<p>If the operating system determines the virtual address allocation for
+the view, the <em>ViewSize</em> is zero, and the complete section has
+been mapped before, the returned based address will be the base address
+where the complete section is already mapped. This allows library
+routines to map complete views of sections without having to determine
+if the section has been previously mapped.</p>
+<p>If the operating system does not determine the virtual address
+allocation (i.e., <em>BaseAddress</em> is not null), then an attempt is
+made to map the view starting at the specified base address and
+extending upward. If any page within this region is already reserved or
+committed, then the view cannot be mapped.</p>
+<p>Committed pages are initialized with the specified protection value
+which must be compatible with the granted access to the section.
+Reserved pages are given a protection value of no access. Any attempt to
+access these pages results in an access violation unless another sharer
+has previously committed the pages.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o <em>STATUS_NO_QUOTA</em> - Error, insufficient quota to create the
+specified section.</p>
+<p>o <em>STATUS_NO_MEMORY</em> - Error, insufficient virtual memory to
+map specified view.</p>
+<p>o <em>STATUS_SECTION_PROTECTION</em> - Error, the specified
+protection is not compatible with the underlying section protection.</p>
+<p>o <em>STATUS_INVALID_PAGE_PROTECTION</em> - Error, an invalid page
+protection was specified.</p>
+<p>o <em>STATUS_CONFLICTING_ADDRESSES</em> - Error, the specified
+address range conflicts with an existing address range.</p>
+<h2 id="extend-size-of-section">2.4 Extend Size Of Section</h2>
+<p>An existing section which maps a data file can be extended with the
+<strong>NtExtendSection</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtExtendSection</strong> (</p>
+<p><strong>IN HANDLE</strong> <em>SectionHandle</em>,</p>
+<p><strong>IN OUT PLARGE_INTEGER</strong> <em>NewSectionSize</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>SectionHandle</em> - An open handle to a section object that maps
+a data file. <em>SECTION_EXTEND_SIZE</em> access to this handle is
+required.</p>
+<p><em>NewSectionSize</em> - A pointer to a variable that supplies the
+new size for the section. This variable receives the new size of the
+section. If the specified size is less than the current size, this
+variable receives the current size.</p>
+<p>The extend section service allows a user to extend the size of a
+section that maps a data file. If the current size of the section is
+greater than the specified size, the section size is not changed and the
+current section size is written to the <em>NewSectionSize</em>.</p>
+<p>If the current section size is less than the new section size, the
+current file allocation size is checked and if the file allocation size
+is greater than the specified new section size, the section is
+extended.</p>
+<p>If, however, the file allocation size is less than the specified
+section size, an attempt is made to set the file allocation size to the
+specified new section size. If this succeeds, the section is extended.
+If this fails the section size is unchanged and the returned status
+indicates why the file allocation could not be increased.</p>
+<h2 id="unmap-view-of-section">2.5 Unmap View Of Section</h2>
+<p>A view of a section can be unmapped from the virtual address space of
+a subject process with the <strong>NtUnmapViewOfSection</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtUnmapViewOfSection</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle</em>,</p>
+<p><strong>IN PVOID</strong> <em>BaseAddress</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - A virtual address within the view which is to
+be unmapped.</p>
+<p>The entire view of the section specified by the base address
+parameter is unmapped from the virtual address space of the specified
+process. The base address argument may be any virtual address within the
+view. The issuing process must have <em>PROCESS_VM_OPERATION</em> access
+to the subject process.</p>
+<p>The virtual address region occupied by the view is no longer reserved
+and is available to map other views or private pages. If the view was
+also the last reference to the underlying section (i.e., no open handles
+exist to the section object), then all committed pages in the section
+are decommitted and the section is deleted.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<h2 id="allocate-virtual-memory">2.6 Allocate Virtual Memory</h2>
+<p>A region of pages within the virtual address space of a subject
+process can be reserved and/or committed with the
+<strong>NtAllocateVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtAllocateVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN OUT PVOID</strong> <em>*BaseAddress,</em></p>
+<p><strong>IN ULONG</strong> <em>ZeroBits,</em></p>
+<p><strong>IN OUT PULONG</strong> <em>RegionSize,</em></p>
+<p><strong>IN ULONG</strong> <em>AllocationType,</em></p>
+<p><strong>IN ULONG</strong> <em>Protect</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - A pointer to a variable that will receive the
+base address of the allocated region of pages. If the initial value of
+this argument is not NULL and the memory is being reserved, then the
+region is allocated starting at the specified virtual address rounded
+down to the next 64K byte boundary. If the memory is already reserved
+and is being committed, this value is rounded down to a host-page-size
+boundary. If the initial value of this argument is NULL, then the
+operating system determines where to allocate the region.</p>
+<p><em>ZeroBits</em> - The number of high-order address bits that must
+be zero in the base address of the section view. The value of this
+argument must be less than 21 and is only used when the operating system
+determines where to allocate the view (i.e., when <em>BaseAddress</em>
+is NULL).</p>
+<p><em>RegionSize</em> - A pointer to a variable that will receive the
+actual size in bytes of the allocated region of pages. The initial value
+of this argument specifies the size in bytes of the region and is
+rounded up to the next host-page-size boundary.</p>
+<p><em>AllocationType</em> - A set of flags that describes the type of
+allocation that is to be performed for the specified region of pages.
+One of <em>MEM_COMMIT</em> or <em>MEM_RESERVED</em> is required, both
+are acceptable (i.e., MEM_COMMIT | MEM_RESERVE).</p>
+<p>AllocationType Flags</p>
+<p><em>MEM_COMMIT</em> - The specified region of pages is to be
+committed.</p>
+<p><em>MEM_RESERVE</em> - The specified region of pages is to be
+reserved.</p>
+<p><em>MEM_TOP_DOWN</em> - The specified region is to be allocated from
+the highest portion of the address space possible based on the
+<em>ZeroBits</em> argument.</p>
+<p><em>Protect</em> - The protection desired for the committed region of
+pages.</p>
+<p>Protect Values</p>
+<p><em>PAGE_NOACCESS</em> - No access to the committed region of pages
+is allowed. An attempt to read, write, or execute the committed region
+results in an access violation (i.e., a GP fault).</p>
+<p><em>PAGE_READONLY</em> - Read access to the committed region of pages
+is allowed. An attempt to write or execute the committed region results
+in an access violation.</p>
+<p><em>PAGE_READWRITE</em> - Read and write access to the committed
+region of pages is allowed. If write access to the underlying section is
+allowed, then a single copy of the pages are shared. Otherwise, the
+pages are shared read-only/copy-on-write.</p>
+<p><em>PAGE_WRITECOPY</em> - Read and write access to the region of
+committed pages is allowed. The pages are shared
+read-only/copy-on-write.</p>
+<p><em>PAGE_EXECUTE</em> - Execute access to the committed region of
+pages is allowed. An attempt to read or write the committed region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READ</em> - Execute and read access to the region of
+committed pages is allowed. An attempt to write the committed region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READWRITE</em> - Execute, read and write access to
+the region of committed pages is allowed.</p>
+<p><em>PAGE_EXECUTE_WRITECOPY</em> - Read, execute, and write access to
+the region of committed pages is allowed. The pages are shared
+read-only/copy-on-write.</p>
+<p><em>PAGE_GUARD</em> - Protect the page with the underlying page
+protection, however, access to the region causes a "<em>guard page
+entered</em>" condition to be raised in the subject process. This value
+is only valid with one of the page protections except PAGE_NOACCESS.</p>
+<p><em>PAGE_NOCACHE</em> - Disable the placement of committed pages into
+the data cache. This is only valid for pages which are not contained
+within a view of a section. For pages which are contained in a view of a
+section, the nocache attribute may be specified when the section is
+created, in which case it cannot be changed. This value is only valid
+with one of the page protections except PAGE_NOACCESS.</p>
+<p>This function can be used to commit a region of previously reserved
+pages (i.e., from a mapped view or a previous call to this function), to
+reserve a region of private pages, or to reserve and commit a region of
+private pages. This function also can be used to create a sparse
+population of committed private or mapped pages. The issuing process
+must have <em>PROCESS_VM_OPERATION</em> access to the subject
+process.</p>
+<p>If the initial value of the base address parameter is NULL, then the
+operating system allocates a region of private pages large enough to
+fulfill the specified allocation request from the virtual address space
+of the subject process. The base address of this region is returned in
+the base address parameter. Private pages are given an inherit
+disposition of equivalent to <em>ViewShare</em>.</p>
+<p>Process address map entries are scanned from the base address upward
+until the entire range of pages can be allocated or a failure occurs. If
+the entire range cannot be allocated, an appropriate status value is
+returned and no pages are mapped.</p>
+<p>Each page in the process virtual address space is either private or
+mapped into a view of a section. Private pages can be in one of three
+states:</p>
+<p>1. Free - Not committed or reserved, and inaccessible</p>
+<p>2. Committed - Allocated backing storage with access controlled by a
+protection code</p>
+<p>3. Reserved - Reserved, not committed, and inaccessible</p>
+<p>Pages that are mapped into a view of a section can be in one of two
+states:</p>
+<p>1. Committed - Allocated backing storage with access controlled by a
+protection code</p>
+<p>2. Reserved - Reserved, not committed, and inaccessible, but can be
+auto-committed if an access to the page is attempted and the page has
+already been committed in the section mapped by the view (i.e., the page
+has been committed by another sharer of the section)</p>
+<p>As each page is considered for allocation, its state and whether it
+is a private or mapped page is determined. Private pages are handled as
+follows:</p>
+<p>1. Free - A private page that is free can be reserved and/or
+committed.</p>
+<p>2. Committed - A private page that is already committed is left
+unchanged (i.e., it is still committed and its protection is not
+changed).</p>
+<p>3. Reserved - A private page that is reserved can be committed. An
+attempt to reserve a page already in the reserved state has no
+effect.</p>
+<p>Pages that are mapped into a view of a section are handled as
+follows:</p>
+<p>1. Committed - A mapped page that is already committed cannot be
+changed to reserved. A shared page that is already committed is
+unchanged, however, in certain cases it's protection may be changed.
+This is due to the fact that shared pages, even though committed, may
+not be active in the process and hence have the original protection of
+the mapping. In committing the page the mapping state is not checked on
+a page by page basis.</p>
+<p>2. Reserved - A mapped page that is reserved can be committed.</p>
+<p>The protection value applied to committed pages that are contained
+within a mapped view of a section must be compatible with the access
+granted to the underlying section. Note that the underlying protection
+of the section does not change, only the specified pages contained in
+the process's view. Any protection value can be applied to committed
+private pages. Reserved pages are given a protection value of no
+access.</p>
+<p>Pages that are backed by a paging file are committed as demand-zero
+pages (i.e., the first attempt to read or write the page causes a page
+of zeros to be created). Pages that are backed by a data file are
+committed such that they map pages of the data file.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_INVALID_PAGE_PROTECTION</em> - Error, an invalid page
+protection was specified.</p>
+<p>o <em>STATUS_CONFLICTING_ADDRESSES</em> - Error, the specified
+address range conflicts with an existing address range.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<h2 id="free-virtual-memory">2.7 Free Virtual Memory</h2>
+<p>A region of pages within the virtual address space of a subject
+process can be decommitted and/or released with the
+<strong>NtFreeVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtFreeVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN OUT PVOID</strong> <em>*BaseAddress,</em></p>
+<p><strong>IN OUT PULONG</strong> <em>RegionSize,</em></p>
+<p><strong>IN ULONG</strong> <em>FreeType</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - A pointer to a variable that will receive the
+base address of the region of pages to be freed. The initial value of
+this argument is the base address of the region of pages to be freed.
+This value is rounded down to the next host-page-address boundary.</p>
+<p><em>RegionSize</em> - A pointer to a variable that will receive the
+actual size in bytes of the freed region of pages. The initial value of
+this argument is rounded up to the next host-page-size boundary. If this
+value is zero and the <em>BaseAddress</em> is the starting address of
+the allocated region, the complete range of pages allocated together is
+freed or decommitted.</p>
+<p><em>FreeType</em> - A set of flags that describes the type of free
+that is to be performed for the specified region of pages. One of the
+following:</p>
+<p>FreeType Flags</p>
+<p><em>MEM_DECOMMIT</em> - The specified region of pages is to be
+decommitted.</p>
+<p><em>MEM_RELEASE</em> - The specified region of pages is to be
+released.</p>
+<p>This function can be used to decommit a region of previously
+committed pages (i.e. from a mapped view or from an allocation of
+virtual memory), to release a region of previously reserved private
+pages, and to decommit and release a region of previously committed
+private pages. The issuing process must have
+<em>PROCESS_VM_OPERATION</em> access to the subject process.</p>
+<p>Process address map entries are scanned from the base address upward
+until the entire range of pages can be freed or until a failure occurs.
+If the entire range cannot be freed, an appropriate status value is
+returned and no pages are freed.</p>
+<p>Each page in the process virtual address space is either private or
+mapped into a view of a section. Private pages can be in one of three
+states:</p>
+<p>1. Free - Not committed or reserved and inaccessible</p>
+<p>2. Committed - Allocated backing storage with access controlled by a
+protection code</p>
+<p>3. Reserved - Reserved, not committed, and inaccessible</p>
+<p>Pages that are mapped into a view of a section can be in one of two
+states:</p>
+<p>1. Committed - Allocated backing storage with access controlled by a
+protection code</p>
+<p>2. Reserved - Reserved, not committed, and inaccessible, but can be
+auto-committed if an access to the page is attempted and the page has
+already been committed in the section mapped by the view (i</p>
+<p>**************LOU - I set hidden the above text because it
+unnecessarily repeats something you already said and it's
+confusing.********</p>
+<p>As each page is considered for deallocation, its state and whether it
+is a private or mapped page is determined. Private pages are handled as
+follows:</p>
+<p>1. Free - A private page that is free cannot be released or
+decommitted.</p>
+<p>2. Committed - A private page that is committed can be released
+and/or decommitted.</p>
+<p>3. Reserved - A private page that is reserved can be released or
+decommitted. Decommitting a reserved page leaves the page in the
+reserved state.</p>
+<p>Pages that are mapped into a view of a section are handled as
+follows:</p>
+<p>1. Committed - A mapped page that is committed cannot be decommitted
+or released.</p>
+<p>2. Reserved - A mapped page that is reserved cannot be decommitted or
+released.</p>
+<p>If the desired type of free is allowed for the specified
+<em>RegionSize</em>, then page attributes are established as necessary
+in the process address map, and the current length of the freed region
+is updated.</p>
+<p>If the desired type of free cannot be performed on the entire range,
+then an appropriate status value is returned and none of the specified
+region is freed.</p>
+<p>Decommitting a private page causes the backing storage for the page
+to be released to the appropriate paging file and the address map entry
+for the corresponding page to be returned to the reserved state.</p>
+<p>Decommitted and released pages are given a protection value of no
+access.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o <em>STATUS_UNABLE_TO_FREE_VM</em> - Error, the specified virtual
+memory could not be released. This could be caused by the virtual memory
+being a system structure (TEB or PEB) or being part of a mapped view, or
+the specified size larger than the original allocation.</p>
+<p>o <em>STATUS_VM_NOT_AT_BASE</em> - Error, the region size was
+specified as zero, but the starting address was not the beginning of the
+allocation.</p>
+<p>o <em>STATUS_MEMORY_NOT_ALLOCATED</em> - Error, no memory as been
+allocated at the specified base address.</p>
+<h2 id="read-virtual-memory">2.8 Read Virtual Memory</h2>
+<p>Data can be read from the address space of another process with the
+<strong>NtReadVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtReadVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN PVOID</strong> <em>BaseAddress,</em></p>
+<p><strong>OUT PVOID</strong> <em>Buffer,</em></p>
+<p><strong>IN ULONG</strong> <em>BufferSize,</em></p>
+<p><strong>OUT PULONG</strong> <em>NumberOfBytesRead</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - The base address in the specified process of
+the region of pages to be read.</p>
+<p><em>Buffer</em> - The address of a buffer that receives the contents
+from the specified process address space.</p>
+<p><em>BufferSize</em> - The requested number of bytes to read from the
+specified process.</p>
+<p><em>NumberOfBytesRead</em> - Receives the actual number of bytes
+transferred into the specified buffer.</p>
+<p>This function reads data from the base address in the specified
+process and places the data in the specified buffer. The
+<em>NtReadVirtualMemory</em> function probes both the input and the
+output buffers before any bytes are copied. If either the
+<em>Buffer</em> fails a probe for write, or the <em>BaseAddress</em>
+fails a probe for read, the function returns an error and the
+<em>NumberOfBytesRead</em> parameter is returned as zero.</p>
+<p>If the probe operations are successful, an attempt is made to copy
+the number of bytes specified in <em>BufferSize</em>. The
+<em>NumberOfBytesRead</em> parameter returns the actual number of bytes
+copied from the specified process into the buffer. The issuing process
+must have <em>PROCESS_VM_READ</em> access to the subject process.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_PARTIAL_COPY</em> - Warning, due to protection conflicts
+not all the requested bytes could be copied.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o <em>STATUS_ACCESS_VIOLATION</em> - Error, one of the memory regions
+was not completely accessible.</p>
+<h2 id="write-virtual-memory">2.9 Write Virtual Memory</h2>
+<p>Data can be written to the address space of another process with the
+<strong>NtWriteVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtWriteVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>OUT PVOID</strong> <em>BaseAddress,</em></p>
+<p><strong>IN PVOID</strong> <em>Buffer,</em></p>
+<p><strong>IN ULONG</strong> <em>BufferSize,</em></p>
+<p><strong>OUT PULONG</strong> <em>NumberOfBytesWritten</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - The base address in the specified process of
+the region of pages to be written.</p>
+<p><em>Buffer</em> - The address of a buffer that contains the contents
+to be written into the specified process address space.</p>
+<p><em>BufferSize</em> - The requested number of bytes to write into the
+specified process.</p>
+<p><em>NumberOfBytesWritten</em> - Receives the actual number of bytes
+transferred into the specified address space.</p>
+<p>This function writes data from the specified buffer in the current
+process to the specified base address in the specified process. The
+<em>NtWriteVirtualMemory</em> function probes both the input and the
+output buffers before any bytes are copied. If either the
+<em>Buffer</em> fails a probe for read, or the <em>BaseAddress</em>
+fails a probe for write, the function returns an error and the
+<em>NumberOfBytesRead</em> parameter is returned as zero.</p>
+<p>If the probe operations are successful, An attempt is made to copy
+the number of bytes specified in <em>BufferSize</em>. The
+<em>NumberOfBytesWritten</em> parameter returns the actual number of
+bytes copied from the buffer to the specified process. The issuing
+process must have <em>PROCESS_VM_WRITE</em> access to the subject
+process.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_PARTIAL_COPY</em> - Warning, due to access violations
+not all the requested bytes could be copied.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o <em>STATUS_ACCESS_VIOLATION</em> - Error, one of the memory regions
+was not completely accessible.</p>
+<h2 id="flush-virtual-memory">2.10 Flush Virtual Memory</h2>
+<p>A region of pages within the virtual address space of a subject
+process can be forced to be written back into the corresponding data
+file (if they have been modified since they were last written) with the
+<strong>NtFlushVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtFlushVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN OUT PVOID</strong> <em>*BaseAddress,</em></p>
+<p><strong>IN OUT PULONG</strong> <em>RegionSize</em>,</p>
+<p><strong>OUT PIO_STATUS_BLOCK</strong> <em>IoStatus</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - A pointer to a variable that will receive the
+base address of the region of pages to flush. The initial value of this
+argument is the base address of the region of pages to flush. This value
+is rounded down to the next host-page-address boundary.</p>
+<p><em>RegionSize</em> - A pointer to a variable that will receive the
+actual size in bytes of the flushed region of pages. The initial value
+of this argument is rounded up to the next host-page-size boundary. If
+the <em>RegionSize</em> is specified as 0, the range from the base
+address until the last address mapped in this view is flushed.</p>
+<p><em>IoStatus</em> - A pointer to an I/O status block that receives
+the I/O status from the last page written.</p>
+<p>Process address map entries are scanned from the base address upward
+until the entire specified range of pages has been flushed. The actual
+size of the flushed region and an appropriate status value are returned.
+The issuing process must have <em>PROCESS_VM_OPERATE</em> access to the
+subject process.</p>
+<p>As each page is considered for flushing, its state is determined. If
+the page is committed, mapped into a view of a section that is backed by
+a data file, and has been modified in memory but not yet written back
+into the file, then a write of the modified page is initiated.
+Otherwise, no operation is performed on the page.</p>
+<p>This function can be used to ensure that a consistent state of the
+data within a file is maintained in the presence of various sequences of
+updates (e.g., forced writes of log pages, etc.).</p>
+<p>If an I/O error occurs while writing pages, the <em>RegionSize</em>
+contains the starting virtual address of the write which failed, and the
+<em>IoStatus</em> contains the failure status.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o Any errors possible from an NtWriteFile service.</p>
+<h2 id="lock-virtual-memory">2.11 Lock Virtual Memory</h2>
+<p>A region of pages within the virtual address space of a subject
+process can be locked for process residency and/or system residency with
+the <strong>NtLockVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtLockVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN OUT PVOID</strong> <em>*BaseAddress,</em></p>
+<p><strong>IN OUT PULONG</strong> <em>RegionSize,</em></p>
+<p><strong>IN ULONG</strong> <em>MapType</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - A pointer to a variable that will receive the
+base address of the region of pages to lock. The initial value of this
+argument is the base address of the region of pages to lock. This value
+is rounded down to the next host-page-address boundary.</p>
+<p><em>RegionSize</em> - A pointer to a variable that receives the
+actual size in bytes of the locked region of pages. The initial value of
+this argument is rounded up to the next host-page-size boundary.</p>
+<p><em>MapType</em> - The map type flags.</p>
+<p>MapType Flags</p>
+<p><em>MAP_PROCESS</em> - Process residency</p>
+<p><em>MAP_SYSTEM</em> - System residency</p>
+<p>Locking a region of pages in an address map causes the residency
+attributes of the corresponding pages to be set such that they are not
+eligible for paging.</p>
+<p>Locking a page for system residency causes the page to remain memory
+resident until it is explicitly unlocked. A special privilege is
+required in a server system to lock a page for system residency.</p>
+<p>Locking a page for process residency causes the page to remain memory
+resident while the subject process is a member of the balance set (i.e.,
+the set of processes that are actively being considered for
+execution).</p>
+<p>Note that changing the protection of a locked page to
+<em>PAGE_NOACCESS</em> or <em>PAGE_GUARD</em> causes the page to become
+unlocked. In addition, locked pages are not inherited as locked, they
+are unlocked in the new process.</p>
+<p>If the entire <em>RegionSize</em> cannot be locked, an appropriate
+status code is returned and none of the pages is locked. The issuing
+process must have <em>PROCESS_VM_OPERATE</em> access to the subject
+process.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_WAS_LOCKED</em> - Warning, at least one of the pages in
+the specified region was already locked.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o <em>STATUS_NO_QUOTA</em> - Error, insufficient quota to lock the
+specified region.</p>
+<h2 id="unlock-virtual-memory">2.12 Unlock Virtual Memory</h2>
+<p>A region of pages within the virtual address space of a subject
+process can be unlocked from process residency and/or system residency
+with the <strong>NtUnlockVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtUnlockVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN OUT PVOID</strong> <em>*BaseAddress,</em></p>
+<p><strong>IN OUT PULONG</strong> <em>RegionSize,</em></p>
+<p><strong>IN ULONG</strong> <em>MapType</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - A pointer to a variable that will receive the
+base address of the region of pages to unlock. The initial value of this
+argument is the base address of the region of pages to unlock. This
+value is rounded down to the next host-page-address boundary.</p>
+<p><em>RegionSize</em> - A pointer to a variable that receives the
+actual size in bytes of the unlocked region of pages. The initial value
+of this argument is rounded up to the next host-page-size boundary.</p>
+<p><em>MapType</em> - The map type flags.</p>
+<p>MapType Flags</p>
+<p><em>MAP_PROCESS</em> - Process residency</p>
+<p><em>MAP_SYSTEM</em> - System residency</p>
+<p>Unlocking a region of pages causes the residency attributes of the
+corresponding pages to be set such that they are eligible for
+paging.</p>
+<p>Unlocking a process-resident page causes the page to become pageable
+until it is explicitly locked.</p>
+<p>Unlocking a system-resident page causes the page to become pageable
+until it is explicitly locked. A special privilege is required in a
+server system to unlock a system-resident page.</p>
+<p>If the entire <em>RegionSize</em> cannot be unlocked, an appropriate
+status code is returned and none of the pages is unlocked. The issuing
+process must have <em>PROCESS_VM_OPERATE</em> access to the subject
+process.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<h2 id="protect-virtual-memory">2.13 Protect Virtual Memory</h2>
+<p>The protection on a region of committed pages within the virtual
+address space of the subject process can be changed with the
+<strong>NtProtectVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtProtectVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN OUT PVOID</strong> <em>*BaseAddress,</em></p>
+<p><strong>IN OUT PULONG</strong> <em>RegionSize,</em></p>
+<p><strong>IN ULONG</strong> <em>NewProtect,</em></p>
+<p><strong>OUT PULONG</strong> <em>OldProtect</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - A pointer to a variable that will receive the
+actual base address of the protected region of pages. The initial value
+of this argument is rounded down to the next host-page-address
+boundary.</p>
+<p><em>RegionSize</em> - A pointer to a variable that will receive the
+actual size in bytes of the protected region of pages. The initial value
+of this argument is rounded up to the next host-page-size boundary.</p>
+<p><em>NewProtect</em> - The new protection desired for the specified
+region of pages.</p>
+<p>NewProtect Values</p>
+<p><em>PAGE_NOACCESS</em> - No access to the specified region of pages
+is allowed. An attempt to read, write, or execute the specified region
+results in an access violation (i.e., a GP fault).</p>
+<p><em>PAGE_READONLY</em> - Read-access to the specified region of pages
+is allowed. An attempt to execute or write the specified region results
+in an access violation.</p>
+<p><em>PAGE_READWRITE</em> - Read and write access to the specified
+region of pages is allowed. If write access to the underlying section is
+allowed, then a single copy of the pages are shared. Otherwise, the
+pages are shared read-only/copy-on-write.</p>
+<p><em>PAGE_WRITECOPY</em> - Read and write access to the region of
+committed pages is allowed. The pages are shared
+read-only/copy-on-write. This value may only be specified for an address
+ranges which is within a mapped view of a section.</p>
+<p><em>PAGE_EXECUTE</em> - Execute access to the specified region of
+pages is allowed. An attempt to read or write the specified region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READ</em> - Execute and read access to the region of
+committed pages is allowed. An attempt to write the committed region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READWRITE</em> - Execute, read and write access to
+the region of committed pages is allowed.</p>
+<p><em>PAGE_EXECUTE_WRITECOPY</em> - Read, execute, and write access to
+the region of committed pages is allowed. The pages are shared
+read-only/copy-on-write. This value may only be specified for an address
+ranges which is within a mapped view of a section.</p>
+<p><em>PAGE_GUARD</em> - Protect the page with the underlying page
+protection, however, access to the region causes a "<em>guard page
+entered</em>" condition to be raised in the subject process. This value
+is only valid with one of the page protections except PAGE_NOACCESS.</p>
+<p><em>PAGE_NOCACHE</em> - Disable the placement of committed pages into
+the data cache. This value is only valid when specified in combination
+with one of the above underlying page protections with the exception of
+PAGE_NOACCESS, e.g., (<em>PAGE_NOCACHE</em> | <em>PAGE_READWRITE</em>).
+The <em>PAGE_NOCACHE</em> attribute may not be specified on an address
+range which is within a mapped view of a section.</p>
+<p><em>OldProtect</em> - A pointer to a variable that will receive the
+old protection of the first page within the specified region of
+pages.</p>
+<p>Setting the protection on a range of pages causes the old protection
+value to be replaced by a new protection value. The protection value can
+only be set on committed pages. The issuing process must have
+<em>PROCESS_VM_OPERATE</em> access to the subject process.</p>
+<p>Note that setting page protections to <em>PAGE_NOACCESS</em> or
+<em>PAGE_GUARD</em> on a page which is locked in memory or locked in the
+process causes the locked page to become unlocked.</p>
+<p>Setting the protection value to <em>PAGE_GUARD</em> causes guard
+pages to be established. If an access to a guard page is attempted, then
+the protection of the accessed page to be set to its declared access,
+and "guard page entered" condition is raised. This capability is
+intended to provide automatic stack checking, but can also be used to
+separate other data structures where appropriate.</p>
+<p>As each page is considered for protecting, its state is determined.
+If the state of the page is not committed, the page is reserved and
+cannot be auto-committed, or the page is contained within a mapped view
+of a section and the granted access to the section is incompatible with
+the new protection, then an appropriate status value is returned and
+none of the pages in the specified region is modified.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_WAS_UNLOCKED</em> - Warning, at least one of the pages
+in the specified region was unlocked due to a page protection of
+PAGE_NOACCESS or PAGE_GUARD.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_INVALID_PAGE_PROTECTION</em> - Error, an invalid page
+protection was specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o <em>STATUS_NOT_COMMITTED</em> - Error, some pages within the range
+are not committed.</p>
+<p>o <em>STATUS_IS_WRITECOPY</em> - Warning, the protection of the
+region was set to <em>PAGE_WRITECOPY</em> due to the underlying nature
+of the section.</p>
+<h2 id="query-virtual-memory">2.14 Query Virtual Memory</h2>
+<p>Information about a range of pages within the virtual address space
+of the subject process can be obtained with the
+<strong>NtQueryVirtualMemory</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQueryVirtualMemory</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN PVOID</strong> <em>BaseAddress,</em></p>
+<p><strong>IN MEMORY_INFORMATION_CLASS</strong>
+<em>MemoryInformationClass,</em></p>
+<p><strong>OUT PVOID</strong> <em>MemoryInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>MemoryInformationLength,</em></p>
+<p><strong>OUT PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress</em> - The base address of the region of pages to be
+queried. This value is rounded down to the next host-page-address
+boundary.</p>
+<p><em>MemoryInformationClass</em> - The memory information class about
+which to retrieve information.</p>
+<p><em>MemoryInformation</em> - A pointer to a buffer that receives the
+specified information. The format and content of the buffer depend on
+the specified information class.</p>
+<p>MemoryInformation Format by Information Class:</p>
+<p><em>MemoryBasicInformation</em> - Data type is
+<em>PMEMORY_BASIC_INFORMATION</em>.</p>
+<p>MEMORY_BASIC_INFORMATION Structure</p>
+<p><strong>PVOID</strong> <em>BaseAddress</em> - The base address of the
+region.</p>
+<p><strong>PVOID</strong> <em>AllocationBase</em> - The allocation base
+of the allocation this page is contained within.</p>
+<p><strong>ULONG</strong> <em>AllocationProtect</em> - The protection
+specified when the region was initially allocated.</p>
+<p><strong>ULONG</strong> <em>RegionSize</em> - The size of the region
+in bytes beginning at the base address in which all pages have identical
+attributes.</p>
+<p><strong>ULONG</strong> <em>State</em> - The state of the pages within
+the region.</p>
+<p>State Values</p>
+<p><em>MEM_COMMIT</em> - The state of the pages within the region is
+committed.</p>
+<p><em>MEM_FREE</em> - The state of the pages within the region is
+free.</p>
+<p><em>MEM_RESERVE</em> - The state of the pages within the region is
+reserved.</p>
+<p>If the memory state is <em>MEM_FREE</em> other the
+<em>AllocationBase, AllocationProtect, Protect</em> and <em>Type</em>
+fields in the information are undefined.</p>
+<p>If the memory state is <em>MEM_RESERVE</em> the information in the
+<em>Protect</em> field is undefined.</p>
+<p><strong>ULONG</strong> <em>Protect</em> - The protection of the pages
+within the region.</p>
+<p>Protect Values</p>
+<p><em>PAGE_NOACCESS</em> - No access to the region of pages is allowed.
+An attempt to read, write, or execute within the region results in an
+access violation (i.e., a GP fault).</p>
+<p><em>PAGE_READONLY</em> - Read-access to the region of pages is
+allowed. An attempt to execute or write within the region results in an
+access violation.</p>
+<p><em>PAGE_READWRITE</em> - Read and write access to the region of
+pages is allowed. If write access to the underlying section is allowed,
+then a single copy of the pages are shared. Otherwise, the pages are
+shared read-only/copy-on-write.</p>
+<p><em>PAGE_WRITECOPY</em> - Read and write access to the region of
+committed pages is allowed. The pages are shared
+read-only/copy-on-write.</p>
+<p><em>PAGE_EXECUTE</em> - Execute access to the region of pages is
+allowed. An attempt to read or write within the region results in an
+access violation.</p>
+<p><em>PAGE_EXECUTE_READ</em> - Execute and read access to the region of
+committed pages is allowed. An attempt to write the committed region
+results in an access violation.</p>
+<p><em>PAGE_EXECUTE_READWRITE</em> - Execute, read and write access to
+the region of committed pages is allowed.</p>
+<p><em>PAGE_EXECUTE_WRITECOPY</em> - Read, execute and write access to
+the region of committed pages is allowed. The pages are shared
+read-only/copy-on-write.</p>
+<p><em>PAGE_GUARD</em> - Protect the page with the underlying page
+protection, however, access to the region causes a "<em>guard page
+entered</em>" condition to be raised in the subject process. This value
+is only valid with one of the page protections except PAGE_NOACCESS.</p>
+<p><em>PAGE_NOCACHE</em> - Disable the placement of committed pages into
+the data cache. This value is only valid with one of the other page
+protections except PAGE_NOACCESS.</p>
+<p><strong>ULONG</strong> <em>Type</em> - The type of pages within the
+region.</p>
+<p>Type Values</p>
+<p><em>MEM_PRIVATE</em> - The pages within the region are private.</p>
+<p><em>MEM_MAPPED</em> - The pages within the region are mapped into the
+view of a section.</p>
+<p><em>MEM_IMAGE</em> - The pages within the region are mapped into the
+view of an image section.</p>
+<p><em>MemoryInformationLength</em> - Specifies the length in bytes of
+the memory information buffer.</p>
+<p><em>ReturnLength</em> - An optional pointer which, if specified,
+receives the number of bytes placed in the process information
+buffer.</p>
+<p>This function provides the capability to determine the state,
+protection, and type of a region of pages within the virtual address
+space of the subject process. The issuing process must have
+<em>PROCESS_QUERY_INFORMATION</em> access to the subject process.</p>
+<p>The state of the first page within the region is determined and then
+subsequent entries in the process address map are scanned from the base
+address upward until either the entire range of pages has been scanned
+or until a page with a nonmatching set of attributes is encountered. The
+region attributes, the length of the region of pages with matching
+attributes, and an appropriate status value are returned.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o <em>STATUS_INFO_LENGTH_MISMATCH</em> - Error, the specified buffer
+size is not large enough to hold the requested information.</p>
+<p>o <em>STATUS_INVALID_INFO_CLASS</em> - Error, the specified
+information class is not valid for this service.</p>
+<h2 id="query-section-information">2.15 Query Section Information</h2>
+<p>Information about a section can be obtained with the
+<strong>NtQuerySection</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQuerySection</strong><em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>SectionHandle,</em></p>
+<p><strong>IN SECTION_INFORMATION_CLASS</strong>
+<em>SectionInformationClass,</em></p>
+<p><strong>OUT PVOID</strong> <em>SectionInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>SectionInformationLength,</em></p>
+<p><strong>OUT PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>SectionHandle</em> - An open handle to a section object.</p>
+<p><em>SectionInformationClass</em> - The section information class
+about which to retrieve information.</p>
+<p><em>SectionInformation</em> - A pointer to a buffer that receives the
+specified information. The format and content of the buffer depend on
+the specified section class.</p>
+<p>SectionInformation Format by Information Class:</p>
+<p><em>SectionBasicInformation</em> - Data type is
+<em>PSECTION_BASIC_INFORMATION.</em>.</p>
+<p>SECTION_BASIC_INFORMATION Structure</p>
+<p><strong>PVOID</strong> <em>BaseAddress</em> - The base virtual
+address of the section if the section is based.</p>
+<p><strong>ULONG</strong> <em>AllocationAttributes</em> - The allocation
+attributes flags.</p>
+<p>AllocationAttributes Flags</p>
+<p><em>SEC_BASED</em> - The section is a based section.</p>
+<p><em>SEC_FILE</em> - The section is backed by a data file.</p>
+<p><em>SEC_RESERVE</em> - All pages of the section were initially set to
+the reserved state.</p>
+<p><em>SEC_COMMIT</em> - All pages of the section were initially set to
+the committed state.</p>
+<p><em>SEC_IMAGE</em> - The section was mapped as an executable image
+file.</p>
+<p><em>SEC_NOCACHE</em> - All pages of the section are to be set as
+non-cacheable.</p>
+<p><strong>LARGE_INTEGER</strong> <em>MaximumSize</em> - The maximum
+size of the section in bytes.</p>
+<p><em>SectionImageInformation</em> - Data type is
+<em>PSECTION_IMAGE_INFORMATION</em>.</p>
+<p>SECTION_IMAGE_INFORMATION Structure</p>
+<p><strong>PVOID</strong> <em>TransferAddress</em> - The transfer
+address of the image.</p>
+<p><strong>ULONG</strong> <em>ZeroBits</em> - The zero bits requirement
+for the creation of the stack.</p>
+<p><strong>ULONG</strong> <em>MaximumStackSize</em> - The maximum stack
+size required by the image.</p>
+<p><strong>ULONG</strong> <em>CommittedStackSize</em> - The amount of
+stack space to initially commit.</p>
+<p><strong>ULONG</strong> <em>SubSystemType</em> - Subsystem image is
+linked for.</p>
+<p><strong>ULONG</strong> <em>SubSystemVersion</em> - Subsystem version
+number.</p>
+<p><strong>ULONG</strong> <em>GpValue</em> - The value for the global
+pointer register.</p>
+<p><strong>USHORT</strong> <em>ImageCharacteristics</em> - Image
+characteristics.</p>
+<p><strong>USHORT</strong> <em>DllCharacteristics</em> - Dll
+characteristics.</p>
+<p><strong>USHORT</strong> <em>Machine</em>- Hardware platform image was
+built for.</p>
+<p><strong>USHORT</strong> <em>Spare1</em> - unused.</p>
+<p><strong>ULONG</strong> <em>LoaderFlags</em> - Flags specified in
+image for loader usage.</p>
+<p><em>SectionInformationLength</em> - Specifies the length in bytes of
+the section information buffer.</p>
+<p><em>ReturnLength</em> - An optional pointer which, if specified,
+receives the number of bytes placed in the section information
+buffer.</p>
+<p>This function provides the capability to determine the base address,
+size, granted access, and allocation of an opened section object. The
+issuing process must have <em>SECTION_QUERY</em> access to the specified
+section.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p>o <em>STATUS_INFO_LENGTH_MISMATCH</em> - Error, the specified buffer
+size is not large enough to hold the requested information.</p>
+<p>o <em>STATUS_INVALID_INFO_CLASS</em> - Error, the specified
+information class is not valid for this service.</p>
+<p>o <em>STATUS_SECTION_NOT_IMAGE</em> - Error, attempt to get image
+information on a section which does not map an image.</p>
+<h2 id="create-paging-file">2.16 Create Paging File</h2>
+<p>An existing file can be declared as a paging file with the
+<strong>NtCreatePagingFile</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreatePagingFile</strong> <em>(</em></p>
+<p><strong>IN PSTRING</strong> <em>PageFileName,</em></p>
+<p><strong>IN PLARGE_INTEGER</strong> <em>InitialSize,</em></p>
+<p><strong>IN PLARGE_INTEGER</strong> <em>MaximumSize,</em></p>
+<p><strong>IN ULONG</strong> <em>Priority</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>PageFileName</em> - Supplies the name of an existing file to
+utilize as a paging file. This file must already exist.</p>
+<p><em>InitialSize</em> - Supplies the initial size of the specified
+paging file in bytes. This value is rounded up to the next host size
+boundary and the specified paging file is extended or truncated to the
+initial size.</p>
+<p><em>MaximumSize</em> - Supplies the maximum number of bytes to store
+in the specified paging file. This value is rounded up to the next host
+page size. This value must be greater than or equal to the
+<em>InitialSize</em>.</p>
+<p><em>Priority</em> - Supplies the relative priority of the paging file
+with zero being the lowest priority and 0xFFFFFFFF being the highest
+priority. Page file space on paging files is searched for based on the
+priority of each paging file.</p>
+<p>At least 8 paging files may be created. The modified page writer
+attempts to write pages to all specified paging file simultaneously,
+therefore, for maximum performance, each paging file should reside on a
+separate disk drive.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o Errors resulting from attempting to open, extend, or truncate the
+specified file.</p>
+<h2 id="flush-instruction-cache">2.17 Flush Instruction Cache</h2>
+<p>The instruction cache for a specific process can be flushed with the
+<strong>NtFlushInstructionCache</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtFlushInstructionCache</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>ProcessHandle,</em></p>
+<p><strong>IN PVOID</strong> <em>BaseAddress</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN ULONG</strong> <em>Length</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>ProcessHandle</em> - An open handle to a process object.</p>
+<p><em>BaseAddress -</em> Optionally supplies the base address to begin
+the flush operation at. If not specified the whole cache is flushed.</p>
+<p><em>Length -</em> Supplies the length of the buffer to flush. Only
+used if BaseAddress is specified.</p>
+<p>This routine is provided for use by system debuggers and routines
+which dynamically modify code segments. The issuing process must have
+<em>PROCESS_VM_OPERATION</em> access to the subject process</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o Errors resulting from referencing the specified process handle.</p>
+<h2 id="flush-write-buffer">2.18 Flush Write Buffer</h2>
+<p>The write buffers are flushed with the
+<strong>NtFlushWriteBuffer</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtFlushWriteBuffer</strong> (</p>
+<p><strong>VOID</strong></p>
+<p>);</p>
+<p>This routine flushes the write buffer on the current processor. On
+processors without write buffers no action is taken.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<h2 id="close-handle">2.19 Close Handle</h2>
+<p>An open handle to any object can be closed with the
+<strong>NtClose</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtClose</strong>(</p>
+<p><strong>IN HANDLE</strong> <em>Handle</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>Handle</em> - An open handle to an object.</p>
+<p>This is a generic function and can be used to close an open handle to
+any object.</p>
+<p>Closing an open handle to an object causes the reference count of the
+associated object to be decremented. If the resultant count is zero
+(i.e., there are no other references to the section), then the object is
+deleted. If the resultant count is one, the object has a name, and the
+object is temporary, then an attempt is made to delete the object by
+removing its name from the appropriate object directory. (Note that this
+operation may fail if another sharer manages to open the object before
+the name can be deleted, i.e., the removal of the name is
+conditional.)</p>
+<p>Closing a handle to a section object causes all modified pages to be
+written to the associated file, if the section is backed by a data
+file.</p>
+<p>After a close operation, the specified section handle is no longer
+valid.</p>
+<p>The following status values may be returned by the function:</p>
+<p>o <em>STATUS_NORMAL</em> - Normal, successful completion.</p>
+<p>o <em>STATUS_INVALID_PARAMETER</em> - Error, an invalid parameter was
+specified.</p>
+<p>o <em>STATUS_NO_ACCESS</em> - Error, access denied to specified
+object.</p>
+<p><strong><br />
+Revision History:</strong></p>
+<p>Revision 1.3, January 4, 1989</p>
+<p>1. Add section that describes the difference between this proposal
+and the proposal included in the <strong>IBM IPFS</strong> for
+<strong>Cruiser</strong>.</p>
+<p>2. Drop expand stack and allow set protection to establish a guard
+region. Accessing a guard region causes the corresponding page to be
+turned into a read/write page and a guard page exception to be
+raised.</p>
+<p>3. Define all API functions as returning a status value that
+determines the success or failure of the operation.</p>
+<p>4. Use the words "commit" and "reserve" when referring to virtual
+address space allocation.</p>
+<p>5. Add flags argument to allocate and free virtual memory which
+signifies whether the commitment and/or reservation of the specified
+region is to be changed. This allows a region of private pages to be
+reserved without creating any kind of memory object.</p>
+<p>6. Correct definition of giveable and gettable sections so they are
+temporary and mapped at a fixed address in the virtual address space of
+each process.</p>
+<p>7. Correct definition of tiled to mean that the preferred mapping of
+the section is within the first <strong>512mb</strong> of the virtual
+address space of a process.</p>
+<p>8. Change give and get section to work with a virtual address rather
+than a section handle.</p>
+<p>9. Add function to query a region of virtual memory.</p>
+<p>10. Clear up confusion about protection types by defining types to be
+no access, execute-only, read-only, read/write, and guard region.</p>
+<p>11. Drop section offset parameter on create section operation which
+allows any number of section to be backed by the same data file.</p>
+<p>12. If no <strong>ACL</strong> is specified for an object, then use a
+process default <strong>ACL</strong>.</p>
+<p>13. Change close section handle to be a generic function that closes
+any type of handle.</p>
+<p>14. More clearly define what permanent objects are and how they are
+deleted.</p>
+<p>Revision 2.0, February 28, 1989</p>
+<p>1. Changed format of calls to match the <strong>Windows NT</strong>
+coding guidelines.</p>
+<p>Revision 2.1, March 16, 1989</p>
+<p>1. Changed format of calls to match the new <strong>Windows
+NT</strong> coding guidelines.</p>
+<p>2. Added <em>ProcessHandle</em> argument create operations which
+operated on the address space.</p>
+<p>3. Change <em>Fork</em> attribute to <em>Inherit</em>.</p>
+<p>4. Removed giveable and gettable attributes and replaced them with
+the based attribute.</p>
+<p>5. Eliminated <strong>NtGetSection</strong> and
+<strong>NtGiveSection</strong> services.</p>
+<p>6. Changed semantics of services that change virtual memory
+attributes on a range of pages to either change the total specified
+range or fail and change none of the range. This matches OS/2
+behavior.</p>
+<p>7. Added OBJ_EXCLUSIVE and OBJ_SYSTEM_TABLE flags to handle
+attributes in create section.</p>
+<p>8. Added handle attributes to OpenSection service.</p>
+<p>9. Enhanced map view to recognize multiple mappings of the same
+complete section and return the base address in subsequent mappings.</p>
+<p>10. Changed FreeVirtualMemory to not allow previously committed
+shared pages to be decommitted. This matches the OS/2 behavior.</p>
+<p>11. Changed lock and unlock virtual memory to talk about system and
+process residency rather than system and process address maps.</p>
+<p>12. Add zero bits parameter to
+<strong>NtAllocateVirtualMemory</strong>.</p>
+<p>13. Add <strong>NtReadVirtualMemory</strong> function.</p>
+<p>14. Add <strong>NtWriteVirtualMemory</strong> function.</p>
+<p>15. Add error return values.</p>
+<p>Revision 2.2, May 9, 1989</p>
+<p>1. Fix typos and minor inconsistencies.</p>
+<p>Revision 2.3, August 7, 1989</p>
+<p>1. Add SEC_IMAGE option to <strong>NtCreateSection</strong>.</p>
+<p>2. Add PAG_NOCACHE option to the protection values.</p>
+<p>Revision 2.4, September 7, 1989</p>
+<p>1. Change names of PAG_READ, PAG_READWRITE, PAG_EXECUTE,
+PAG_NOACCESS, PAGE_NOCACHE, PAG_GUARD to PAGE_READ, etc.</p>
+<p>2. Change names of PAG_COMMIT, PAG_RESERVE, PAG_RELEASE,
+PAG_DECOMMIT, PAG_PRIVATE, PAG_MAPPED, to MEM_COMMIT, MEM_RESERVE,
+etc.</p>
+<p>3. Changed NtMapViewOfSection to have AllocationType parameter and
+changed the type of InheritDisposition from ULONG to
+SECITON_INHERIT.</p>
+<p>4. Added MEM_TOP_DOWN to NtAllocateVirtualMemory and
+NtMapViewOfSection.</p>
+<p>5. Changed BaseAddress from an IN to an IN OUT in
+NtFreeVirtualMemory, NtProtectVirtualMemory, NtLockVirtualMemoryh and
+NtUnlockVirtualMemory.</p>
+<p>6. Added BaseAddress field to MEMORYBASICINFO type.</p>
+<p>7. Added PAGE_WRITECOPY protection to NtMapViewOfSection,
+NtProtectVirtualMemory, and NtQueryVirtualMemory.</p>
+<p>8. Added note to NtProtectVirtualMemory indicating that changing a
+locked page to PAGE_NOACCESS causes the page to be unlocked.</p>
+<p>9. Added note to NtLockVirtualMemory to indicate that locked pages
+are not locked in a process which inherits the memory.</p>
+<p>10. Changed SectionOffset in NtMapViewOfSection to IN OUT.</p>
+<p>Revision 2.5, October 23, 1989</p>
+<p>1. Add PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE and
+PAGE_EXECUTE_WRITECOPY.</p>
+<p>2. Change semantic of PAGE_GUARD to be similar to PAGE_NOACCESS, but
+instead of an "access violation" being raised, the page protection is
+changed to its declared protection and a "guard page entered" exception
+is raised. Like PAGE_NOACCESS, guard pages unlocked locked pages.</p>
+<p>3. Added SectionPageProtection argument to NtCreateSection.</p>
+<p>4. Added SEC_NOCACHE attribute to NtCreateSection.</p>
+<p>5. Made SetionOffset optional for NtMapViewOfSection and changed its
+allocation from host page size, to system allocation granularity
+(64k).</p>
+<p>6. Changed SEC_COPY, SEC_SHARE, SEC_UNMAP to ViewCopy, ViewShare,
+ViewUnmap in NtMapViewOfSection.</p>
+<p>7. Removed PAGE_NOCACHE option from NtMapViewOfSection.</p>
+<p>8. Added PAGE_GUARD option to NtMapViewOfSection.</p>
+<p>9. Added PAGE_GUARD option to NtAllocateVirtualMemory.</p>
+<p>10. Clarified PAGE_NOCACHE option in NtAllocateVirtualMemory.</p>
+<p>11. Changed region size of zero to operate on complete range in
+NtFreeVirtualMemory.</p>
+<p>12. Added AllocationBase and AllocationProtect to
+NtQueryVirtualMemory.</p>
+<p>13. Added SECTIONIMAGEINFO to NtQuerySection.</p>
+<p>14. For NtReadVirtualMemory the NumberOfBytesRead was changed to be
+OPTIONAL.</p>
+<p>15. For NtWriteVirtualMemory the NumberOfBytesWritten was changed to
+be OPTIONAL.</p>
+<p>Revision 2.6, December 1, 1989</p>
+<p>1. Changed description of NtCreateSection and NtOpenSection to sue
+OBJECT_ATTRIBUTES and reference the Object Management Specification for
+details.</p>
+<p>2. Changed Query services info structure names.</p>
+<p>3. Removed all references to TILE.</p>
+<p>Revision 2.7, January 5, 1990</p>
+<p>1. Changed section access rights from READ, WRITE, and EXECUTE to
+SECTION_MAP_READ, SECTION_MAP_WRITE, and SECTION_MAP_EXECUTE.</p>
+<p>2. Added SECTION_QUERY access right.</p>
+<p>3. Described the type of access required on the section and process
+handles for various virtual memory services.</p>
+<p>Revision 2.8, February 8, 1990</p>
+<p>1. Changed NtReadVirtualMemory to have OUT on the buffer argument
+rather than IN.</p>
+<p>2. Changed NtWriteVirtualMemory to have OUT on the base address
+argument rather than IN.</p>
+<p>3. Changed both NtReadVirtualMemory and NtWriteVirtualMemory to
+remove the base address rounding down to the host page size.</p>
+<p>4. Removed PAGE_NOACCESS and PAGE_GUARD as valid page protections
+when creating a section.</p>
+<p>5. PAGE_NOACCESS may not be specified in combination with PAGE_GUARD
+or PAGE_NOCACHE.</p>
+<p>6. Removed STATUS_BUFFER_TOO_SMALL.</p>
+<p>7. Added status's of STATUS_INVALID_INFO_CLASS and
+STATUS_INFO_LENGHT_MISMATCH to query functions.</p>
+<p>8. Disallow the combination of Commit and Release to
+NtFreeVirtualMemory.</p>
+<p>9. Add STATUS_NOT_IMAGE to query vm and create section.</p>
+<p>10. Add section on page file quota and commitment.</p>
+<p>11. Clarify protection rules in MapViewOfSection.</p>
+<p>12. Don't allow protection of PAGE_WRITECOPY or
+PAGE_EXECUTE_WRITECOPY on address ranges not mapping a view of a
+section.</p>
+<p>13. Don't allow a protection of PAGE_NOCACHE on address ranges
+mapping a view of a section.</p>
+<p>Revision 2.9, March 9, 1990</p>
+<p>1. Added the following status values to various calls:
+STATUS_SECTION_TOO_BIG and STATUS_CONFLICTING_ADDRESS.</p>
+<p>2. Changed DesiredAccess to type ACCESS_MASK.</p>
+<p>3. When SEC_IMAGE is specified in NtCreateSection only accept
+SEC_BASED with it.</p>
+<p>4. Limit MaximumSize in NtCreateSection to 0xFFFEFFFF.</p>
+<p>5. Removed ViewCopy from NtMapViewOfSection.</p>
+<p>Revision 3.0, May 31, 1990</p>
+<p>1. Added the NtExtendSection service.</p>
+<p>2. Added SECTION_EXTEND_SIZE access.</p>
+<p>3. In create section SEC_COMMIT is only meaningful for page file
+backed sections.</p>
+<p>4. Changed SectionSize parameter to type PLARGE_INTEGER in
+NtCreateSection.</p>
+<p>5. Changed description of MaximumSize parameter in
+NtCreateSection.</p>
+<p>6. Changed SectionOffset parameter to type PLARGE_INTEGER in
+NtMapViewOfSection.</p>
+<p>7. Added NtCreatePagingFile routine.</p>
+<p>8. Added NtFlushInstructionCache routine.</p>
+<p>9. Added NtFlushWriteBuffer routine.</p>
+<p>10. Changed NtFreeVirtualMemory to require the base address to be the
+start of the region if the region size is specified as zero.</p>
+<p>11. Added more status codes to NtFreeVirtualMemory.</p>
+<p>Revision 3.1, October 4, 1990</p>
+<p>1. Added STATUS_NOT_COMMITTED to NtProtectVirtualMemory.</p>
+<p>2. Added MEM_IMAGE as another type to NtQueryVirtualMemory.</p>
+<p>Revision 3.2, January 24, 1991</p>
+<p>1. Added SECTION_EXTEND_SIZE to NtOpenSection.</p>
+<p>2. Clarified that SECTION_WRITE access also grants read access.</p>
+<p>3. Clarified that private pages are inherited on a fork
+operation.</p>
+<p>4. Changed parameters to NtCreatePagingFile.</p>
+<p>5. Clarified NtReadVirtualMemory and NtWriteVirtualMemory to state
+that the buffers are probed before any bytes are copied.</p>
+<p>Revision 3.3, April 25, 1991</p>
+<p>1. For NtFlushVirtualMemory if RegionSize is zero, flush from the
+base address to the end of the mapped view.</p>
+<p>Revision 4.0, April 28, 1993</p>
+<p>1. Reflect Windows NT version 3.1.</p>
+<p>2. Remove all references to OS/2.</p>
+<p>3. Change references to 64k alignment to Allocation Granularity as
+this alignment is hardware architecture dependent.</p>
+<p>4. Changed description of SEC_BASED.</p>
+<p>5. Added MEM_LARGE_PAGES and MEM_DOS_LIM to NtMapViewOfSection.</p>
+<p>6. Changed NtAllocateVirtualMemory to reflect the fact that committed
+pages may be committed.</p>
+<p>7. Change NtFreeVirtualMemory to reflect the fact that reserved pages
+may be decommitted.</p>
+<p>8. Updated section information structure.</p>
+<p>9. Added parameters to NtFlushInstructionCache.</p>
+<p>[end of vm.doc]</p>

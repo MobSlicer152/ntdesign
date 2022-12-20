@@ -1,0 +1,100 @@
+<p><strong>Portable Systems Group</strong></p>
+<p><strong>NT OS/2 Suspend/Resume Design Note</strong></p>
+<p><strong>Author</strong>: <em>David N. Cutler</em></p>
+<p><em>Original Draft 1.0, February 9, 1989</em></p>
+<p><em>Revision 1.1, March 30, 1989</em></p>
+<p>This design note discusses a proposal to implement suspend and resume
+as part of the kernel rather than in the executive layer.</p>
+<p>The suspension of a thread is controlled by a suspend count and a
+semaphore object that is built into the thread object. This semaphore
+has an initial value of zero and a maximum count of two (see explanation
+at end of this document as to why the maximum count must be two rather
+than one).</p>
+<p>When an attempt is made to suspend a thread, the suspend count is
+incremented and a check is made to determine if the thread is already
+suspended (indicated by a nonzero initial suspend count). If the thread
+is not suspended, then a normal kernel <strong>APC</strong> is queued to
+the thread which will cause it to wait on its builtin semaphore.</p>
+<p>A special case arises when the builtin <strong>APC</strong> is
+already queued to the target thread. This situation occurs when the
+target thread has been suspended and then resumed, but has never
+actually received the <strong>APC</strong> and suspended itself. Since
+the target thread has never actually suspended itself, the builtin
+semaphore count is decremented to indicate that the thread should
+suspend rather than resume.</p>
+<p>The following pseudo code describes the logic of SuspendThread;</p>
+<p><strong>PROCEDURE</strong> SuspendThread (</p>
+<p><strong>IN</strong> Tcb : <strong>POINTER</strong> KtThread;</p>
+<p>) <strong>RETURNS</strong> integer;</p>
+<p><strong>VARIABLE</strong></p>
+<p>OldCount : integer;</p>
+<p><strong>BEGIN</strong></p>
+<p>Acquire dispatcher database lock;</p>
+<p>OldCount = Tcb.SuspendCount;</p>
+<p><strong>IF</strong> Tcb.SuspendCount == 0 <strong>THEN</strong></p>
+<p><strong>IF</strong> <strong>NOT</strong> QueueApc(Tcb.SuspendAcb)
+<strong>THEN</strong></p>
+<p>Tcb.SuspendSemaphore.Signal =</p>
+<p>Tcb.SuspendSemaphore.Signal - 1;</p>
+<p><strong>END IF;</strong></p>
+<p><strong>END IF;</strong></p>
+<p>Tcb.SuspendCount = Tcb.SuspendCount + 1;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>RETURN</strong> OldCount;</p>
+<p><strong>END</strong> SuspendThread;</p>
+<p>Resuming a thread checks to determine if the thread has been
+suspended by examining the suspend count. If the thread has not been
+suspended, then no operation is performed. Otherwise the suspend count
+is decremented. If the resultant value is zero, then the target thread's
+builtin suspend semaphore is released.</p>
+<p>The following pseudo code describes the logic of ResumeThread;</p>
+<p><strong>PROCEDURE</strong> ResumeThread (</p>
+<p><strong>IN</strong> Tcb : <strong>POINTER</strong> KtThread;</p>
+<p>) <strong>RETURNS</strong> integer;</p>
+<p><strong>VARIABLE</strong></p>
+<p>OldCount : integer;</p>
+<p><strong>BEGIN</strong></p>
+<p>Acquire dispatcher database lock;</p>
+<p>OldCount = Tcb.SuspendCount;</p>
+<p><strong>IF</strong> Tcb.SuspendCount &lt;&gt; 0
+<strong>THEN</strong></p>
+<p>Tcb.SuspendCount = Tcb.SuspendCount - 1;</p>
+<p>IF Tcb.SuspendCount == 0 THEN</p>
+<p>Release Tcb.SuspendSemaphore;</p>
+<p><strong>END IF</strong>;</p>
+<p><strong>END</strong> <strong>IF</strong>;</p>
+<p>Release dispatcher database lock;</p>
+<p><strong>RETURN</strong> OldCount;</p>
+<p><strong>END</strong> SuspendThread;</p>
+<p>The maximum count of the builtin semaphore must be two so that the
+following race condition can be avoided.</p>
+<blockquote>
+<p>1. a target thread is suspended by incrementing its suspend count to
+one and queuing its builtin suspend <strong>APC</strong></p>
+<p>2. before the thread can respond to the suspend <strong>APC</strong>,
+it is resumed which causes the suspend count to be decremented to zero
+and the builtin suspend semaphore to be incremented to one</p>
+<p>3. the thread receives the suspend <strong>APC</strong>, but before
+it can wait on the builtin semaphore it is interrupted to deliver a
+special kernel <strong>APC</strong></p>
+<p>4. the special kernel <strong>APC</strong> code page faults and waits
+on the page to be brought into memory</p>
+<p>5. the target thread is again suspended which causes its suspend
+count to be incremented and its builtin suspend <strong>APC</strong> to
+be queued</p>
+<p>6. the thread is resumed before it has finished processing the
+special kernel <strong>APC</strong> which causes the suspend count to be
+decremented to zero and the builtin semaphore to be incremented to
+two</p>
+</blockquote>
+<p>No additional nesting can occur since further attempts to queue the
+<strong>APC</strong> will fail which cause the semaphore count to be
+decremented. Thus the maximum count does not need to be greater than
+two.</p>
+<p><strong>Revision History</strong>:</p>
+<p>Original Draft 1.0, February 9, 1989</p>
+<p>Revision 1.1, March 30, 1989</p>
+<blockquote>
+<p>1. Minor edits to conform to standard format.</p>
+</blockquote>
+<p>[end of suspend.doc]</p>

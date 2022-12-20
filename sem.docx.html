@@ -1,0 +1,540 @@
+<p>Portable Systems Group</p>
+<p>Windows NT Event - Semaphore Specification</p>
+<p><strong>Author:</strong> Lou Perazzoli</p>
+<p>Original Draft 1.0, January 5, 1989</p>
+<p>Revision 1.3, May 11, 1989</p>
+<p>Revision 1.4, August 8, 1989</p>
+<p>Revision 1.5, October 23, 1989</p>
+<p>Revision 1.6, December 1, 1989</p>
+<p>Revision 1.7, January 3, 1990</p>
+<p>Revision 1.8, January 23, 1990</p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 1</p>
+<p>2. Event Objects 1</p>
+<p>2.1 Create Event Object 1</p>
+<p>2.2 Open Event Object 2</p>
+<p>2.3 Set Event 3</p>
+<p>2.4 Reset Event 4</p>
+<p>2.5 Pulse Event 4</p>
+<p>2.6 Query Event 4</p>
+<p>3. Semaphore Objects 5</p>
+<p>3.1 Create Semaphore Object 5</p>
+<p>3.2 Open Semaphore Object 6</p>
+<p>3.3 Release Semaphore Object 7</p>
+<p>3.4 Query Semaphore 8</p>
+<p>4.0 Delay Execution 9</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>This specification describes the <strong>Windows NT</strong> event
+and semaphore objects and the wait services. A definition and an
+explanation of operation is given for each API. No attempt has been
+made, however, to fully explain all error conditions and their
+consequences.</p>
+<p>The APIs described include:</p>
+<p><strong>NtCreateEvent</strong> - create event and open handle</p>
+<p><strong>NtOpenEvent</strong> - open handle to existing event</p>
+<p><strong>NtSetEvent</strong> - set event to Signal state</p>
+<p><strong>NtResetEvent</strong> - set event to Not-Signaled state</p>
+<p><strong>NtPulseEvent</strong> - set / reset event state
+atomically</p>
+<p><strong>NtQueryEvent</strong> - get information about event</p>
+<p><strong>NtCreateSemaphore</strong> - create semaphore and open
+handle</p>
+<p><strong>NtOpenSemaphore</strong> - open handle to existing
+semaphore</p>
+<p><strong>NtReleaseSemaphore</strong> - release semaphore</p>
+<p><strong>NtQuerySemaphore</strong> - get information about
+semaphore</p>
+<p><strong>NtWaitForSingleObject</strong> - wait for specified
+object</p>
+<p><strong>NtWaitForMultipleObjects</strong> - wait for a list of
+objects</p>
+<p><strong>NtDelayExecution</strong> - delay execution for the specified
+time</p>
+<p><strong>NtClose</strong> - close an object handle</p>
+<h1 id="event-objects">2. Event Objects</h1>
+<p>There are two types of event objects, <em>notification events</em>
+and <em>synchronization events</em>. Notification event objects provide
+a mechanism for notification. Notification events are either
+<em>Signaled</em> (TRUE) or <em>Not</em>-<em>Signaled</em> (FALSE). An
+event may be set multiple times, yet the state remains Signaled.
+Notification events provides no ownership capability. If multiple
+threads are waiting on a notification event, then when the event becomes
+Signaled, <strong>all</strong> threads waiting for the event are made
+"runnable". A notification event becomes Not-Signaled only when
+explicitly reset.</p>
+<p>Synchronization event objects have the property that when the event
+is set, the event attains a state of Signaled, which releases a single
+thread currently waiting on the event, and then the event immediately
+attains a state of Not-Signaled. If there are no threads waiting on the
+event, the state of the event remains Signaled. This allows threads to
+"synchronize" on the signaling of the event. Like notification events,
+synchronization events provide no ownership capability.</p>
+<p>A synchronization event attains a state of Not-Signaled when
+explicitly reset or when the first wait operation is satisfied on the
+event. Note that any time an event attains a state of Not-Signaled, the
+event count for the state of the event is set to zero.</p>
+<h2 id="create-event-object">2.1 Create Event Object</h2>
+<p>An event object is created and a handle opened for access to the
+object with the <strong>NtCreateEvent</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateEvent</strong> (</p>
+<p><strong>OUT PHANDLE</strong> <em>EventHandle,</em></p>
+<p><strong>IN ULONG</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN EVENT_TYPE</strong> <em>EventType,</em></p>
+<p><strong>IN BOOLEAN</strong> <em>InitialState</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>EventHandle</em> - A pointer to a variable that receives the
+event object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access for the event.
+The following object type specific access flags can be specified in
+addition to the <em>STANDARD_RIGHTS_REQUIRED</em> flags described in the
+Object Management Specification.</p>
+<p>DesiredAccess Flags</p>
+<p><em>EVENT_QUERY_STATE</em> - Query access to the event is
+desired.</p>
+<p><em>EVENT_MODIFY_STATE</em> - Modify state access (set and reset) to
+the event is desired.</p>
+<p><em>SYNCHRONIZE</em> - Synchronization access (wait) to the event is
+desired.</p>
+<p><em>ObjectAttributes</em> - An optional pointer to a structure that
+specifies the object's attributes. Refer to the <em>Object Management
+Specification</em> for details.</p>
+<p><em>EventType</em> - The type of event object to be created. One of
+<em>NotificationEvent</em> or <em>SynchronizationEvent</em>.</p>
+<p><em>InitialState</em> - The initial state of the event object, one of
+<em>TRUE</em> or <em>FALSE</em>. If the <em>InitialState</em> is
+specified as TRUE, the event's current state value is set to one,
+otherwise it is set to zero.</p>
+<p>The <strong>NtCreateEvent</strong> function creates an event object
+with the specified initial state. If an event is in the Signaled state
+(TRUE), a wait operation on the event does not block. If the event is in
+the Not-Signaled state (FALSE), a wait operation on the event blocks
+until the specified event attains a state of Signaled, the timeout value
+is exceeded, or an alert is delivered.</p>
+<h2 id="open-event-object">2.2 Open Event Object</h2>
+<p>A handle can be opened to an existing event object with the
+<strong>NtOpenEvent</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtOpenEvent</strong> <em>(</em></p>
+<p><strong>OUT PHANDLE</strong> <em>EventHandle,</em></p>
+<p><strong>IN ULONG</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes,</em></p>
+<p><em>)</em>;</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>EventHandle</em> - A pointer to a variable that receives the
+value of the event object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the event.
+The following object type specific access flags can be specified in
+addition to the <em>STANDARD_RIGHTS_REQUIRED</em> flags described in the
+Object Management Specification.</p>
+<p>DesiredAccess Flags</p>
+<p><em>EVENT_QUERY_STATE</em> - Query access to the event is
+desired.</p>
+<p><em>EVENT_MODIFY_STATE</em> - Modify state access (set and reset) to
+the event is desired.</p>
+<p><em>SYNCHRONIZE</em> - Synchronization access (wait) to the event is
+desired.</p>
+<p><em>ObjectAttributes</em> - A pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object Management
+Specification</em> for details.</p>
+<h2 id="set-event">2.3 Set Event</h2>
+<p>An event can be set to the signaled state (<em>TRUE</em>) with the
+<strong>NtSetEvent</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtSetEvent</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>EventHandle,</em></p>
+<p><strong>OUT PLONG</strong> <em>PreviousState</em>
+<strong>OPTIONAL</strong></p>
+<p><em>);</em></p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>EventHandle</em> - An open handle to an event object.</p>
+<p><em>PreviousState</em> - An optional pointer to a variable that
+receives the previous state of the event. Zero is Not-Signaled, non-zero
+is Signaled. The value indicates the number of times the event has been
+set since the last reset.</p>
+<p>Setting the event causes the event to attain a state of Signaled,
+which releases all threads currently waiting on the event. Any threads
+which issue a wait operation on the event do not block and continue to
+execute. It also increments the event count for the state of the
+event.</p>
+<h2 id="reset-event">2.4 Reset Event</h2>
+<p>The state of an event is set to the Not-Signaled state
+(<em>FALSE</em>) using the <strong>NtResetEvent</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtResetEvent</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>EventHandle,</em></p>
+<p><strong>OUT PLONG</strong> <em>PreviousState</em>
+<strong>OPTIONAL</strong></p>
+<p><em>);</em></p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>EventHandle</em> - An open handle to an event object.</p>
+<p><em>PreviousState</em> - An optional pointer to a variable that
+receives the previous state of the event. Zero is Not-Signaled, non-zero
+is Signaled. The value indicates the number of times the event has been
+set since the last reset.</p>
+<p>Once the event attains a state of Not-Signaled, any threads which
+wait on the event block, awaiting the event to become Signaled. The
+reset event service sets the event count to zero for the state of the
+event.</p>
+<h2 id="pulse-event">2.5 Pulse Event</h2>
+<p>An event can be set to the Signaled state and reset to the
+Not-Signaled state atomically with the <strong>NtPulseEvent</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtPulseEvent</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>EventHandle,</em></p>
+<p><strong>OUT PLONG</strong> <em>PreviousState</em>
+<strong>OPTIONAL</strong></p>
+<p><em>);</em></p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>EventHandle</em> - An open handle to an event object.</p>
+<p><em>PreviousState</em> - An optional pointer to a variable that
+receives the previous state of the event. Zero is Not-Signaled, non-zero
+is Signaled. The value indicates the number of times the event has been
+set since the last reset.</p>
+<p>Pulsing the event causes the event to attain a state of Signaled,
+which releases all threads currently waiting on the event, and then
+attain a state of Not-Signaled. The pulse event service sets the event
+count to zero for the state of the event.</p>
+<h2 id="query-event">2.6 Query Event</h2>
+<p>The state of an event can be queried with the
+<strong>NtQueryEvent</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQueryEvent</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>EventHandle,</em></p>
+<p><strong>IN EVENT_INFORMATION_CLASS</strong>
+<em>EventInformationClass,</em></p>
+<p><strong>OUT PVOID</strong> <em>EventInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>EventInformationLength,</em></p>
+<p><strong>OUT PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>EventHandle</em> - An open handle to an event object.</p>
+<p><em>EventInformationClass</em> - The event information class about
+which to retrieve information.</p>
+<p><em>EventInformation</em> - A pointer to a buffer that receives the
+specified information. The format and content of the buffer depend on
+the specified event class.</p>
+<p>EventInformation Format by Information Class:</p>
+<p><em>EventBasicInformation</em> - Data type is
+<em>EVENT_BASIC_INFORMATION</em>.</p>
+<p>EVENT_BASIC_INFORMATION Structure</p>
+<p><strong>EVENT_TYPE</strong> <em>EventType</em> - The type of the
+event.</p>
+<p><strong>LONG</strong> <em>EventState</em> - The current state of the
+event.</p>
+<p><em>EventInformationLength</em> - Specifies the length in bytes of
+the event information buffer.</p>
+<p><em>ReturnLength</em> - An optional pointer which, if specified,
+receives the number of bytes placed in the event information buffer.</p>
+<p>This function provides the capability to determine the state and
+granted access of an event object.</p>
+<h1 id="semaphore-objects">3. Semaphore Objects</h1>
+<p>Semaphore objects provide a mechanism for resource gates. When a
+semaphore is created, it is provided an initial count and maximum count.
+When a thread waits on a semaphore, if the current count is greater than
+zero, then the current count is decremented and the thread continues to
+execute. If the current count is zero, the thread blocks until the count
+becomes greater than zero. When a thread releases a semaphore, the
+current count is augmented. Semaphores do not provide ownership;
+multiple threads can be waiting and releasing the same semaphore.</p>
+<h2 id="create-semaphore-object">3.1 Create Semaphore Object</h2>
+<p>A semaphore object is created and a handle opened for access to the
+object with the <strong>NtCreateSemaphore</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtCreateSemaphore</strong> (</p>
+<p><strong>OUT PHANDLE</strong> <em>SemaphoreHandle,</em></p>
+<p><strong>IN ULONG</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN LONG</strong> <em>InitialCount,</em></p>
+<p><strong>IN LONG</strong> <em>MaximumCount</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>SemaphoreHandle</em> - A pointer to a variable that receives the
+value of the semaphore object handle.</p>
+<p><em>DesiredAccess</em> - The desired types of access for the
+semaphore. The following object type specific access flags can be
+specified in addition to the <em>STANDARD_RIGHTS_REQUIRED</em> flags
+described in the Object Management Specification.</p>
+<p>DesiredAccess Flags</p>
+<p><em>SEMAPHORE_QUERY_STATE</em> - Query access to the semaphore is
+desired.</p>
+<p><em>SEMAPHORE_MODIFY_STATE</em> - Modify state access (release) to
+the semaphore is desired.</p>
+<p><em>SYNCHRONIZE</em> - Synchronization access (wait) to the semaphore
+is desired.</p>
+<p><em>ObjectAttributes</em> - An optional pointer to a structure that
+specifies the object's attributes. Refer to the <em>Object Management
+Specification</em> for details.</p>
+<p><em>InitialCount</em> - The initial count for the semaphore, this
+value must be positive and less than or equal to the maximum count.</p>
+<p><em>MaximumCount</em> - The maximum count for the semaphore, this
+value must be greater than zero..</p>
+<p>The <strong>NtCreateSemaphore</strong> function causes a semaphore
+object to be created which contains the specified initial and maximum
+counts.</p>
+<h2 id="open-semaphore-object">3.2 Open Semaphore Object</h2>
+<p>A handle can be opened to an existing semaphore object with the
+<strong>NtOpenSemaphore</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtOpenSemaphore</strong> <em>(</em></p>
+<p><strong>OUT PHANDLE</strong> <em>SemaphoreHandle,</em></p>
+<p><strong>IN ULONG</strong> <em>DesiredAccess,</em></p>
+<p><strong>IN POBJECT_ATTRIBUTES</strong> <em>ObjectAttributes</em></p>
+<p><em>)</em>;</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>SemaphoreHandle</em> - A pointer to a variable that receives the
+semaphore object handle value.</p>
+<p><em>DesiredAccess</em> - The desired types of access to the
+semaphore. The following object type specific access flags can be
+specified in addition to the <em>STANDARD_RIGHTS_REQUIRED</em> flags
+described in the Object Management Specification.</p>
+<p>DesiredAccess Flags</p>
+<p><em>SEMAPHORE_QUERY_STATE</em> - Query access to the semaphore is
+desired.</p>
+<p><em>SEMAPHORE_MODIFY_STATE</em> - Modify state access (release) to
+the semaphore is desired.</p>
+<p><em>SYNCHRONIZE</em> - Synchronization access (wait) to the semaphore
+is desired.</p>
+<p><em>ObjectAttributes</em> - A pointer to a structure that specifies
+the object's attributes. Refer to the <em>Object Management
+Specification</em> for details.</p>
+<h2 id="release-semaphore-object">3.3 Release Semaphore Object</h2>
+<p>A semaphore object can be released with the
+<strong>NtReleaseSemaphore</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtReleaseSemaphore</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>SemaphoreHandle,</em></p>
+<p><strong>IN LONG</strong> <em>ReleaseCount,</em></p>
+<p><strong>OUT PLONG</strong> <em>PreviousCount</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>SemaphoreHandle</em> - An open handle to a semaphore object.</p>
+<p><em>ReleaseCount</em> - The release count for the semaphore. The
+count must be greater than zero and less than the maximum value
+specified for the semaphore.</p>
+<p><em>PreviousCount</em> - An optional pointer to a variable that
+receives the previous count for the semaphore.</p>
+<p>When the semaphore is released, the current count of the semaphore is
+incremented by the <em>ReleaseCount</em>. Any threads that are waiting
+for the semaphore are examined to see if the current semaphore value is
+sufficient to satisfy their wait.</p>
+<p>If the value specified by <em>ReleaseCount</em> would cause the
+maximum count for the semaphore to be exceeded, then the count for the
+semaphore is not affected and an error status is returned.</p>
+<h2 id="query-semaphore">3.4 Query Semaphore</h2>
+<p>The state of a semaphore can be queried with the
+<strong>NtQuerySemaphore</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtQuerySemaphore</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>SemaphoreHandle,</em></p>
+<p><strong>IN SEMAPHORE_INFORMATION_CLASS</strong>
+<em>SemaphoreInformationClass,</em></p>
+<p><strong>OUT PVOID</strong> <em>SemaphoreInformation,</em></p>
+<p><strong>IN ULONG</strong> <em>SemaphoreInformationLength,</em></p>
+<p><strong>OUT PULONG</strong> <em>ReturnLength</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>SemaphoreHandle</em> - An open handle to a semaphore object.</p>
+<p><em>SemaphoreInformationClass</em> - The semaphore information class
+about which to retrieve information.</p>
+<p><em>SemaphoreInformation</em> - A pointer to a buffer which receives
+the specified information. The format and content of the buffer depend
+on the specified semaphore class.</p>
+<p>SemaphoreInformation Format by Information Class:</p>
+<p><em>SemaphoreBasicInformation</em> - Data type is
+<em>SEMAPHORE_BASIC_INFORMATION</em>.</p>
+<p>SEMAPHORE_BASIC_INFORMATION Structure</p>
+<p><strong>LONG</strong> <em>CurrentCount</em> - The current count of
+the semaphore.</p>
+<p><strong>LONG</strong> <em>MaximumCount</em> - The maximum count that
+may be obtained by the semaphore.</p>
+<p><em>SemaphoreInformationLength</em> - Specifies the length in bytes
+of the semaphore information buffer.</p>
+<p><em>ReturnLength</em> - An optional pointer which, if specified,
+receives the number of bytes placed in the semaphore information
+buffer.</p>
+<p>This function provides the capability to determine the state and
+granted access of a semaphore object</p>
+<p><strong>4. Wait Services</strong></p>
+<p><strong>Windows NT</strong> provides wait services for threads to use
+for synchronization. A thread can wait on one or more objects to attain
+a state of signaled, as follows:</p>
+<p>o A thread can wait on a single waitable object.</p>
+<p>o A thread can wait on any waitable object in a list of objects.</p>
+<p>o A thread can wait on all waitable objects in a list of objects.</p>
+<p>When a thread executes a wait service, it specifies through the
+<em>Alertable</em> parameter whether or not alerts and
+<strong>APC's</strong> should interrupt the wait. If an alert is
+delivered while the thread is waiting with <em>Alertable</em>
+<em>TRUE</em>, the wait service completes and a condition of
+<em>STATUS_ALERTED</em> is raised. If an <strong>APC</strong> is
+delivered while the thread is waiting with <em>Alertable</em>
+<em>TRUE</em>, the <strong>APC</strong> is invoked and, when the APC
+completes, the wait operation re-executed.</p>
+<p>An optional <em>TimeOut</em> argument is supplied on the wait
+services. If the <em>TimeOut</em> argument is not supplied, the wait
+service completes when the wait conditions have been satisfied, or, when
+the thread is alerted, if the wait specified alerts.</p>
+<p>A <em>TimeOut</em> value is a signed 64 bit integer. If the
+<em>TimeOut</em> value is positive, then the value is interpreted as an
+absolute time and the wait expires when the system time equals the
+specified absolute time. If the <em>TimeOut</em> value is negative, then
+the absolute value of the <em>TimeOut</em> indicates the number of 100
+nanosecond clock ticks to wait from the current time before completing
+the wait with a time-out status.</p>
+<p><strong>4.1 Wait For Single Object</strong></p>
+<p>A wait operation on a waitable object is accomplished with the
+<strong>NtWaitForSingleObject</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtWaitForSingleObject</strong> <em>(</em></p>
+<p><strong>IN HANDLE</strong> <em>Handle,</em></p>
+<p><strong>IN BOOLEAN</strong> <em>Alertable,</em></p>
+<p><strong>IN PTIME</strong> <em>TimeOut</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>Handle</em> - An open handle to a waitable object.</p>
+<p><em>Alertable</em> - A boolean value that specifies whether the wait
+is alertable.</p>
+<p><em>TimeOut</em> - An optional pointer to a time-out value that
+specifies the absolute or relative time over which the wait is to be
+completed.</p>
+<p>Waiting on an object checks the current state of the object. If the
+current state of the object allows continued execution, any adjustments
+to the object state are made (for example, decrementing the semaphore
+count for a semaphore object) and the thread continues execution. If the
+current state of the object does not allow continued execution, the
+thread is placed into the wait state pending the change of the object's
+state or time-out.</p>
+<p>The returned status value indicates how the wait was satisfied:</p>
+<p>o A value of <em>STATUS_TIME_OUT</em> indicates that the wait was
+terminated due to the <em>TimeOut</em> conditions.</p>
+<p>o A value of <em>STATUS_SUCCESS</em> indicates the specified object
+attained a Signaled state thus completing the wait.</p>
+<p>o A value of <em>STATUS_ABANDONED</em> indicates the specified object
+attained a Signaled state but was abandoned.</p>
+<p><strong>4.2 Wait for Multiple Objects</strong></p>
+<p>A wait operation on multiple waitable objects (up to
+<em>MAXIMUM_WAIT_OBJECTS)</em> is accomplished with the
+<strong>NtWaitMultipleObjects</strong> function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtWaitForMultipleObjects (</strong></p>
+<p><strong>IN ULONG</strong> <em>Count,</em></p>
+<p><strong>IN HANDLE</strong> <em>Handles[],</em></p>
+<p><strong>IN WAIT_TYPE  </strong><em>WaitType,</em></p>
+<p><strong>IN BOOLEAN</strong> <em>Alertable,</em></p>
+<p><strong>IN PTIME</strong> <em>TimeOut</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>Count</em> - A count of the number of objects that are to be
+waited on.</p>
+<p><em>Handles</em> - An array of object handles.</p>
+<p><em>WaitType</em> - The type of operation that is to be performed
+(<em>WaitAny</em> or <em>WaitAll</em>).</p>
+<p><em>Alertable</em> - A boolean value that specifies whether the wait
+is alertable.</p>
+<p><em>TimeOut</em> - An optional pointer to a time-out value that
+specifies the absolute or relative time over which the wait is to be
+completed.</p>
+<p>The returned status value indicates how the wait was satisfied:</p>
+<p>o A value of <em>STATUS_TIME_OUT</em> indicates that the wait was
+terminated due to the <em>TimeOut</em> conditions.</p>
+<p>o A value from 0 to <strong>MAXIMUM_WAIT_OBJECTS - 1</strong>,
+indicates, in the case of wait for any object, the object number which
+satisfied the wait. In the case of wait for all objects, the value only
+indicates that the wait was completed successfully.</p>
+<p>o A value from <em>STATUS_ABANDONED</em> to <em>STATUS_ABANDONED</em>
++ (<strong>MAXIMUM_WAIT_OBJECTS - 1</strong>), indicates, in the case of
+wait for any object, the object number which satisfied the event, and
+that the object which satisfied the event was abandoned. In the case of
+wait for all objects, the value indicates that the wait was completed
+successfully and at least one of the objects was abandoned.</p>
+<h1 id="delay-execution">4.0 Delay Execution</h1>
+<p>The execution of the current thread can be delayed for a specified
+interval of time with the <strong>NtDelayExecution</strong>
+function:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>NtDelayExecution</strong> (</p>
+<p><strong>IN BOOLEAN</strong> <em>Alertable,</em></p>
+<p><strong>IN PTIME</strong> <em>DelayInterval</em></p>
+<p>);</p>
+<p><strong><u>Parameters:</u></strong></p>
+<p><em>Alertable</em> - A boolean value that specifies whether the wait
+is alertable.</p>
+<p><em>DelayInterval</em> - The absolute or relative time over which the
+wait is to occur.</p>
+<p>The <strong>NtDelayExecution</strong> function causes the current
+thread to enter a waiting state until the specified interval of time has
+passed. If <em>Alertable</em> is specified as <em>TRUE</em>, the wait
+service completes and a condition of <em>STATUS_ALERTED</em> is raised.
+If an <strong>APC</strong> is delivered while the thread is waiting
+alertable, the <strong>APC</strong> is invoked and the wait operation
+re-executed.</p>
+<p><strong>5. Fast Interprocess Synchronization</strong></p>
+<p>A general set of routines should be developed to provide extremely
+fast synchronization primitives for a single process. These routines
+could be utilized for medium and fine-grained parallel applications.</p>
+<p>Basically a routine is called to allocate the "resource lock". The
+resource lock consists of a data structure which has a "test and set"
+variable, status variable, and a waitable object handle.</p>
+<p>A request to gain the "lock" does a test and set on the resource lock
+variable. If the resource lock is unowned, the thread continues to run.
+If the resource lock is already owned, the thread sets the status
+variable to indicate waiters are present, rechecks the lock variable,
+and if not free, makes a system call to wait on the waitable object.
+Note that for fine grained parallelism with multiprocessors it may be
+desirable to "spin" on the lock for some period of time before doing the
+wait.</p>
+<p>A request to "unlock" does a test and set on the lock variable,
+clearing the ownership. If the status variable indicates that waiters
+are present, the waitable object is "signaled", thereby allowing any
+waiters to compete for the lock.</p>
+<p>In the typical case, a lock request would succeed without blocking
+and the same for the unlock request. It is only when there is contention
+on the lock that a call to the system has to be made.</p>
+<p><strong>Revision History:</strong></p>
+<p>Original Draft 1.0, January 5, 1989</p>
+<p>Revision 1.2, March 12, 1989</p>
+<p>1. Removed Muxwait object and Mutex object.</p>
+<p>Revision 1.3, May 11, 1989</p>
+<p>1. Added wait for multiple objects.</p>
+<p>2. Added NtDelayExecution</p>
+<p>Revision 1.4, August 8, 1989</p>
+<p>1. Make return parameters for PreviousState and CurrentState
+optional.</p>
+<p>Revision 1.5, October 23, 1989</p>
+<p>1. Changed EventName/SemaphoreName in OBJA structure to
+ObjectName.</p>
+<p>2. Added description of notification and synchronization events.</p>
+<p>3. Changed <em>PreviousState</em> to return a count that indicates
+the number of times the event was set since the last reset.</p>
+<p>4. Added the <em>EventType</em> to the query event call.</p>
+<p>5. Changed wait services to describe the abandoned state.</p>
+<p>Revision 1.6, December 1, 1989</p>
+<p>1. Changed desciption of NtCreateSemaphore, NtCreateEvent,
+NtOpenSemaphore and NtOpenEvent to use OBJECT_ATTRIBUTES and reference
+Object Management Specification for detials.</p>
+<p>2. Changed PULONG to PLONG for PreviousState argument in NtSetEvent,
+NtResetEvent, and NtPulseEvent.</p>
+<p>Revision 1.7, January 3, 1990</p>
+<p>1. Clarified the behavior of sychronzation events and the state of
+the event count.</p>
+<p>2. Changed desired access flags for NtCreateEvent, NtOpenEvent,
+NtCreateSemaphore, and NtOpenSemaphore.</p>
+<p>3. Removed NtWait description. This is now in the Object Management
+Specification.</p>
+<p>Revision 1.8, January 23, 1990</p>
+<p>1. Changed NtReleaseSemaphore to return a failure if the ReleaseCount
+is greater than the maximum count.</p>
+<p>2. Changed NtReleaseSemaphore to require the ReleaseCount to be
+greater than 0.</p>

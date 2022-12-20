@@ -1,0 +1,604 @@
+<p><strong>Portable Systems Group</strong><br />
+<br />
+<strong>NT OS/2 System Startup Design Note</strong><br />
+<br />
+<strong>Author:</strong> <em>Mark Lucovsky</em><br />
+<br />
+<em>Revision 1.2, July 26, 1990</em><br />
+<em>Original Draft May 31, 1990</em></p>
+<p>.Begin Table C.</p>
+<p>1. Overview 1</p>
+<p>1.1 System Initialization 1</p>
+<p>1.2 System Startup 1</p>
+<p>1.2.1 Executive Level System System Startup 1</p>
+<p>1.2.2 Session Manager System Startup 1</p>
+<p>1.2.2.1 First Phase SM system startup 2</p>
+<p>1.2.2.1.1 Link Keyword 2</p>
+<p>1.2.2.1.2 PagingFile Keyword 3</p>
+<p>1.2.2.2 Second Phase SM system startup 3</p>
+<p>1.2.2.2.1 Subsystem Keyword 3</p>
+<p>1.2.2.2.2 Start Keyword 4</p>
+<p>1.2.2.2.3 Run Keyword 5</p>
+<p>1.2.2.2.4 Debug Keyword 5</p>
+<p>1.2.2.2.5 LibPath Keyword 5</p>
+<p>1.2.2.2.6 Short Term Keywords 6</p>
+<p>2. Configuration File APIs 7</p>
+<p>2.1 Configuration File Data Structures 9</p>
+<p>2.1.1 CONFIG_FILE 9</p>
+<p>2.1.2 CONFIG_SECTION 9</p>
+<p>2.1.3 CONFIG_KEYWORD 9</p>
+<p>2.1.4 Configuration File APIs 10</p>
+<p>2.1.4.1 RtlOpenConfigFile 10</p>
+<p>2.1.4.2 RtlCloseConfigFile 10</p>
+<p>2.1.4.3 RtlLocateSectionConfigFile 11</p>
+<p>2.1.4.4 RtlLocateKeywordConfigFile 11</p>
+<p>2.1.4.5 RtlEnumerateSectionConfigFile 12</p>
+<p>2.1.4.6 RtlEnumerateKeywordConfigFile 12</p>
+<p>.End Table C.</p>
+<h1 id="overview">1. Overview</h1>
+<p>This design note describes system startup for NT OS/2. For the
+purposes of this paper, system startup begins after phase 1 system
+initialization completes.</p>
+<p>This paper does not describe an agreed to, long term strategy. It
+describes an interim startup sequence that will be used until the system
+installation and system configuration plans solidify.</p>
+<h2 id="system-initialization">1.1 System Initialization</h2>
+<p>This paper does not describe system initialization in any great level
+of detail. System initialization occurs in three phases. After boot
+loading the system image, the kernel is called at
+<strong>KiSystemStartup</strong>. After kernel initialization, the
+executive is called to perform phase 0 initialization. This causes
+memory management, the object manager, and the process architecture to
+initialize. During phase 0, a thread is created to perform phase 1
+initialization. Upon completion of phase 0 initialization, a context
+switch to the thread occurs and it proceeds with phase 1 initialization.
+The bulk of NT OS/2 is initialized during this phase. Upon completion of
+phase 1 initialization, system startup begins.</p>
+<h2 id="system-startup">1.2 System Startup</h2>
+<p>System startup occurs in the NT OS/2 executive, and in the NT OS/2
+Session Manager (SM).</p>
+<h3 id="executive-level-system-system-startup">1.2.1 Executive Level
+System System Startup</h3>
+<p>The executive's role in system startup is very simple. It simple
+creates a process to run SM. This is done using
+<strong>RtlCreateUserProcess</strong> with an image name of
+"\BootDevice\smss.exe". If the executive fails to create a process to
+run SM, then system startup fails. If this occurs on debug systems
+(compiled with DBG set), the NT OS/2 Command Line Interpreter (CLI) is
+started; otherwise, the system is halted with a bug check.</p>
+<h3 id="session-manager-system-startup">1.2.2 Session Manager System
+Startup</h3>
+<p>If executive level system startup is successful, then SM starts. SM
+begins by initializing itself. This includes:</p>
+<p>o Creating ports for session manager, and subsystem APIs.</p>
+<p>o Creating listen and API threads for session manager, and subsystem
+APIs.</p>
+<p>o Enabling all connection requests and APIs.</p>
+<p>Once SM is initialized, it begins system startup. Session Manager
+level system startup is driven from the NT OS/2 system configuration
+file located in "\BootDevice\ntos2.cfg". The file is a standard
+configuration file operated on by the "RtlxxxxConfigFile" APIs
+(described later in this paper).</p>
+<p>Session Manager level system startup occurs in two phases. During the
+first phase, the "soft", or "configurable" portion of the NT OS/2
+executive is configured. During the second phase, the session manager
+starts and initializes various protected subsystems.</p>
+<h4 id="first-phase-sm-system-startup">1.2.2.1 First Phase SM system
+startup</h4>
+<p>First phase SM system startup begins with an open of the NT OS/2
+system configuration file. This is done using
+<strong>RtlOpenConfigFile</strong> with a pathname of
+"\BootDevice\ntos2.cfg". If the open fails, then SM system startup does
+not occur. The system will run, but system level subsystems, and other
+portions of the system normally controlled by SM startup will not
+occur.</p>
+<p>Once the configuration file is opened, the "ntos2" section is located
+using <strong>RtlLocateSectionConfigFile</strong> with a section name of
+"ntos2". If this section can not be located, then first phase SM system
+startup terminates and second phase SM system startup begins.</p>
+<p>If the "ntos2" section is located, then all of the keywords in the
+section are enumerated and processed. Keywords are processed in
+configuration file order. Multiple keywords (keywords with the same
+keyword name) are processed in configuration file order.</p>
+<p>SM reckognizes a small set of "ntos2" section keywords. The following
+sections describe the set of supported keywords.</p>
+<h5 id="link-keyword">1.2.2.1.1 Link Keyword</h5>
+<p>The "Link" keyword causes SM to create a symbolic link object
+accessible to all processes in the system. Link keywords are processed
+in configuration file order. The syntax of the link keyword is as
+follows:</p>
+<blockquote>
+<p>Link = NAME-OF-LINK NAME-OF-LINK-TARGET</p>
+</blockquote>
+<p>The "standard" set of symbolic link objects can be created by
+including the following in the "ntos2" section of your configuration
+file. Note that system initialization no longer creates these symbolic
+link objects. It only creates the "\BootDevice" symbolic link.</p>
+<blockquote>
+<p>[ntos2]</p>
+<p>//</p>
+<p>// MIPS Links</p>
+<p>//</p>
+<p>// Link = \A: \Device\SaDisk</p>
+<p>// Link = \C: \Device\HardDisk // for 3240</p>
+<p>// Link = \C: \Device\SaDisk // for sable</p>
+<p>//</p>
+<p>//</p>
+<p>// Simulator Links</p>
+<p>//</p>
+<p>// Link = \A: \Device\Floppy1</p>
+<p>// Link = \B: \Device\Floppy2</p>
+<p>// Link = \C: \Device\Filesystem</p>
+<p>// Link = \D: \Device\Filesystem // ddfs</p>
+<p>// Link = \C: \Device\HardDisk1 // pinball</p>
+<p>//</p>
+<p>//</p>
+<p>// Standard Links</p>
+<p>//</p>
+<p>Link = \A: \Device\Floppy0</p>
+<p>Link = \C: \Device\HardDisk0\Partition1</p>
+<p>Link = \D: \Device\HardDisk1\Partition1</p>
+<p>Link = \E: \Device\HardDisk2</p>
+<p>Link = \SystemDisk \C:</p>
+</blockquote>
+<h5 id="pagingfile-keyword">1.2.2.1.2 PagingFile Keyword</h5>
+<p>The "PagingFile" keyword causes SM to create a system wide file used
+by the modified page writer. If a paging file keyword does not exist in
+your system configuration file, then the amount of virtual memory
+available on the system is limited. System initialization no longer
+creates a paging file. The syntax of the pagingfile keyword is as
+follows:</p>
+<blockquote>
+<p>PagingFile = NAME-OF-PAGING-FILE
+MAXIMUM-SIZE-OF-PAGING-FILE-MEGABYTES</p>
+</blockquote>
+<p>The following example causes the system to use a 10Mb paging file
+called pagefile.sys in the "\Nt" directory of the system disk.</p>
+<blockquote>
+<p>[ntos2]</p>
+<p>//</p>
+<p>// Create a 10Mb Paging File</p>
+<p>//</p>
+<p>PagingFile = \SystemDisk\Nt\pagefile.sys 10</p>
+</blockquote>
+<p>Note that since the previous example uses the "\SystemDisk" symbolic
+link, it must occur after the appropriate link keyword.</p>
+<h4 id="second-phase-sm-system-startup">1.2.2.2 Second Phase SM system
+startup</h4>
+<p>Second phase SM system startup begins after first phase SM startup
+completes. If first phase SM fails to open the NT OS/2 system
+configuration file, then this phase is skipped.</p>
+<p>This phase begins by locating the "sm" section of the configuration
+file. This is done using <strong>RtlLocateSectionConfigFile</strong>
+with a section name of "sm". If this section can not be located, then
+second phase SM system startup terminates.</p>
+<p>If the "sm" section is located, then all of the keywords in the
+section are enumerated and processed. Keywords are processed in
+configuration file order. Multiple keywords (keywords with the same
+keyword name) are processed in configuration file order.</p>
+<p>SM reckognizes a small set of "sm" section keywords. The following
+sections describe the set of supported keywords.</p>
+<h5 id="subsystem-keyword">1.2.2.2.1 Subsystem Keyword</h5>
+<p>The "SubSystem" keyword causes SM to start the specified system
+service emulation subsystem as a registerd subsystem. The subsystem must
+conform to the subsystem/SM connection protocol, and must accept
+appropriate proceses.</p>
+<p>When SM encounters a subsystem keyword, it creates a process to run
+the subsystem, and waits for the subsystem to complete the connection
+protocol.</p>
+<p>The syntax of the subsystem keyword is as follows:</p>
+<blockquote>
+<p>SubSystem = [debug ] PATHNAME-OF-SUBSYSTEM [,
+OPTIONAL-COMMAND-LINE]</p>
+</blockquote>
+<p>Note that processes created through the SubSystem keyword must be
+marked as COFF_TARGET_SUBSYSTEM_NATIVE images.</p>
+<p>The debug prefix is optional and if present invokes the subsystem
+with the DebugFlag passed to main set to 1. If the optional command line
+test is specified, then a pointer to the text after the comma will be
+passed in argv[ 1 ] to the main procedure of the subsystem.</p>
+<p>The following example shows the subsystem keyword needed to start the
+OS/2 subsystem.</p>
+<blockquote>
+<p>[sm]</p>
+<p>//</p>
+<p>// Start the os2 subsystem</p>
+<p>//</p>
+<p>SubSystem = \SystemDisk\Nt\SubSys\os2ss.exe</p>
+</blockquote>
+<h5 id="start-keyword">1.2.2.2.2 Start Keyword</h5>
+<p>The "Start" keyword causes SM to create and start a process. SM then
+waits for the initial thread in the process to terminate. Using this
+mechanism, you can write a server program whose initial thread performs
+all initialization then creates its worker threads. When the server is
+fully initialized and all worker threads are ready, the initial thread
+in the process could terminate. This allows SM to begin processing other
+keywords.</p>
+<p>The syntax of the start keyword is as follows:</p>
+<blockquote>
+<p>Start = [debug ] PATHNAME-OF-PROGRAM-TO-START [,
+OPTIONAL-COMMAND-LINE]</p>
+</blockquote>
+<p>Note that processes created through the start keyword must be marked
+as COFF_TARGET_SUBSYSTEM_NATIVE images.</p>
+<p>The debug prefix is optional and if present invokes the process with
+the DebugFlag passed to main set to 1. If the optional command line test
+is specified, then a pointer to the text after the comma will be passed
+in argv[ 1 ] to the main procedure of the process.</p>
+<p>The following example causes SM to start the Presentation Manager
+(PM) and security servers.</p>
+<blockquote>
+<p>[sm]</p>
+<p>//</p>
+<p>// Start PM</p>
+<p>//</p>
+<p>Start = \SystemDisk\Nt\SubSys\pmsrv.exe</p>
+<p>//</p>
+<p>// Start SAM</p>
+<p>//</p>
+<p>start = \SystemDisk\Nt\SubSys\samsrv.exe</p>
+</blockquote>
+<h5 id="run-keyword">1.2.2.2.3 Run Keyword</h5>
+<p>The "Run" keyword causes SM to create and start a process. SM does
+not wait for the process. It is simply created and set free to run. This
+keyword is useful to start logon processes and shells, and various
+"leaf" system processes.</p>
+<p>The syntax of the run keyword is as follows:</p>
+<blockquote>
+<p>Run = [debug ] PATHNAME-OF-PROGRAM-TO-RUN [,
+OPTIONAL-COMMAND-LINE]</p>
+</blockquote>
+<p>Note that processes created through the run keyword must be marked as
+COFF_TARGET_SUBSYSTEM_NATIVE images.</p>
+<p>The debug prefix is optional and if present invokes the process with
+the DebugFlag passed to main set to 1. If the optional command line test
+is specified, then a pointer to the text after the comma will be passed
+in argv[ 1 ] to the main procedure of the process.</p>
+<p>The following example causes SM to run the PM Shell and NT OS/2 Error
+Logger.</p>
+<blockquote>
+<p>[sm]</p>
+<p>//</p>
+<p>// Start PM Shell</p>
+<p>//</p>
+<p>Run = \SystemDisk\Nt\Bin\pmshell.exe</p>
+<p>//</p>
+<p>// Start Error Logger</p>
+<p>//</p>
+<p>Run = \SystemDisk\Nt\Bin\errlog.exe</p>
+</blockquote>
+<h5 id="debug-keyword">1.2.2.2.4 Debug Keyword</h5>
+<p>The "Debug" keyword causes SM to start the debug subsystem and enable
+debugging.</p>
+<p>The syntax of the debug keyword is as follows:</p>
+<blockquote>
+<p>Debug = PATHNAME-OF-DEBUG-SUBSYSTEM</p>
+</blockquote>
+<p>The following example causes SM to start the debug subsystem.</p>
+<blockquote>
+<p>[sm]</p>
+<p>//</p>
+<p>// Start DBG</p>
+<p>//</p>
+<p>Debug = \SystemDisk\Nt\SubSys\dbgss.exe</p>
+</blockquote>
+<h5 id="libpath-keyword">1.2.2.2.5 LibPath Keyword</h5>
+<p>The "LibPath" keyword causes SM to establish a default DLL search
+path. This path is made available to the loader subsystem and is used to
+locate DLLs.</p>
+<p>The syntax of the LibPath keyword is as follows:</p>
+<blockquote>
+<p>LibPath = DLL-SEARCH-PATH</p>
+</blockquote>
+<p>The following example illustrates the use of the LibPath keyword:</p>
+<blockquote>
+<p>[sm]</p>
+<p>//</p>
+<p>// Establish a DLL search path</p>
+<p>//</p>
+<p>LibPath = \BootDevice;\SystemDisk\Nt\Dll</p>
+</blockquote>
+<h5 id="short-term-keywords">1.2.2.2.6 Short Term Keywords</h5>
+<p>There are a number of keywords that are currently supported by SM,
+but are only supported due to shortcomings in the rest of the system.
+These keywords will remain until the appropriate components are complete
+and they are no longer needed. The following sections describe keywords
+that are supported, but have a limited lifetime.</p>
+<p><strong>1.2.2.2.6.1 GlobalFlag Keyword</strong></p>
+<p>The "GlobalFlag" keyword causes SM to set the value of
+<em>NtGlobalFlag</em>. This flag controls various debug portions of the
+system.</p>
+<p>The syntax of the GlobalFlag keyword is as follows:</p>
+<blockquote>
+<p>GlobalFlag = VALUE-FOR-NTGLOBALFLAG</p>
+</blockquote>
+<p>The following example illustrates the use of the GlobalFlag
+keyword:</p>
+<blockquote>
+<p>[sm]</p>
+<p>//</p>
+<p>// Setup NtGlobalFlag to display object deletion messages</p>
+<p>// and to stop on first chance exceptions</p>
+<p>//</p>
+<p>GlobalFlag = 3</p>
+</blockquote>
+<p><strong>1.2.2.2.6.2 Path Keyword</strong></p>
+<p>The "Path" keyword causes SM to establish a default search path used
+when running programs from the NT SM&gt; CLI.</p>
+<p>The syntax of the Path keyword is as follows:</p>
+<blockquote>
+<p>Path = DEFAULT-SEARCH-PATH</p>
+</blockquote>
+<p>The following example illustrates the use of the Path keyword:</p>
+<blockquote>
+<p>[sm]</p>
+<p>//</p>
+<p>// Setup a search path used at the NT SM&gt; prompt</p>
+<p>//</p>
+<p>Path = \BootDevice;\SystemDisk\Nt\Bin</p>
+</blockquote>
+<p><strong>1.2.2.2.6.3 Quota Keywords</strong></p>
+<p>The quota keywords establish a default quota for processes started
+from the NT SM&gt; CLI. Quota keywords can be used to establish:</p>
+<p>o Non-paged pool limit</p>
+<p>o Paged pool limit</p>
+<p>o Minimum working set size</p>
+<p>o Maximum working set size</p>
+<p>o Pagefile limit</p>
+<p>If a configuration file does not specify a quota keyword, then the
+defult for that resource is unlimited. Quota keywords have the following
+syntax:</p>
+<blockquote>
+<p>PagedPoolLimit = AMOUNT-OF-PAGED-POOL-QUOTA</p>
+<p>NonPagedPoolLimit = AMOUNT-OF-PAGED-POOL-QUOTA</p>
+<p>MinimumWorkingSetSize = MINIMUM-WORKING-SET-SIZE-IN-PAGES</p>
+<p>MaximumWorkingSetSize = MAXIMUM-WORKING-SET-SIZE-IN-PAGES</p>
+<p>PagefileLimit = MAXIMUM-PAGE-FILE-USAGE</p>
+</blockquote>
+<p>The following example illustrates the use of the quota keywords:</p>
+<blockquote>
+<p>[sm]</p>
+<p>//</p>
+<p>// Setup Quota</p>
+<p>//</p>
+<p>PagedPoolLimit = 1048576</p>
+<p>NonPagedPoolLimit = 1048576</p>
+<p>MinimumWorkingSetSize = 45</p>
+<p>MaximumWorkingSetSize = 75</p>
+</blockquote>
+<h1 id="configuration-file-apis">2. Configuration File APIs</h1>
+<p>The NT OS/2 user-mode DLL (udll.dll) contains a set of APIs used to
+manage configuration files. Configuration files are very similar to
+existing Microsoft configuration files (tools.ini, win.ini...).</p>
+<p>Configuration files consist of sections. Within sections, there are
+keywords that have optional values. The following describes the format
+of a configuration file (note that "#", or "//" begin line
+comments).</p>
+<blockquote>
+<p>//</p>
+<p>// Section names are enclosed in "[" and "]". Section names are</p>
+<p>// any valid C identifier. Section names are case insensitive.</p>
+<p>//</p>
+<p>[NAME-OF-SECTION]</p>
+<p>// Keywords appear within sections. Keyword names are any</p>
+<p>// valid C identifier and are case insensitive. Keywords</p>
+<p>// may optionally contain a value. A keyword's value is all</p>
+<p>// characters to the right of the "=" character. Leading</p>
+<p>// and trailing whitespace is trimmed. If a line comment</p>
+<p>// occurs on a keyword line, the keyword's value ends at</p>
+<p>// the start of the line comment with trailing whitspace</p>
+<p>// trimmed.</p>
+<p>NAME-OF-KEYWORD // keyword without a value</p>
+<p>NAME-OF-KEYWORD = VALUE-OF-KEYWORD // keyword with a value</p>
+</blockquote>
+<p>The following sample shows a standard NT OS/2 configuration file.</p>
+<blockquote>
+<p>[ntos2]</p>
+<p>//</p>
+<p>// Standard Links</p>
+<p>//</p>
+<p>Link = \A: \Device\Floppy0</p>
+<p>Link = \C: \Device\HardDisk0\Partition1</p>
+<p>Link = \D: \Device\HardDisk1\Partition1</p>
+<p>Link = \E: \Device\HardDisk2</p>
+<p>Link = \SystemDisk \C:</p>
+<p>//</p>
+<p>// Create a 10Mb Paging File</p>
+<p>//</p>
+<p>PagingFile = \SystemDisk\Nt\pagefile.sys 10</p>
+<p>[sm]</p>
+<p>//</p>
+<p>// Set up global flag to show exceptions,</p>
+<p>// LibPath to search hard disk, and Path</p>
+<p>// to search BootDevice and HardDisk</p>
+<p>//</p>
+<p>GlobalFlag = 8</p>
+<p>LibPath = \BootDevice;\SystemDisk\Nt\Dll</p>
+<p>Path = \BootDevice;\SystemDisk\Nt\Bin</p>
+<p>//</p>
+<p>// Start the debug subsystem</p>
+<p>//</p>
+<p>Debug = \SystemDisk\Nt\SubSys\dbgss.exe</p>
+<p>//</p>
+<p>// Start the os2 subsystem</p>
+<p>//</p>
+<p>SubSystem = \SystemDisk\Nt\SubSys\os2ss.exe</p>
+<p>//</p>
+<p>// Setup Quota</p>
+<p>//</p>
+<p>PagedPoolLimit = 1048576</p>
+<p>NonPagedPoolLimit = 1048576</p>
+<p>MinimumWorkingSetSize = 45</p>
+<p>MaximumWorkingSetSize = 75</p>
+</blockquote>
+<h2 id="configuration-file-data-structures">2.1 Configuration File Data
+Structures</h2>
+<p>The configuration file APIs export several data structures that are
+visible to it's users.</p>
+<h3 id="config_file">2.1.1 CONFIG_FILE</h3>
+<p>The CONFIG_FILE data structure is a "handle" to a configuration file.
+This data structure is opaque as far as it's users are concerned.</p>
+<h3 id="config_section">2.1.2 CONFIG_SECTION</h3>
+<p>The CONFIG_SECTION data structure is a "handle" to a configuration
+file section. It is used to enumerate and locate keywords within a
+section. This data structure is opaque as far as it's users are
+concerned.</p>
+<h3 id="config_keyword">2.1.3 CONFIG_KEYWORD</h3>
+<p>The CONFIG_KEYWORD is the only data structure that is not opaque.
+This data structure contains strings for the keyword's name and value.
+It also contains a pointer to the next keyword whose keyword value is
+the same.</p>
+<p>typedef struct <strong>_CONFIG_KEYWORD</strong> {</p>
+<p><strong>STRING</strong> <em>Keyword</em>;</p>
+<p><strong>STRING</strong> <em>Value</em>;</p>
+<p><strong>struct_CONFIG_KEYWORD</strong>
+<strong>*</strong><em>NextKeyword</em>;</p>
+<p><strong>struct_CONFIG_KEYWORD</strong>
+<strong>*</strong><em>LastKeyword</em>;</p>
+<p>} <strong>CONFIG_KEYWORD</strong>,
+<strong>*PCONFIG_KEYWORD</strong>;</p>
+<p><u>CONFIG_KEYWORD Structure:</u></p>
+<p><em>Keyword</em> ——Supplies the name of the keyword as a counted
+string. The <em>Keyword</em>.Buffer field is a NULL terminated
+string.</p>
+<p><em>Value</em> ——Supplies the value of the keyword as a counted
+string. If the keyword has no value, then the <em>Length</em> and
+<em>MaximumLength</em> fields are zero, and the <em>Buffer</em> filed is
+NULL. Otherwise, <em>Value</em>.Buffer is a NULL terminated string.</p>
+<p><em>NextKeyword</em> ——Supplies the address of the next keyword
+having the same keyword name. The end of the list contains a value of
+NULL. Keywords in this chain are in configuration file order.</p>
+<p><em>LastKeyword</em> ——Opaque.</p>
+<h3 id="configuration-file-apis-1">2.1.4 Configuration File APIs</h3>
+<p>There are several Configuration File APIs.</p>
+<h4 id="rtlopenconfigfile">2.1.4.1 RtlOpenConfigFile</h4>
+<p>A configuration file is opened using the following API:</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>RtlOpenConfigFile</strong>(</p>
+<p><strong>IN</strong> <strong>PSTRING</strong>
+<em>ConfigFilePathname</em>,</p>
+<p><strong>OUT</strong> <strong>PCONFIG_FILE</strong>
+<strong>*</strong><em>ConfigFile</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ConfigFilePathname</em> ——Supplies the name of the configuration
+file to open.</p>
+<p><em>ConfigFile</em> ——Returns a handle to a configuration file.</p>
+<p><u>Return Value:</u></p>
+<p>SUCCESS() ——The configuration file was opened successfully.</p>
+<p>!SUCCESS() ——A failure occured opening the configuration file, or the
+configuration file could not be properly parsed.</p>
+<p>This function opens the specified configuration file and initializes
+all associated data structures. Configuration files are broken up into
+sections, each section contains keywords and associated values.</p>
+<p>Sections are identified by a section name enclosed in braces
+appearing alone on a line. Each section contains zero or more keywords
+where a keyword is a keyword=value string.</p>
+<h4 id="rtlcloseconfigfile">2.1.4.2 RtlCloseConfigFile</h4>
+<p><strong>VOID</strong></p>
+<p><strong>RtlCloseConfigFile</strong>(</p>
+<p><strong>IN</strong> <strong>PCONFIG_FILE</strong>
+<em>ConfigFile</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ConfigFile</em> ——Supplies the address of the configuration file
+to close.</p>
+<h4 id="rtllocatesectionconfigfile">2.1.4.3
+RtlLocateSectionConfigFile</h4>
+<p><strong>PCONFIG_SECTION</strong></p>
+<p><strong>RtlLocateSectionConfigFile</strong>(</p>
+<p><strong>IN</strong> <strong>PCONFIG_FILE</strong>
+<em>ConfigFile</em>,</p>
+<p><strong>IN</strong> <strong>PSTRING</strong> <em>SectionName</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ConfigFile</em> ——Supplies the address of the configuration file
+to search for the specified section name.</p>
+<p><em>SectionName</em> ——Supplies the section name to locate in the
+configuration file.</p>
+<p><u>Return Value:</u></p>
+<p>NULL ——A matching section name was not found.</p>
+<p>NON-NULL ——Returns a pointer to the specified section.</p>
+<p>This function locates the named section in the specified
+configuration file.</p>
+<h4 id="rtllocatekeywordconfigfile">2.1.4.4
+RtlLocateKeywordConfigFile</h4>
+<p><strong>PCONFIG_KEYWORD</strong></p>
+<p><strong>RtlLocateKeywordConfigFile</strong>(</p>
+<p><strong>IN</strong> <strong>PCONFIG_SECTION</strong>
+<em>ConfigSection</em>,</p>
+<p><strong>IN</strong> <strong>PSTRING</strong> <em>KeywordName</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ConfigSection</em> ——Supplies the address of the configuration
+file section to search for the specified keyword name.</p>
+<p><em>KeywordName</em> ——Supplies the keyword name to locate in the
+configuration file section.</p>
+<p><u>Return Value:</u></p>
+<p>NULL ——A matching keyword name was not found.</p>
+<p>NON-NULL ——Returns a pointer to the specified keyword.</p>
+<p>This function locates the named keyword in the the specified
+configuration file section. If multiple values of the same keyword
+exist, the <em>NextKeyword</em> field of the returned keyword points to
+the list of duplicate keywords.</p>
+<h4 id="rtlenumeratesectionconfigfile">2.1.4.5
+RtlEnumerateSectionConfigFile</h4>
+<p><strong>PCONFIG_SECTION</strong></p>
+<p><strong>RtlEnumerateSectionConfigFile</strong>(</p>
+<p><strong>IN</strong> <strong>PCONFIG_FILE</strong>
+<em>ConfigFile</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong> <em>Restart</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ConfigFile</em> ——Supplies the address of the configuration file
+whose sections are to be enumerated.</p>
+<p><em>Restart</em> ——Supplies a value that causes the enumeration to
+start at the beginning of the section list (TRUE), or continue from the
+last returned section (FALSE).</p>
+<p><u>Return Value:</u></p>
+<p>NULL ——All sections have been returned.</p>
+<p>NON-NULL ——Returns a pointer to the next section.</p>
+<p>This function enumerates all of the sections in the specified
+configuration file. To start at the beginning of the configuration file
+the <em>Restart</em> parameter is specified as TRUE, subsequent sections
+are returned with a <em>Restart</em> value of FALSE. A value of NULL is
+returned when all of the sections have been returned.</p>
+<p>To enumerate the sections in a loop:</p>
+<blockquote>
+<p>for(p=RtlEnumerateSectionConfigFile(ConfigFile,TRUE);</p>
+<p>p;</p>
+<p>p=RtlEnumerateSectionConfigFile(ConfigFile,FALSE) )</p>
+</blockquote>
+<h4 id="rtlenumeratekeywordconfigfile">2.1.4.6
+RtlEnumerateKeywordConfigFile</h4>
+<p><strong>PCONFIG_KEYWORD</strong></p>
+<p><strong>RtlEnumerateKeywordConfigFile</strong>(</p>
+<p><strong>IN</strong> <strong>PCONFIG_SECTION</strong>
+<em>ConfigSection</em>,</p>
+<p><strong>IN</strong> <strong>BOOLEAN</strong> <em>Restart</em></p>
+<p>)</p>
+<p><u>Parameters:</u></p>
+<p><em>ConfigSection</em> ——Supplies the address of the configuration
+file section whose keywords are to be enumerated.</p>
+<p><em>Restart</em> ——Supplies a value that causes the enumeration to
+start at the beginning of the keyword list (TRUE), or continue from the
+last returned keyword (FALSE).</p>
+<p><u>Return Value:</u></p>
+<p>NULL ——All keywords have been returned.</p>
+<p>NON-NULL ——Returns a pointer to the next keyword.</p>
+<p>This function enumerates all of the keywords in the specified
+configuration file section. To start at the beginning of the
+configuration file section the <em>Restart</em> parameter is specified
+as TRUE, subsequent keywords are returned with a <em>Restart</em> value
+of FALSE. A value of NULL is returned when all of the keywords have been
+returned.</p>
+<p>Keywords having the same name are linked through the
+<em>NextKeyword</em> field. This function does not walk these links. For
+each keyword returned by this function, the caller must traverse the
+<em>NextKeyword</em> list to enumerate keywords with the same name.</p>
+<p>To enumerate the sections in a loop:</p>
+<blockquote>
+<p>for(p=RtlEnumerateKeywordConfigFile(ConfigFile,TRUE);</p>
+<p>p;</p>
+<p>p=RtlEnumerateKeywordConfigFile(ConfigFile,FALSE) )</p>
+</blockquote>

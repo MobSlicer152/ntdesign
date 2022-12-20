@@ -1,0 +1,1082 @@
+<p><strong>Portable Systems Group</strong></p>
+<p><strong>Windows NT Session Management and Control</strong></p>
+<p><strong>Author:</strong> <em>Mark Lucovsky</em></p>
+<p><em>Revision 1.9, January 7, 1990</em></p>
+<p>.Begin Table C.</p>
+<p>1. Introduction 2</p>
+<p>1.1 NT Sessions 2</p>
+<p>1.3 Windows NT System Structure 4</p>
+<p>2. General Sm Services 8</p>
+<p>2.1 SmConnectToSm 8</p>
+<p>2.2 SmGetLogonObjectDirectory 8</p>
+<p>3. Logon Process Support 9</p>
+<p>3.1 Logon Process Philosophy 9</p>
+<p>3.2 SmRegisterLogonProcess 12</p>
+<p>3.3 SmExecLogonShell 13</p>
+<p>4. System Subsystems Support 15</p>
+<p>4.1 Session Control Services 15</p>
+<p>4.1.1 SmCreateForeignSession 15</p>
+<p>4.1.2 SmSessionComplete 16</p>
+<p>4.1.3 SmTerminateForeignSession 17</p>
+<p>4.2 Piper 18</p>
+<p>4.2.1 PiperCreatePipe 18</p>
+<p>4.2.2 PiperJoinPipe 19</p>
+<p>4.2.3 PiperLeavePipe 20</p>
+<p>4.2.4 PiperReadPipe 20</p>
+<p>4.2.5 PiperWritePipe 20</p>
+<p>5. Emulation Subsystems 22</p>
+<p>5.1 PSX++ 22</p>
+<p>5.2 OS/2++ 22</p>
+<p>5.3 NT++ 23</p>
+<p>5.4 Emulation Subsystem APIs 23</p>
+<p>5.4.1 SbCreateSession 24</p>
+<p>5.4.2 SbTerminateSession 25</p>
+<p>5.4.3 SbForeignSessionComplete 26</p>
+<p>.End Table C.</p>
+<h1 id="introduction">1. Introduction</h1>
+<p>The <strong>Windows NT</strong> operating system is designed to
+support multiple concurrent application execution environments. The
+initial application execution environments that will be supported under
+<strong>Windows NT</strong> include <strong>POSIX</strong> (<em>IEEE Std
+1003.1-1988</em>), and <strong>32-Bit Cruiser OS/2</strong>.</p>
+<p>Users will see <strong>Windows NT</strong> as a system that lets them
+execute both <strong>POSIX</strong> and <strong>OS/2</strong>
+applications concurrently. There is no need to reboot the system to gain
+access to a particular execution environment.</p>
+<p>Multiple concurrent application execution environments are made
+possible by implementing these environments as <em>Emulation
+Subsystems</em>. An <em>Emulation Subsystem</em> implements the APIs of
+a given operating system as a protected subsystem. Each application
+program image file header contains a description of the operating system
+environment that it has been designed to run in (e.g.,
+<strong>cmd.exe</strong> is marked as an <strong>OS/2</strong>
+application and <strong>ed</strong> is marked as a
+<strong>POSIX</strong> application). During the process initialization
+of an application, an <em>LPC</em> connection is made between the
+application and the <em>Emulation Subsystem</em> that it has been
+designed to run with. Each system service API call that the application
+makes is translated into a <em>Local Procedure Call</em> (<em>LPC</em>)
+to the <em>Emulation Subsystem</em>. The subsystem implements the
+respective APIs using native <strong>Windows NT</strong> services.</p>
+<p>The structure of an application program with respect to an
+<em>Emulation Subsystem</em> and the Native <strong>Windows NT</strong>
+System Services is depicted below.</p>
+<p>Ö‑‑‑‑‑‑‑Ì Ö‑‑‑‑‑‑‑Ì</p>
+<p>°Port ° °Port °</p>
+<p>°Memory ° °Memory °</p>
+<p>ÛÚ‑‑‑‑‑Úì ÛÚ‑‑‑‑‑Úì</p>
+<p>° ° ° °</p>
+<p>° ° ° °</p>
+<p>Ö‑‑‑‑‑‑‑‑‑‑‑‑‑À û‑‑‑‑‑‑‑‑‑‑‑À û‑‑‑‑‑‑‑‑‑Ì</p>
+<p>°Emulation ° °Application° °User32 °</p>
+<p>°Subsystem °&lt;‑ ‑ ûÌ ÖÀ ‑ ‑&gt;°Subsystem°</p>
+<p>°OS/2 or POSIX° °° °° ° °</p>
+<p>Û‑‑‑Ú‑‑‑‑‑‑‑‑‑ì Ûé‑‑‑‑‑‑‑‑‑éì Û‑‑‑‑‑‑Ú‑‑ì</p>
+<p>° ° ° °</p>
+<p>V ° ° ° ° V</p>
+<p>Ö‑‑‑‑‑‑é‑‑‑‑‑‑‑‑‑‑‑‑‑é‑‑‑‑‑‑‑‑‑é‑‑‑‑‑‑‑‑‑‑‑é‑‑‑‑‑Ì</p>
+<p>° Û‑‑‑IPC Port‑‑ì Û‑IPC Port‑‑ì °</p>
+<p>° °</p>
+<p>° Windows NT Executive °</p>
+<h2 id="nt-sessions">1.1 NT Sessions</h2>
+<p><strong>Windows NT</strong> provides a mechanism that allows an
+application in one environment to execute an application designed to run
+in another environment. For example, the <strong>OS/2</strong> command
+line interpreter <strong>cmd.exe</strong> can start the
+<strong>POSIX</strong> editor <strong>ed</strong> as follows.</p>
+<p>- <strong>cmd.exe</strong>, an <strong>OS/2</strong> application
+calls <strong>DosExecPgm</strong> passing it the program name
+<strong>ed</strong>.- The <strong>OS/2</strong> subsystem creates a
+process ready to execute the <strong>ed</strong> program.</p>
+<p>- After creating the process, the image type is examined.</p>
+<p>- Since the image type indicates that it is not an
+<strong>OS/2</strong> application, the <strong>OS/2</strong> subsystem
+issues an <em>LPC</em> to <em>Sm</em> asking it to forward the process
+off to an appropriate <em>Emulation Subsystem</em>. <em>Sm</em> exports
+an API named <strong>SmCreateForeignSession</strong> that performs this
+function.</p>
+<p>- <em>Sm</em> examines the image type passed as part of the
+<strong>SmCreateForeignSession</strong> call. The image type indicates
+that <strong>ed</strong> is a <strong>POSIX</strong> application.</p>
+<p>- <em>Sm</em> issues an <em>LPC</em> to the <strong>POSIX</strong>
+subsystem passing it the process (originally created by the
+<strong>OS/2</strong> subsystem). Each <em>Emulation Subsystem</em>
+exports an API named <strong>SbCreateSession</strong> that performs this
+function.</p>
+<p>- When the <strong>ed</strong> application terminates, the
+<strong>POSIX</strong> subsystem issues an <em>LPC</em> to <em>Sm</em>
+indicating that the process has completed with the specified termination
+status. <em>Sm</em> exports an API named
+<strong>SmSessionComplete</strong> that performs this function.</p>
+<p>- Upon receipt of the call, <em>Sm</em> issues an <em>LPC</em> to the
+<strong>OS/2</strong> subsystem indicating that <strong>ed</strong> has
+terminated with the specified termination status. Each <em>Emulation
+Subsystem</em> exports an API named
+<strong>SbForeignSessionComplete</strong> that performs this
+function.</p>
+<p>In addition to starting an application in a different environment,
+<strong>Windows NT</strong> allows an application in one environment to
+pass information through a pipe stream to a process in another
+environment. The <em>Pipe</em> <em>Stream Subsystem</em>
+(<em>Piper</em>) exports a set of APIs used by <em>Emulation
+Subsystems</em> that make this possible.</p>
+<h2 id="nt-logon-sessions">1.2 NT Logon Sessions</h2>
+<p>To tie all related NT sessions together, a <em>logon session</em> is
+used. A logon session serves as a parent to all sessions related to a
+single logon.</p>
+<p>Associated with a logon session, and all the sessions related to it,
+is an object directory refered to as the <em>Logon Object
+Directory</em>. This object directory may be used to house objects
+related to processes related to all sessions of the logon session. The
+name of the logon object directory may be obtained using the
+<strong>SmGetLogonObjectDirectory()</strong> service.</p>
+<p>Throughout this document, the term <em>session</em> typically referes
+to an NT session. When a higher level <em>logon session</em> is being
+refered to, it will explicitly be called out as a logon session.</p>
+<h2 id="windows-nt-system-structure">1.3 Windows NT System
+Structure</h2>
+<p>Before going any further, the following diagram is presented to show
+the overall structure of the subsystems and system processes that
+implement the session management and control portion of the
+<strong>Windows NT</strong> operating system.</p>
+<p><strong>Windows NT System Structure</strong></p>
+<p>Ö‑‑‑‑‑‑‑Ì Ö‑‑‑‑‑‑‑Ì Ö‑‑‑‑‑‑‑Ì</p>
+<p>°Logon ° °Logon ° °Logon °</p>
+<p>°Process° °Process° °Process°</p>
+<p>Û‑‑‑Ú‑‑‑ì Û‑‑‑Ú‑‑‑ì Û‑‑‑Ú‑‑‑ì</p>
+<p>Û‑‑‑‑‑‑‑Ì ° Ö‑‑‑‑‑‑‑ì</p>
+<p>v v v</p>
+<p>Ö‑‑‑‑‑‑‑‑‑Ì</p>
+<p>°Sm °</p>
+<p>°Subsystem°</p>
+<p>Û‑‑Ú‑‑Ú‑‑‑ì</p>
+<p>^ ° ° ^</p>
+<p>° ° ° °</p>
+<p>Ö‑‑‑ì ° ° °</p>
+<p>° Ö‑‑‑ì ° °</p>
+<p>° v v °</p>
+<p>Ö‑‑‑‑‑Ì Ö‑‑‑‑‑‑Ù‑‑Ì Ö‑‑Ù‑‑‑‑‑‑Ì Ö‑‑‑‑Ì</p>
+<p>°Posixû&gt;°Posix ° °OS/2 °&lt;‑ÀOS/2°</p>
+<p>°App ° °SubsystemûÌ ÖÀSubsystem°&lt;Ì°App °</p>
+<p>Û‑‑‑‑‑ì Û‑Ú‑‑‑‑‑‑‑ì° °Û‑‑‑‑‑‑‑Ú‑ì °Û‑‑‑‑ì</p>
+<p>° ^ v v ^ ° ° .</p>
+<p>° ° Ö‑‑‑‑‑‑‑‑‑Ì ° ° °Ö‑‑‑‑Ì</p>
+<p>° ° °Piper ° ° ° ÛÀOS/2°</p>
+<p>° ° °Subsystem° ° ° °App °</p>
+<p>° ° Û‑‑‑‑‑‑‑‑‑ì ° ° Û‑‑‑‑ì</p>
+<p>° Û‑‑‑‑‑‑Ì Ö‑‑‑‑‑ì °</p>
+<p>Û‑‑‑‑‑‑Ì ° ° Ö‑‑‑‑‑ì</p>
+<p>v ° ° v</p>
+<p>Ö‑‑Ù‑‑‑Ù‑‑Ì Ö‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ì</p>
+<p>°Dbg °&lt;‑‑‑ÀDebug °</p>
+<p>°Subsystem°&lt;‑Ì °User Interface°</p>
+<p>Û‑‑‑‑‑‑‑‑‑ì ° Û‑‑‑‑‑‑‑‑‑‑‑‑‑‑ì</p>
+<p>° .</p>
+<p>Client ‑‑‑‑‑‑&gt; Server ° Ö‑‑‑‑‑‑‑‑‑‑‑‑‑‑Ì</p>
+<p>End End Û‑ÀDebug °</p>
+<p>°User Interface°</p>
+<p>Û‑‑‑‑‑‑‑‑‑‑‑‑‑‑ì</p>
+<p>The above diagram shows the structure of a <strong>Windows
+NT</strong> system. Most of the structure is static and is created at
+system boot time. The purpose of each component is described below.</p>
+<p><em>Logon Processes</em> - A logon process is created for each class
+of devices that can accept and process logon requests. Each logon
+process exists as a client process served by <em>Sm</em>. The
+<em>LPC</em> connection between a logon process and <em>Sm</em> is
+trusted and relatively static (created when each logon process
+initializes). A logon process is responsible for detecting logon
+requests from the devices it manages, authenticating the user (using the
+Local Security Authority), and calling <em>Sm</em> to activate the logon
+shell for the newly logged on user.</p>
+<p><em>Sm Subsystem</em> - The <em>Sm</em> subsystem is created during
+system initialization as the initial user mode process. It is
+responsible for building the structure presented in the above diagram.
+After the structure is built, <em>Sm</em> acts as the system session
+manager. In this role it is responsible for activating new logon shell
+programs and for fielding process creation requests from the various
+<em>Emulation Subsystem</em> and forwarding them on to the appropriate
+<em>Emulation Subsystem</em>.</p>
+<p>This occurs when a subsystem is instructed to execute a program
+image, and the image file header describes an image designed to run in a
+different environment. <em>Sm</em> acts as a server to both logon
+processes and <em>Emulation Subsystems</em>.</p>
+<p>As a server, <em>Sm</em> exports the following APIs over a trusted
+<em>LPC</em> connection between an <em>Emulation Subsystem</em> and
+itself:</p>
+<p>o - <strong>SmConnectToSm</strong> - Called by an <em>Emulation
+Subsystem</em> to create an <em>LPC</em> connection to <em>Sm</em>.</p>
+<p>o - <strong>SmCreateForeignSession</strong> - Called by an
+<em>Emulation Subsystem</em> when it detects an image file designed to
+execute in a different environment.</p>
+<p>o - <strong>SmTerminateForeignSession</strong> - Called by an
+<em>Emulation Subsystem</em> when it wants to terminate a session that
+it has asked <em>Sm</em> to create.</p>
+<p>o - <strong>SmSessionComplete</strong> - Called by an <em>Emulation
+Subsystem</em> when a session it has been asked to create completes.</p>
+<p>o - <strong>SmGetLogonObjectDirectory</strong> - Called by an
+<em>Emulation Subsystem</em> to determine the logon object directory
+associated with a session.</p>
+<p>As a server, <em>Sm</em> exports the following APIs over a trusted
+<em>LPC</em> connection between a <em>Logon Process</em> and itself:</p>
+<p>o - <strong>SmConnectToSm</strong> - Called by an <em>Logon
+Process</em> to create an <em>LPC</em> connection to <em>Sm</em>.</p>
+<p>o - <strong>SmRegisterLogonProcess</strong> - Called by a <em>Logon
+Process</em> to identify itself as a logon process. This is called after
+connecting to <em>Sm</em> using <strong>SmConnectToSm</strong>.</p>
+<p>o - <strong>SmExecLogonShell</strong> - Called by a <em>Logon
+Process</em> to activate a user interface shell program for a new
+interactive logon session. This is used after the user has been
+authenticated, and a token obtained from the Local Security
+Authority.</p>
+<p><em>Sm</em> acts as a client of the <em>Emulation Subsystems</em>. As
+a client, <em>Sm</em> makes the following API calls over trusted
+<em>LPC</em> connections between an <em>Emulation Subsystem</em> and
+itself:</p>
+<p>o - <strong>SbCreateSession</strong> - <em>Sm</em> calls this API to
+implement a portion of <strong>SmCreateForeignSession</strong>. After
+examining the image type, <em>Sm</em> directs this call to the
+appropriate <em>Emulation Subsystem</em>.</p>
+<p>o - <strong>SbTerminateSession</strong> - <em>Sm</em> calls this API
+to implement a portion of <strong>SmTerminateForeignSession</strong>.
+After locating the <em>Emulation Subsystem</em> responsible for the
+specified session ID, <em>Sm</em> makes this call to the <em>Emulation
+Subsystem</em>.</p>
+<p>o - <strong>SbForeignSessionComplete</strong> - <em>Sm</em> calls
+this API to implement a portion of <strong>SmSessionComplete</strong>.
+After locating the <em>Emulation Subsystem</em> responsible for the
+specified session ID, <em>Sm</em> makes this call to the <em>Emulation
+Subsystem</em>.</p>
+<p><em>Emulation Subsystems</em> - <em>Emulation Subsystems</em>
+implement the operating system service APIs for a given operating system
+environment. In this role, <em>Emulation Subsystems</em> act as "system
+service servers" exporting system service APIs between themselves and
+the applications that run in a particular environment. The <em>LPC</em>
+connections between an application and its <em>Emulation Subsystem</em>
+are not trusted. When an <em>Emulation Subsystem</em> is called it can
+determine if it created the calling thread and can fail the call if
+appropriate.</p>
+<p><em>Emulation Subsystems</em> maintain connections to other
+subsystems as well. These connections are static connections created at
+system initialization time and are trusted. Each <em>Emulation
+Subsystem</em> maintains the following static connections:</p>
+<p>o - A pair of connections is maintained between each <em>Emulation
+Subsystem</em> and <em>Sm</em>. One connection is used when the
+<em>Emulation</em> <em>Subsystem</em> is acting as a server to export
+the <strong>Sb...</strong> APIs to <em>Sm</em>. The other connection is
+used when the <em>Emulation Subsystem</em> is acting as a client calling
+the <strong>Sm...</strong> APIs.</p>
+<p>o - A single connection is maintained between each <em>Emulation
+Subsystem</em> and <em>Piper</em>. This connection allows the subsystem
+to pass pipe stream input and output between itself and another
+<em>Emulation Subsystem</em>. The <em>Emulation Subsystem</em> is
+responsible for determining when I/O needs to be serviced using APIs
+available over this connection. The <strong>Windows NT</strong> I/O
+system is not involved in this decision.</p>
+<p>o - A pair of connections is maintained between each <em>Emulation
+Subsystem</em> and the <em>Debugger</em> <em>Subsystem</em>
+(<em>Dbg</em>). One connection is used when the <em>Emulation</em>
+<em>Subsystem</em> is acting as a server to export the
+<strong>SbDebugSupport</strong> API to <em>Dbg</em>. This API lets
+<em>Dbg</em> read and write the memory and context associated with the
+specified thread, and to control the execution (start, stop, terminate)
+of the specified thread. The other connection is used by the
+<em>Emulation Subsystem</em> to notify <em>Dbg</em> of significant
+events occuring in a "debugged" thread or process (e.g., encountering an
+exception, process or thread creation, process or thread
+termination).</p>
+<p>o - A pair of implicit connections are maintained between each
+<em>Emulation Subsystem</em> and the <strong>Windows NT</strong>
+executive. These connections can act as the "<em>DebugPort</em> and
+<em>ExceptionPort</em>" values specified in a call to
+<strong>NtCreateProcess</strong>. Upon receipt of an exception, the
+<strong>Windows NT</strong> executive examines the process of the thread
+in which the exception occured. If the process was created with either a
+<em>DebugPort</em> or an <em>ExceptionPort</em>, then the <em>Emulation
+Subsystem</em> is notified of the exception over this connection.</p>
+<p><em>Piper Subsystem</em> - <em>Piper</em> is implemented as a server
+subsystem that views <em>Emulation Subsystems</em> as its clients.
+<em>Piper</em> only maintains trusted <em>LPC</em> connections between
+itself and the <em>Emulation Subsystems</em>. <em>Piper</em> is
+responsible for maintaining read/write data streams. <em>Piper</em>
+exports the following APIs:</p>
+<p>o - <strong>PiperCreatePipe</strong> - This API causes the
+<em>Piper</em> to create a pipe stream accessible to processes in the
+specified sessions. The data in the stream is only available by having
+the process' <em>Emulation Subsystem</em> call <em>Piper</em>.</p>
+<p>o - <strong>PiperJoinPipe</strong> - This API causes the
+<em>Piper</em> to bind to a pipe stream so that data can flow over the
+pipe.</p>
+<p>o - <strong>PiperLeavePipe</strong> - This API causes the
+<em>Piper</em> to close one end of a pipe stream. Once both ends of a
+pipe stream are closed, the pipe and any remaining data become
+inaccesible.</p>
+<p>o - <strong>PiperReadPipe</strong> - This API causes the
+<em>Piper</em> to return data stored in the pipe stream making room for
+new data.</p>
+<p>o - <strong>PiperWritePipe</strong> - This API causes the
+<em>Piper</em> to store data in the specified pipe stream.</p>
+<p><em>Dbg Subsystem</em> - The <em>Dbg Subsystem</em> implements the
+machine dependent facilities needed to debug an application thread. For
+more information on the <em>Dbg Subsystem</em>, refer to the
+<strong>Windows NT Debug Architecture</strong> document.</p>
+<h1 id="general-sm-services">2. General Sm Services</h1>
+<p>The <em>Sm</em> has several classes of client, and provides services
+tailored to each class. The services that are used by more than one
+class of client are:</p>
+<p><strong>SmConnectToSm<br />
+SmGetLogonObjectDirectory</strong></p>
+<p>These services are described in the following subsections.</p>
+<h2 id="smconnecttosm">2.1 SmConnectToSm</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>SmConnectToSm</strong>(</p>
+<blockquote>
+<p><strong>IN PSTRING</strong> <em>SbApiPortName</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>SbApiPort</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>OUT PHANDLE</strong> <em>SmApiPort</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SbApiPortName</em> - An optional string that if supplied
+specifies the name of a connection port that <em>Sm</em> will use to
+connect back to the <em>Emulation Subsystem</em>. This parameter is only
+used by <em>Emulation Subsystems</em> that are known to <em>Sm</em>.</p>
+<p><em>SbApiPort</em> - A optional handle that if supplied specifies a
+handle to a port named by the <em>SbApiPortName</em> parameter. This
+parameter is only used by <em>Emulation Subsystems</em> that are known
+to <em>Sm</em>.</p>
+<p><em>SmApiPort</em> - An output variable that returns a handle to a
+communication port connected to <em>Sm</em>, and over which the
+<strong>Sm...</strong> APIs may be made.</p>
+<p>The <strong>SmConnectToSm</strong> API is provided so that
+<em>Emulation Subsystem's</em> and <em>Logon Processes</em> can connect
+to <em>Sm</em>. For <em>Emulation Subsystem's</em>, the
+<em>SbApiPortName,</em> and <em>SbApiPort</em> parameters must be
+supplied. This is because in addition to creating a connection to
+<em>Sm</em> (over which the <strong>Sm...</strong> APIs are exported), a
+connection is made to the <em>Emulation Subsystem</em> over which the
+<strong>Sb...</strong> APIs are exported.</p>
+<h2 id="smgetlogonobjectdirectory">2.2 SmGetLogonObjectDirectory</h2>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>SmGetLogonObjectDirectory</strong>(</p>
+<blockquote>
+<p><strong>IN ULONG</strong> <em>SessionId</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>OUT PSTRING</strong> <em>LogonObjectDirectoryName</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SessionId</em> - An optioanl variable that supplies the session
+id whose associated logon object directory name is to be found. If this
+optional parameter is not provided, then the caller's logon object
+directory name is returned.</p>
+<p><em>LogonObjectDirectoryName</em> - A variable that returns the name
+of the session's associated logon object directory.</p>
+<p>The name of the logon object directory associated with a session can
+be determined using the <strong>SmGetLogonObjectDirectory</strong>
+function.</p>
+<h1 id="logon-process-support">3. Logon Process Support</h1>
+<p>Before a user can make use of the <strong>Windows NT</strong> system,
+that user must first "logon" to the system. Device-specific logon
+processes are responsible for collecting information about the user and
+authenticating the user. The authentication is performed using services
+of the Local Security Authority. Following authentication, a logon
+process may decide to activate a user interface shell program to
+interact with the user.(<a href="#fn1" class="footnote-ref" id="fnref1"
+role="doc-noteref"><sup>1</sup></a>) This is done using <em>Sm</em>
+services.</p>
+<p>The <em>Sm</em> services provided to support logon processes are:</p>
+<p><strong>SmRegisterLogonProcess<br />
+SmExecLogonShell</strong></p>
+<p>These services are described in following subsections. Before these
+API descriptions, some background/philosophy informtion is provided on
+logon processes.</p>
+<h2 id="logon-process-philosophy">3.1 Logon Process Philosophy</h2>
+<p>The general philosophy and logic of logon processes, from the
+perspective of the <em>Sm</em> is:</p>
+<p>o Some set of logon process are activated by configuration control or
+other means. For the standard Windows NT devices (windows, terminals,
+LAN Manager), the logon processes will be started as part of
+device/network initialization. Other logon processes, such as automated
+teller device, or cash-register device logon processes may be started
+either via configuration control, or other mechanisms, such as operator
+actions.</p>
+<p>Note that there is nothing special about a logon process except that
+it has the <strong>SeTcbPrivilege</strong> privilege. Note also that a
+logon process does not have to be an independent process running nothing
+but logon process code. For example, the windows server (User32 server)
+could include logon processing code within it.</p>
+<p>o Each logon process connects to the session manager using
+<strong>SmConnectToSm()</strong>. The <em>SbApiPortName</em> is left
+null in this call to indicate that something other than an emulation
+subsystem is connecting. At this time, the session manager doesn't yet
+know that the connected client is a logon process.</p>
+<p>o The logon process then identifies itself as a logon process. This
+is done using the <strong>SmRegisterLogonProcess()</strong> API. This
+allows the session manager to authenticate the caller as having the
+<strong>SeTcbPrivilege</strong>.</p>
+<p>As part of <strong>SmRegisterLogonProcess()</strong> processing, the
+session manager opens the client process for
+<strong>PROCESS_DUP_HANDLE</strong> access. Note that all calls from
+this logon process must originate from this same process. That is, the
+port object handles used to communicate with the session manager can not
+be shared with a third process who will also act as a logon process.</p>
+<p>o When a user attempts to log on, the logon process collects
+identification and authentication information and calls the Local
+Security Authority (LSA) directly to authenticate the user. If the
+authentication is successful, the logon process will be given a handle
+to a primary token representing the new logon session.</p>
+<p>o Once a user has been successfully authenticated, the logon process
+may activate a root process for the user by calling
+<strong>SmExecLogonShell()</strong>. This call takes as parameters:</p>
+<p>- The name of the shell (image) to activate,</p>
+<p>- A handle to the primary token to assign to the new process,</p>
+<p>- Memory quota information for the new process,</p>
+<p>- A GUID representing the new logon session (which the session
+manager will use to create a logon object directory),</p>
+<p>- (optional) environment variables that are to be passed to the new
+logon shell process.</p>
+<p>o The session manager attempts to create a new process running the
+logon shell image. The session manager sets the process's primary token
+to be that supplied by the logon process. The initial thread of this
+process is created, but left in a suspended state. It is the logon
+process's responsibility to resume the thread when desired.</p>
+<p>If the process creation is successful, then handles to the newly
+created shell process and thread are returned to the logon process. The
+process handle will be open for <strong>SYNCHRONIZE</strong> access. The
+thread handle will be open for <strong>THREAD_SUSPEND_RESUME</strong>
+access. Logon processes are expected to close these handles when no
+longer needed.</p>
+<p>This allows logon processes to:</p>
+<p>1) Specify UI shell initialization parameters (via environment
+variables). For example, the User32 logon process will specify the name
+of the window station the user has logged on from using environment
+variables.</p>
+<p>2) Wait on the newly logged on process to exit unexpectedly. For
+example, a windows32 logon shell is expected to open a desktop object in
+the window station the user logged on from. If the shell process exits
+before openning a desktop, then the User32 logon process assumes
+something has gone wrong and treats the condition as a logoff, making
+the window station available for another logon.</p>
+<h2 id="smregisterlogonprocess">3.2 SmRegisterLogonProcess</h2>
+<p><strong>NTSTATUS<br />
+SmRegisterLogonProcess</strong>(<br />
+<strong>IN HANDLE</strong> <em>SmApiPort,</em><br />
+<strong>IN PSTRING</strong> <em>LogonProcessName</em><br />
+);</p>
+<p><u>Parameters:</u></p>
+<p><em>SmApiPort</em> - A variable that supplies an handle to a
+communcation port connected to <em>Sm</em>.</p>
+<p><em>LogonProcessName</em> - A name string that identifies the logon
+process. This should be a printable name suitable for display to
+administrators. For example, "User32LogonProcess" might be used for the
+windows logon process name. No check is made to determine whether the
+name is already in use.</p>
+<p><u>Return Value:</u></p>
+<p><strong>STATUS_SUCCESS</strong> - The call completed
+successfully.</p>
+<p><strong>STATUS_PRIVILEGE_NOT_HELD</strong> - Indicates the caller
+does not have the privilege necessary to act as a logon process.
+<strong>SeTcbPrivilege</strong> is needed.</p>
+<p>Before being able to use the <strong>SmExecLogonShell()</strong>
+service, a logon process must identify itself as a logon process. This
+is done using the <strong>SmRegisterLogonProcess()</strong> service.</p>
+<p>This service verifies that the caller is a legitimate logon process.
+This is done by ensuring the caller has <strong>SeTcbPrivilege</strong>.
+It also opens the caller's process for
+<strong>PROCESS_DUP_HANDLE</strong>. This information is cached for
+future use.</p>
+<h2 id="smexeclogonshell">3.3 SmExecLogonShell</h2>
+<p><strong>NTSTATUS<br />
+SmExecLogonShell</strong>(<br />
+<strong>IN HANDLE</strong> <em>SmApiPort,</em><br />
+<strong>IN GUID</strong> <em>LogonGuid</em>,<br />
+<strong>IN PSTRING</strong> <em>ShellImageName</em>,<br />
+<strong>IN HANDLE</strong> <em>PrimaryToken</em>,<br />
+<strong>IN QUOTA_LIMITS</strong> <em>Quotas</em>,<br />
+<strong>IN</strong> <strong>RTL_USER_PROCESS_PARAMETERS</strong>
+<em>ProcessParameters</em>,<br />
+<strong>OUT PHANDLE</strong> <em>Process</em>,<br />
+<strong>OUT PHANDLE</strong> <em>Thread</em><br />
+);</p>
+<p><u>Parameters:</u>(<a href="#fn2" class="footnote-ref" id="fnref2"
+role="doc-noteref"><sup>2</sup></a>)</p>
+<p><em>SmApiPort</em> - A variable that supplies an handle to a
+communcation port connected to <em>Sm</em>.</p>
+<p><em>LogonGuid</em> - A GUID uniquelly assigned to represent this
+logon session.</p>
+<p><em>ShellImageName</em> - Provides the path name of the shell program
+to execute.</p>
+<p><em>PrimaryToken</em> - Provides a handle to the primary token to
+assign to the new process. This handle must be open for
+<strong>TOKEN_ASSIGN_PRIMARY</strong> access.</p>
+<p><em>Quotas</em> - Provides quota values to be assigned to the new
+process.</p>
+<p><em>ProcessParameters</em> - Provides parameters to be passed to the
+new process.</p>
+<p><em>Process</em> - Receives a handle to the new process. The handle
+will be open for <strong>SYNCHRONIZE</strong> access.</p>
+<p><em>Thread</em> - Receives a handle to the initial thread of the
+process. The handle will be open for
+<strong>THREAD_SUSPEND_RESUME</strong> access. The thread will not yet
+have been activated.</p>
+<p><u>Return Value:</u></p>
+<p><strong>STATUS_SUCCESS</strong> - The call completed
+successfully.</p>
+<p><strong>STATUS_NOT_LOGON_PROCESS</strong> - The caller has not
+registered as a logon process.</p>
+<p><strong>STATUS_LOGON_SESSION_EXISTS</strong> - Indicates the GUID
+assigned to this logon session is already in use.</p>
+<p>In addition to these, the following general classes of errors may be
+returned:</p>
+<p>o Errors related to creation of a process or thread, including
+attempts to access the image file.</p>
+<p>o Attempts to duplicate and assign the primary token.</p>
+<p>This service is used by logon processes to activate a user interface
+shell program for a newly logged on interactive user. The logon process
+may pass information to the new shell program via environment
+variables.</p>
+<p>The session manager:</p>
+<p>1) Creates a new logon session to run the logon shell program in,</p>
+<p>2) Creates a logon object directory for the new logon session,</p>
+<p>3) creates the logon program and the initial thread in that program
+(but leaves the thread in a suspended state).</p>
+<p>Handles to the new process and its initial thread are passed back to
+the requesting logon process. The process handle will be open for
+<strong>SYNCHRONIZE</strong> access. The thread handle will be open for
+<strong>THREAD_SUSPEND_RESUME</strong> access. The logon process is
+expected to close these handles when no longer needed.</p>
+<h1 id="system-subsystems-support">4. System Subsystems Support</h1>
+<p>System subsystems are logical extensions of the operating system.
+They provide privileged and protected operating system support, but are
+implemented as separated processes that execute in user mode.</p>
+<h2 id="session-control-services">4.1 Session Control Services</h2>
+<p>The <em>Sm</em> subsystem is responsible for coordinating the
+creation and management of sessions. It is responsible for coordinating
+the creation of sessions when <em>Emulation Subsystems</em> encounter an
+image file designed to operate in a different API environment.</p>
+<p><em>Sm</em> tends to act as an intermediary between <em>Emulation
+Subsystems</em>. It is responsible for allocating session ID's, and for
+associating a session ID with its controlling <em>Emulation
+Subsystem</em>.</p>
+<p><em>Sm</em> is also responsible for associating an image file with
+the <em>Emulation Subsystem</em> it is designed to run with.</p>
+<p><em>Sm</em> exports the following APIs to support <em>Emulation
+subsystem</em> operations:</p>
+<p><strong>SmCreateForeignSession<br />
+SmSessionComplete<br />
+SmTerminateForeignSession</strong></p>
+<h3 id="smcreateforeignsession">4.1.1 SmCreateForeignSession</h3>
+<p>A request to create a foreign session can be made using the
+<strong>SmCreateForeignSession</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>SmCreateForeignSession</strong>(</p>
+<blockquote>
+<p><strong>IN HANDLE</strong> <em>SmApiPort,</em></p>
+<p><strong>OUT PULONG</strong> <em>ForeignSessionId,</em></p>
+<p><strong>IN ULONG</strong> <em>SourceSessionId,</em></p>
+<p><strong>IN PRTL_USER_PROCESS_INFORMATION</strong>
+<em>ProcessInformation,</em></p>
+<p><strong>IN PCID</strong> <em>DebugUiClientId</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>StandardInput</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>StandardOutput</em>
+<strong>OPTIONAL</strong><em>,</em></p>
+<p><strong>IN HANDLE</strong> <em>StandardError</em>
+<strong>OPTIONAL</strong></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SmApiPort</em> - A variable that supplies an handle to a
+communcation port connected to <em>Sm</em>.</p>
+<p><em>ForeignSessionId</em> - A variable whose return value specifies
+the session ID of the created session. The session ID is assigned by the
+session manager. The session ID is used in the session control APIs to
+identify the target foreign session.</p>
+<p><em>SourceSessionId</em> - A variable that specifies the session ID
+of the application that is creating (through its <em>Emulation
+Subsystem</em>) the foreign session. This session ID is used by
+<em>Sm</em> to determine a user profile for the new session.</p>
+<p><em>ProcessInformation</em> - A structure that describes the process
+to be run as a foreign session. This data structure contains a complete
+description of the process including handles to the process and its
+initial thread. Using <strong>NtDupObject</strong>, <em>Sm</em> makes
+these handles available to the <em>Emulation Subsystem</em> responsible
+for the process. Regardless of the outcome of this call, the calling
+process looses its handles to the process and thread.</p>
+<p><em>DebugUiClientId</em> - An optional parameter that specifies the
+client ID of the debugger user interface that is debugging the session.
+If this parameter is specified, then the session is a "debug
+session".</p>
+<p><em>StandardInput</em> - An optional handle that specifies the
+standard input stream associated with the session. Using
+<strong>NtDupObject</strong>, <em>Sm</em> makes this handle available to
+the <em>Emulation Subsystem</em> responsible for the process. Regardless
+of the outcome of this call, the calling process' version of this handle
+is closed.</p>
+<p><em>StandardOutput</em> - An optional handle that specifies the
+standard output stream associated with the session. Using
+<strong>NtDupObject</strong>, <em>Sm</em> makes this handle available to
+the <em>Emulation Subsystem</em> responsible for the process. Regardless
+of the outcome of this call, the calling process' version of this handle
+is closed.</p>
+<p><em>StandardError</em> - An optional handle that specifies the
+standard error output stream associated with the session. Using
+<strong>NtDupObject</strong>, <em>Sm</em> makes this handle available to
+the <em>Emulation Subsystem</em> responsible for the process. Regardless
+of the outcome of this call, the calling process' version of this handle
+is closed.</p>
+<p><em>Emulation Subsystems</em> use this service whenever they are
+instructed to execute an image whose type is not supported by the
+subsystem (e.g. an <strong>OS/2</strong> application executes a
+<strong>DosExecPgm</strong> specifying an image file that is a
+<strong>POSIX</strong> application).</p>
+<p><em>Sm</em> implements this API by associating the image file type
+with an appropriate <em>Emulation Subsystem</em>, allocating a new
+session ID, transfering the handles ( <em>Thread, Process,
+StandardInput, StandardOutput,</em> and <em>StandardError</em>) into the
+appropriate <em>Emulation Subsystem's</em> handle table, and calling the
+<em>Emulation Subsystem</em> at its <strong>SbCreateSession</strong>
+entry point. Assuming that the call to <strong>SbCreateSession</strong>
+succeeds, the session ID of the new session is returned to the
+caller.</p>
+<h3 id="smsessioncomplete">4.1.2 SmSessionComplete</h3>
+<p><em>Sm</em> is notified that a session has completed through the
+<strong>SmSessionComplete</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>SmSessionComplete</strong>(</p>
+<blockquote>
+<p><strong>IN HANDLE</strong> <em>SmApiPort,</em></p>
+<p><strong>IN ULONG</strong> <em>SessionId,</em></p>
+<p><strong>IN NTSTATUS</strong> <em>CompletionStatus</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SmApiPort</em> - A variable that supplies an handle to a
+communcation port connected to <em>Sm</em>.</p>
+<p><em>SessionId</em> - A parameter that specifies the session ID of the
+foreign session that has completed.</p>
+<p><em>CompletionStatus</em> - A parameter that specifies the completion
+status of the session.</p>
+<p>The <strong>SmSessionComplete</strong> API is provided so that an
+<em>Emulation Subsystem</em> can notify <em>Sm</em> that one of its
+sessions has completed.</p>
+<p>Once <em>Sm</em> receives this call, it locates the <em>Emulation
+Subsystem</em> that created the foreign session using the specified
+session ID, and calls the subsystem at its
+<strong>SbForeignSessionComplete</strong> entry point.</p>
+<h3 id="smterminateforeignsession">4.1.3 SmTerminateForeignSession</h3>
+<p>A request that a foreign session be terminated can be made through
+the <strong>SmTerminateForeignSession</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>SmTerminateForeignSession</strong>(</p>
+<blockquote>
+<p><strong>IN HANDLE</strong> <em>SmApiPort,</em></p>
+<p><strong>IN ULONG</strong> <em>ForeignSessionId,</em></p>
+<p><strong>IN NTSTATUS</strong> <em>TerminationStatus</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SmApiPort</em> - A variable that supplies an handle to a
+communcation port connected to <em>Sm</em>.</p>
+<p><em>ForeignSessionId</em> - A parameter that specifies the session ID
+of the foreign session being terminated.</p>
+<p><em>TerminationStatus</em> - A parameter that specifies the reason
+that the foreign session should be terminated.</p>
+<p>The <strong>SmTerminateForeignSession</strong> API is provided so
+that an <em>Emulation Subsystem</em> can request the termination of a
+foreign session that it created.</p>
+<p><em>Sm</em> implements this call by locating the appropriate
+<em>Emulation Subsystem</em> using the specified foreign session ID, and
+then calling the subsystem at its <strong>SbTerminateSession</strong>
+entry point.</p>
+<p>The <strong>SmTerminateForeignSession</strong> call returns before
+the session is actually terminated. When the session terminates
+<em>Sm</em> will be notified.</p>
+<h2 id="piper">4.2 Piper</h2>
+<p>The <em>Piper</em> subsystem is responsible for providing pipe stream
+input and output between threads in different sessions (under the
+supervision of <em>Emulation Subsystems</em>).</p>
+<p>This capability is provided to support transfering information
+between applications that are of a different class (e.g <em>foo |
+bar</em> where <em>foo</em> is a <strong>POSIX</strong> application and
+<em>bar</em> is and <strong>OS/2</strong> application).</p>
+<p><em>Piper</em> requires coordination between the <em>Emulation
+Subsystem</em> involved in the data piping, and the application runtime
+libraries that provide stream input and output through the <em>STDIN,
+STDOUT,</em> and <em>STDERR</em> I/O streams. All application input and
+output through these streams must be handled by the application's
+<em>Emulation Subsystem</em>. Only the subsystem knows the session that
+the application is part of, and the "file names" of its input, output,
+and error streams.</p>
+<p><em>Piper</em> exports the following APIs:</p>
+<p><strong>PiperCreatePipe<br />
+PiperJoinPipe<br />
+PiperLeavePipe<br />
+PiperReadPipe<br />
+PiperWritePipe<br />
+</strong></p>
+<h3 id="pipercreatepipe">4.2.1 PiperCreatePipe</h3>
+<p>An <em>Emulation Subsystem</em> creates the potential for pipe stream
+communication between the application threads in one of its sessions,
+and application threads in a "foreign" session that it asked <em>Sm</em>
+to create using the <strong>PiperCreatePipe</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>PiperCreatePipe</strong>(</p>
+<blockquote>
+<p><strong>IN ULONG</strong> <em>ForeignSessionId</em>,</p>
+<p><strong>IN ULONG</strong> <em>SourceSessionId</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>ForeignSessionId</em> - Specifies the session ID of the foreign
+session that makes up the other end of the pipe.</p>
+<p><em>SourceSessionId</em> - Specifies the session ID of the local
+session that is creating the pipe.</p>
+<p>Creating a pipe causes the potential for pipe stream communication to
+occur between the two specified sessions. Pipes provide a full duplex
+byte stream communication path between application threads in the
+specified sessions.</p>
+<p>Data written by application threads within the local session is made
+available (to satisfy pipe reads) to threads within the foreign session.
+Reads to the pipe by application threads within the local session are
+satisfied by corresponding pipe writes made by threads within the
+foreign session.</p>
+<p>After this call completes, application threads within the local
+session may attempt to read data from the pipe, and write data to the
+pipe. Until the foreign session joins the pipe using the
+<strong>PiperJoinPipe</strong> API, data that they write will remain in
+the pipe, and their pipe reads will block.</p>
+<p>There is no need to synchronize this call with a corresponding
+<strong>PiperJoinPipe</strong> call specifying the foreign session.
+These calls may be issued in either order.</p>
+<h3 id="piperjoinpipe">4.2.2 PiperJoinPipe</h3>
+<p>An <em>Emulation Subsystem</em> joins a pipe so that it can
+participate in pipe stream communication between the application threads
+in one of its sessions, and application threads in the session that
+created it using the <strong>PiperJoinPipe</strong> function.</p>
+<p><strong>NTSTATUS<br />
+PiperJoinPipe</strong>(</p>
+<blockquote>
+<p><strong>IN ULONG</strong> <em>SessionId</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SessionId</em> - Specifies the session ID of the local session
+that is joining a pipe.</p>
+<p>Joining a pipe allows the threads within the specified local session
+to begin pipe stream communication over a pipe created in a
+corresponding call to <strong>PiperCreatePipe</strong>.</p>
+<p>After this call completes, application threads within the local
+session may read data from the pipe, and write data to the pipe.</p>
+<p>This call completes when a corresponding call to
+<strong>PiperCreatePipe</strong> is issued specifying the local session
+in its <em>ForeignSessionId</em> parameter.</p>
+<h3 id="piperleavepipe">4.2.3 PiperLeavePipe</h3>
+<p>An <em>Emulation Subsystem</em> leaves a pipe which informs
+<em>Piper</em> that it no longer wants to participate in pipe stream
+communication using the <strong>PiperLeavePipe</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>PiperLeavePipe</strong>(</p>
+<blockquote>
+<p><strong>IN ULONG</strong> <em>SessionId</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SessionId</em> - Specifies the session ID of the local session
+that is leaving the pipe.</p>
+<p>Leaving a pipe causes application threads within the local session to
+disassociate themselves with the pipe. All data destined for the local
+session is flushed, and further pipe writes to the local session
+fail.</p>
+<p>When both sessions that make up a pipe leave the pipe, the pipe is
+deleted. All data within or destined for the pipe is deleted.</p>
+<h3 id="piperreadpipe">4.2.4 PiperReadPipe</h3>
+<p>An <em>Emulation Subsystem</em> can read data from a pipe stream that
+it has either joined or created using the <strong>PiperReadPipe</strong>
+function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>PiperReadPipe</strong>(</p>
+<blockquote>
+<p><strong>IN ULONG</strong> <em>SessionId</em>,</p>
+<p><strong>OUT PUCHAR</strong> <em>DataReadBuffer</em>,</p>
+<p><strong>IN ULONG</strong> <em>DataReadLength</em>,</p>
+<p><strong>OUT PULONG</strong> <em>DataActuallyReadLength</em></p>
+<p>);</p>
+</blockquote>
+<h3 id="piperwritepipe">4.2.5 PiperWritePipe</h3>
+<p>An <em>Emulation Subsystem</em> can write data to a pipe stream that
+it has either joined or created using the
+<strong>PiperWritePipe</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>PiperWritePipe</strong>(</p>
+<blockquote>
+<p><strong>IN ULONG</strong> <em>SessionId</em>,</p>
+<p><strong>IN PUCHAR</strong> <em>DataWriteBuffer</em>,</p>
+<p><strong>IN ULONG</strong> <em>DataWriteLength</em>,</p>
+<p><strong>OUT PULONG</strong> <em>DataActuallyWrittenLength</em></p>
+<p>);</p>
+</blockquote>
+<h1 id="emulation-subsystems">5. Emulation Subsystems</h1>
+<p>The primary role of an <em>Emulation Subsystem</em> is to emulate a
+set of system services using native <strong>Windows NT</strong> system
+services. Applications written to a particular API use the appropriate
+<em>Emulation Subsystem</em> to implement that particular system
+API.</p>
+<p>Each application contains in its image file header, a description of
+the <em>Emulation Subsystem</em> that the application requires (e.g.
+OS/2 applications like cmd.exe describe the <strong>OS/2++</strong>
+subsystem). In addition to providing operating system API emulation, the
+subsystem is responsible for managing the session to which the
+application belongs. The subsystem also acts as an intermediary between
+the <strong>Dbg</strong> protected subsystem and the application when
+the application is being "debugged".</p>
+<p>Each <em>Emulation Subsystem</em> exports three <strong>Windows
+NT</strong> connection ports. An <em>LPC</em> connection to an
+<em>Emulation Subsystem</em> is established by specifying one of these
+ports in a call to <strong>NtConnectPort</strong>. Each connection port
+is associated with a class of services implemented by the <em>Emulation
+Subsystem</em>. The three classes of services are:</p>
+<p>- <em>Sm</em> to <em>Emulation Subsystem</em> APIs. The connection
+port associated with this class of services is protected such that only
+the <em>Sm</em> subsystem can access the port. Once a connection has
+been established, the <em>Emulation Subsystem</em> does not respond to
+connection requests arriving on this port. The connection between
+<em>Sm</em> and each <em>Emulation Subsystem</em> is a trusted
+connection.</p>
+<p>- <em>Dbg</em> to <em>Emulation Subsystem</em> APIs. The connection
+port associated with this class of services is protected such that only
+the <em>Dbg</em> subsystem can access the port. Once a connection has
+been established, the <em>Emulation Subsystem</em> does not respond to
+connection requests arriving on this port. The connection between
+<em>Dbg</em> and each <em>Emulation Subsystem</em> is a trusted
+connection.</p>
+<p>- Operating System APIs emulated by the subsystem. The connection
+port associated with this class of services does not have to be
+protected. Each application that is using the APIs exported over this
+connection establishes a connection during its process initialization
+sequence (<em>crt0</em> equivalent). <em>Emulation Subsystem</em> must
+authenticate each call (associate the caller's CID with a CID created by
+the subsystem) to ensure that the thread making the call is one of its
+threads. The connection between and application and its <em>Emulation
+Subsystem</em> is not a trusted connection.</p>
+<h2 id="psx">5.1 PSX++</h2>
+<p>The <strong>PSX++</strong> protected subsystem implements the APIs
+described in the <em>IEEE P1003.1/Draft 13 August 22, 1988</em>
+specification. It is responsible for managing all applications written
+to this API.</p>
+<h2 id="os2">5.2 OS/2++</h2>
+<p>The <strong>OS/2++</strong> protected subsystem implements the
+<em>Cruiser OS/2 V2.0</em> APIs. It is responsible for managing all
+applications written to this API.</p>
+<h2 id="nt">5.3 NT++</h2>
+<p>The <strong>NT++</strong> protected subsystem implements a very small
+set of APIs. Its primary purpose is to implement the set of APIs needed
+to manage and control sessions, and to provide a <em>DosExecPgm</em>
+like API that a native debugger user interface or application can use to
+create and manage a session or to execute an image designed to run with
+one of the other <em>Emulation Subsystems</em>.</p>
+<h2 id="emulation-subsystem-apis">5.4 Emulation Subsystem APIs</h2>
+<p>Each <em>Emulation Subsystem</em> exports a set of APIs designed to
+manage and control sessions. These APIs are called by the <em>Sm</em>,
+<em>Dbg</em>, or by the <strong>Windows NT</strong> executive.</p>
+<p><em>Emulation Subsystems</em> export the following APIs:</p>
+<p><strong>SbCreateSession<br />
+SbTerminateSession<br />
+SbForeignSessionComplete</strong></p>
+<p><em>Emulation Subsystems</em> see the APIs in their raw form. The
+subsystems must provide their own "API Loops" that receive and reply
+using <em>LPC</em> messages. The subsystem APIs are all called (by their
+own API loops) with a pointer to a subsystem API message
+(<em>SBAPIMSG</em>) the format of the message is given below:</p>
+<p><strong><u>SbApiMsg Structure</u></strong></p>
+<p><strong>PORTMSG</strong> <em>h</em> - This field contains a standard
+<em>LPC</em> port message. The <em>ClientId</em> of the sender, message
+type, and length information are all placed in this area by the
+system.</p>
+<p><strong>SBAPINUMBER</strong> <em>ApiNumber</em> - This field
+specifies the API number of the call. Values are:</p>
+<blockquote>
+<p><strong><u>ApiNumber Enumeration</u></strong></p>
+<p><em>SbCreateSessionApi</em> - The message specifies the
+<strong>SbCreateSession</strong> API.</p>
+<p><em>SbTerminateSessionApi</em> - The message specifies the
+<strong>SbTerminateSession</strong> API.</p>
+<p><em>SbForeignSessionCompleteApi</em> - The message specifies the
+<strong>SbForeignSessionComplete</strong> API.</p>
+</blockquote>
+<p><strong>NTSTATUS</strong> <em>ReturnedStatus</em> - This field is
+used to pass the return status of the <strong>Sb...</strong> API back to
+the caller of the API. This field is designed to be modified by the "API
+loop".</p>
+<blockquote>
+<p><strong><em>union</em></strong> <em>u</em> - This union contains one
+field for each of the API types.</p>
+<p><strong><u>u Union</u></strong></p>
+<p><strong>SBCREATESESSION</strong> <em>CreateSession</em> - This field
+contains information specific to the <strong>SbCreateSession</strong>
+API.</p>
+<p><strong>SBTERMINATESESSION</strong> <em>TerminateSession</em> - This
+field contains information specific to the
+<strong>SbTerminateSession</strong> API.</p>
+<p><strong>SBFOREIGNSESSIONCOMPLETE</strong>
+<em>ForeignSessionComplete</em> - This field contains information
+specific to the <strong>SbForeignSessionComplete</strong> API.</p>
+</blockquote>
+<h3 id="sbcreatesession">5.4.1 SbCreateSession</h3>
+<p>A session is created and placed under the control of an <em>Emulation
+Subsystem</em> through the <strong>SbCreateSession</strong>
+function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>SbCreateSession</strong>(</p>
+<blockquote>
+<p><strong>IN OUT PSBAPIMSG</strong> <em>SbApiMsg</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SbApiMsg</em> - A variable that supplies an <em>LPC</em> message
+that contains information necessary to allow the subsystem to create a
+session capable of running the process described in the message.</p>
+<p>The <em>ApiNumber</em> associated with this call is
+<em>SbCreateSessionApi</em>. The <em>CreateSession</em> field of the API
+message contains the following:</p>
+<p><strong><u>CreateSession Structure</u></strong></p>
+<p><strong>ULONG</strong> <em>SessionId</em> - A variable that specifies
+the session ID to be associated with the session being created. The
+session ID is assigned by the session manager. The session ID is used in
+the session control APIs to identify the target session.</p>
+<p><strong>RTL_USER_PROCESS_INFORMATION</strong>
+<em>ProcessInformation</em> - A structure that describes the process to
+be run as a new session. This data structure contains a complete
+description of the process including handles to the process and its
+initial thread. The subsystem is responsible for the process and thread
+even if it fails the create session request. It must terminate and close
+the process and thread at the appropriate time (even if it fails the
+session creation).</p>
+<p><strong>CID</strong> <em>DebugUiClientId</em> - An optional parameter
+that specifies the client ID of the debugger user interface that is
+debugging the session. If this parameter is specified, then the session
+is created as a "debug session". Debug sessions are created in a
+suspended state (i.e., the initial thread of the process is left
+suspended). In addition, the subsystem servicing this call must call
+into the <em>Dbg</em> subsystem to report the new debug session and the
+CID of the debugger user interface that is debugging the session.</p>
+<blockquote>
+<p><em>// All Windows NT threads are created in a suspended state. Most
+Emulation Subsystems create an application thread by creating a Windows
+NT thread and then resuming the thread. This parameter instructs the
+Emulation Subsystem to not resume the application thread. The Emulation
+Subsystem will be instructed to resume the thread through a DebugUi
+-&gt; Dbg -&gt; Emulation Subsystem transaction. //</em></p>
+</blockquote>
+<p>The value of this parameter originates in the system. When a
+<em>DebugUi</em> issues a call to an API that creates a "debug process"
+the CID of the <em>DebugUi</em> is captured by the <em>DebugUi's</em>
+<em>Emulation Subsystem</em> from the message header of the message
+associated with the process creation call. If the process is foreign to
+the <em>DebugUi's</em> subsystem, the CID passes from the
+<em>DebugUi's</em> <em>Emulation Subsystem</em> to <em>Sm</em>, and then
+from <em>Sm</em> to the <em>Emulation Subsystem</em> that should run the
+process.</p>
+<p><strong>HANDLE</strong> <em>StandardInput</em> - An optional handle
+that specifies the standard input stream associated with the session.
+Regardless of the outcome of this call, the subsystem is responsible for
+closing the handle at the appropriate time (even if it fails the session
+creation).</p>
+<p><strong>HANDLE</strong> <em>StandardOutput</em> - An optional handle
+that specifies the standard output stream associated with the session.
+Regardless of the outcome of this call, the subsystem is responsible for
+closing the handle at the appropriate time (even if it fails the session
+creation).</p>
+<p><strong>HANDLE</strong> <em>StandardError</em> - An optional handle
+that specifies the standard error output stream associated with the
+session. Regardless of the outcome of this call, the subsystem is
+responsible for closing the handle at the appropriate time (even if it
+fails the session creation).</p>
+<p>The <em>Sm</em> subsystem uses the <strong>SbCreateSession</strong>
+API to create a session to run the specified process. This call is made
+as part of the logon sequence (part of <strong>SmLogonUser</strong>), or
+when <em>Sm</em> is asked (by another subsystem, termed the "source
+subsystem") to create a session to run an image whose format is not
+understood by the source subsystem.</p>
+<h3 id="sbterminatesession">5.4.2 SbTerminateSession</h3>
+<p>A session can be terminated through the
+<strong>SbTerminateSession</strong> function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>SbTerminateSession</strong>(</p>
+<blockquote>
+<p><strong>IN OUT PSBAPIMSG</strong> <em>SbApiMsg</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SbApiMsg</em> - A variable that supplies an <em>LPC</em> message
+that contains information necessary to allow the subsystem to terminate
+the specified session.</p>
+<p>The <em>ApiNumber</em> associated with this call is
+<em>SbTerminateSessionApi</em>. The <em>TerminateSession</em> field of
+the API message contains the following:</p>
+<p><strong><u>TerminateSession Structure</u></strong></p>
+<p><strong>ULONG</strong> <em>SessionId</em> - A value that specifies
+the session ID of the session being terminated.</p>
+<p><strong>NTSTATUS</strong> <em>TerminationStatus</em> - A that
+specifies the reason that the session should be terminated.</p>
+<p>The <strong>SbTerminateSession</strong> API is provided so that a
+session can be terminated<span class="smallcaps">. T</span>his call is
+made by the <em>Sm</em> subsystem in response to a request by the
+<em>Emulation Subsystem</em> that indirectly created the session.</p>
+<p>The <strong>SbTerminateSession</strong> call returns before the
+session is actually terminated. When the session terminates, the
+<em>Sm</em> subsystem will be notified through an RPC from the session's
+controlling <em>Emulation Subsystem</em> to <em>Sm</em> at its
+<strong>SmSessionComplete</strong> entry point.</p>
+<h3 id="sbforeignsessioncomplete">5.4.3 SbForeignSessionComplete</h3>
+<p>An <em>Emulation Subsystem</em> is notified that a foreign session
+has completed through the <strong>SbForeignSessionComplete</strong>
+function.</p>
+<p><strong>NTSTATUS</strong></p>
+<p><strong>SbForeignSessionComplete</strong>(</p>
+<blockquote>
+<p><strong>IN OUT PSBAPIMSG</strong> <em>SbApiMsg</em></p>
+<p>);</p>
+</blockquote>
+<p><u>Parameters:</u></p>
+<p><em>SbApiMsg</em> - A variable that supplies an <em>LPC</em> message
+that contains information which notifies the subsystem that a foreign
+session that it started has completed.</p>
+<p>The <em>ApiNumber</em> associated with this call is
+<em>SbForeignSessionCompleteApi</em>. The
+<em>ForeignSessionComplete</em> field of the API message contains the
+following:</p>
+<p><strong><u>ForeignSessionComplete Structure</u></strong></p>
+<p><strong>ULONG</strong> <em>SessionId</em> - A value that specifies
+the session ID of the session that has completed.</p>
+<p><strong>NTSTATUS</strong> <em>CompletionStatus</em> - A value that
+specifies the completion status of the session.</p>
+<p>The <strong>SbForeignSessionComplete</strong> API is provided so that
+a subsystem can be notified that a foreign session that it created has
+completed. The subsystem that services this call is the subsystem that
+originally requested that the foreign session be created.</p>
+<p>Once this call returns, the session ID is available for re-use.</p>
+<p><strong>Revision History</strong></p>
+<p>Revision 1.9, January 7, 1990. Jim Kelly (JimK)</p>
+<p>1) Eliminated all references to Presentation Manager.</p>
+<p>2) Changed logon so that logon processes authenticate directly with
+the Local Security authority (LSA) and then interact with the NT Session
+Manager to activate the logon shell process. This obsoleted the
+SmLogonUser() API and caused the introduction of the
+SmRegisterLogonProcess() and SmExecLogonShell() APIs.</p>
+<section id="footnotes" class="footnotes footnotes-end-of-document"
+role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Note that this is not always the case. The LAN Manager
+logon process, for instance, authenticates users as part of session
+setup, but no shell process is activated.<a href="#fnref1"
+class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>Loup, DaveC, DarrylH: Do we need a
+<em>CaptiveAccount</em> parameter too?<a href="#fnref2"
+class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
