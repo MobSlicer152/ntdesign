@@ -1,0 +1,831 @@
+Portable Systems Group
+
+NT OS Base Product Contents
+
+Author: Lou Perazzoli
+
+Original Draft 0.0, September 19, 1990
+
+Revision 0.1, September 25, 1990
+
+Revision 0.2, October 2, 1990
+
+Revision 0.3, October 15, 1990
+
+Revision 0.4, October 18, 1990
+
+Revision 0.5, October 30, 1990
+
+Revision 0.6, November 27, 1990
+
+.Begin Table C.
+
+1. Introduction 1
+
+2. Internal development workstation 1
+
+3. Beta testing SDK kit (includes DDK) 2
+
+3.1 API Sets 2
+
+3.2 Subsystems 2
+
+3.3 File Systems 3
+
+3.4 Device Drivers 3
+
+3.4.1 MIPS R4000 PC drivers: 4
+
+3.4.2 Intel 486/MP and uni-processor drivers: 4
+
+3.5 Fault tolerance 5
+
+3.6 Language support 5
+
+3.7 MIPS support 5
+
+3.8 Intel 486 support 5
+
+3.9 Hardware booting support 6
+
+3.10 Installation / Setup 6
+
+3.11 Performance utilities 6
+
+3.12 Development utilities 7
+
+3.13 Internal Development Utilities (not shipped with SDK) 7
+
+4. Retail Product for RISC/PC (includes an SDK) 8
+
+4.1 API Sets 8
+
+4.2 Subsystems 8
+
+4.3 Device Drivers 8
+
+4.4 File Systems 8
+
+4.5 Fault tolerance 8
+
+4.6 Language support 8
+
+4.7 Hardware booting support 8
+
+4.8 Installation / Setup 8
+
+4.9 Security 9
+
+4.10 Performance utilities 11
+
+4.11 Development utilities 12
+
+5. Retail Product for Servers (RISC, 486 and 486MP) 13
+
+5.1 API Sets 13
+
+5.2 Subsystems 13
+
+5.3 File Systems 13
+
+5.4 Device Drivers 13
+
+5.5 Fault tolerance 13
+
+5.6 Language support 13
+
+5.7 Hardware booting support 13
+
+5.8 Installation / Setup 14
+
+5.9 Security 14
+
+5.10 Performance utilities 14
+
+5.11 Development utilities 14
+
+6. Retail Product for 486 workstations 15
+
+6.1 API Sets 15
+
+6.2 Subsystems 15
+
+6.3 File Systems 15
+
+6.4 Device Drivers 15
+
+6.5 Fault tolerance 15
+
+6.6 Language support 15
+
+6.7 Intel 486 support 15
+
+6.8 Installation / Setup 15
+
+6.9 Security 16
+
+6.10 Performance utilities 16
+
+6.11 Development utilities 16
+
+.End Table C.
+
+1. Introduction
+
+This document describes the NT Base group deliverables for the NT OS for
+four product releases:
+
+o beta testing SDK kit for RISC and 486
+
+o retail product for MIPS and 486 workstation (includes retail SDK kit).
+
+o retail product for RISC, uniprocessor 486, and 486 mutliprocessor
+servers
+
+o retail product for 486 workstation which includes MVDM and Win-16
+support.
+
+Note that 386 workstations will be supported (B6 stepping and above),
+but they will not have kernel support for correcting the deficiencies in
+i386 memory management. This deficiency manifests itself by allowing one
+thread to change the page protection on a page to read-only and having
+another thread (which is executing a kernel service) write to that page.
+The 486 has hardware support to honor page protections in kernel mode.
+
+The Base group is responsible for those portions of NT OS which do not
+include networking or windowing, for example, device drivers, files
+systems, scheduler, loader.
+
+2. Internal development workstation
+
+Allows self-hosting of NT on an NT workstation. This includes CMD.EXE,
+compiler, assembler, linker, SLM, editor (MEP), redirector, and other
+tools.
+
+As the windowing environment will still be under development, a stopgap
+character mode window driver will be developed which will allow the VGA
+on the 386/486 and frame buffer on JAZZ to appear as an ANSI terminal
+device. This allows character based applications to operate using the
+graphics device as an output device. The ANSI terminal emulation will be
+incorporated into the Windows environment for the SDK release. This
+support is described in the document titled NT Console Interface
+Specification.
+
+ 3. Beta testing SDK kit (includes DDK)
+
+The beta testing SDK kit contains the basic features of NT OS to allow
+ISVs and OEMs to begin developing applications and device drivers
+targeted specifically at Win-32 and/or NT.
+
+3.1 API Sets
+
+The following API sets are provided (including necessary header files
+for C language):
+
+Win-32 Base API - provides the 32-bit interface for integrating with the
+base operating system. These APIs are described in the document titled
+Win32 Base APIs and are designed as a logical extension to the Windows
+3.0 Base APIs thereby allowing a straightforward conversion of software
+developed for Windows 3.0. This same API set is offered on the 32-bit
+version of Windows.
+
+NT Native API - this is the underlying API set for NT. It is currently
+undecided if this API set is formally documented, though certain
+features may be provided through an "NT Extension" API set. One such
+feature which would improve server based applications is asynchronous
+I/O. Issue: if the NT API set is provided, documentation must exist.
+
+Device Drivers - this is the "public executive" (device helper) API set
+exposed by NT kernel mode components. The User Ed group is developing
+documentation for device driver developers. The NT Design Workbook
+specifies the device driver model and interface in documents titled NT
+OS Driver Model Specification and NT OS I/O System Specification.
+
+3.2 Subsystems
+
+The NT OS base provides a number of subsystems which act as servers for
+various applications. Subsystems operate as user mode processes but may
+have amplified privileges beyond the client application. This allows
+subsystems to manage global state, open key files, and manage critical
+resources on behalf of its clients.
+
+The following subsystems exist in the NT OS base:
+
+o Session Manager - provides a mechanism to start processes executing
+images which were developed for a different API environment then the
+current process. For example, a POSIX application can "exec" an image
+which was developed with the OS/2 API set. The session manager is
+describes in a document titled NT OS Session Management and Control.
+
+o Security
+
+o Local Security Authority - maintains security policy information,
+including list of privileged users, audit control, and security domain
+membership. This is described in a document titled NT OS Local Security
+Specification.
+
+o Security Account Manager - maintains user and group account
+information as described in the document NT OS Security Account Manager
+Protected Server (SAM).
+
+o Loader - provides mechanism for locating DLLs, translating symbol
+names to executable images, and other DLL related functions.
+
+o Windows Base - provide mechanism for maintaining shared state between
+window processes and groups. The functionality provided by this
+subsystem may be moved to the subsystem which provides windows graphic
+support.
+
+o Debug - provides dispatching of debug events. This subsystem is
+described in the document titled NT OS Debug Architecture.
+
+Issue: Is DOS emulation required on the RISC/PC? How about Win-16
+emulation?
+
+3.3 File Systems
+
+o FAT - supports the FAT file format. This allows floppy disks to be
+exchanged between NT and DOS. The overall file system design is
+described in the document titled NT File System Design Note.
+
+o HPFS - supports the HPFS file format as defined by OS/2 v1.21.
+
+o NTFS - supports the NT native fully recoverable file system. This file
+system provides enhanced data integrity features to provide basic
+support for transactions. The NTFS is described in the document titled
+NT Recoverable File System Specification.
+
+o CD-ROM - supports the ISO CD-ROM file format.
+
+o NPFS - supports named pipes. The named pipe file system is described
+in the document titled NT Named Pipe File Specification.
+
+o BOOT - supports multiple boot partitions and allows new file formats
+to be bootable as described in the NT Boot Architecture.
+
+3.4 Device Drivers
+
+Device drivers provide the necessary logic to bind the I/O functions to
+a physical device. NT OS supplies the proper mechanisms to allow drivers
+to be loaded either at system initialization or later once the system is
+operational.
+
+3.4.1 MIPS R4000 PC drivers:
+
+o floppy as described in the document NT Floppy Driver Specification.
+
+o SCSI driver with support for disk, CD-rom and tape as described in NT
+SCSI Design Note.
+
+o serial - western digital part (2 serial, 1 parallel port), supports
+modems, printers, basic serial devices as described in the NT Serial
+Driver Specification.
+
+o parallel - western digital part, supports printers and basic parallel
+devices as described in the NT Parallel Driver Specification.
+
+o video - frame buffer as described in NT Screen Device Driver Design
+Note.
+
+o keyboard as described in NT Keyboard Device Driver Design Note.
+
+o mouse - in port as described in NT Mouse Device Driver Design Note.
+
+o sound
+
+o EISA support - verification driver to show that EISA functions
+properly.
+
+3.4.2 Intel 486/MP and uni-processor drivers:
+
+o floppy as described in the document NT Floppy Driver Specification.
+
+o SCSI driver with support for disk, CD-rom and tape as described in NT
+SCSI Design Note.
+
+o disk - ST506 EDSI driver as described in the NT EDSI Driver
+Specification.
+
+o serial - Intel 8250 part supports modems, printers, basic serial
+devices as described in the NT Serial Driver Specification.
+
+o parallel supports printers and basic parallel devices as described in
+the NT Parallel Driver Specification..
+
+o video - frame buffer as described in NT Screen Device Driver Design
+Note.
+
+o keyboard as described in NT Keyboard Device Driver Design Note.
+
+o mouse - in port and serial variants as described in NT Mouse Device
+Driver Design Note.
+
+o EISA support - verification driver to show that EISA functions
+properly
+
+o MCA support - verification driver to show that MCA functions properly
+
+3.5 Fault tolerance
+
+For systems with battery backed up memory, power fail recovery is
+supported. This support involves saving volatile hardware registers and
+caches into RAM during loss of power and restoring the system state when
+power is regained. At restoration time, all drivers requesting powerfail
+notification are notified and any I/O operations in progress are
+restarted by the drivers.
+
+3.6 Language support
+
+3.7 MIPS support
+
+o C compiler for MIPS (from either MS or MIPS)
+
+o MIPS assembler for R4000 (only runs on RISC/PC)
+
+o Linker for R4000 (provided by NT/Base group)
+
+o Debugger similar to symdeb
+
+o Kernel debugger for device driver ISV's (requires separate host
+machine, currently running OS/2)
+
+o C Run time libraries for Win-32 applications
+
+o Cross development tools for 486 development:
+
+o C6.0 compiler
+
+o MASM Assembler
+
+o Linker for 486 modules. Current plan is for the NT native linker to
+support both MIPS and 486 OMFs (Object Module Formats).
+
+3.8 Intel 486 support
+
+o C6.0 compiler
+
+o MASM Assembler
+
+o Linker for 486 modules.
+
+o Debugger similar to symdeb
+
+o Kernel debugger for device driver ISV's (requires host machine,
+currently OS/2).
+
+Issue: the kernel debugger should be ported to the Win-32 environment at
+a minimum and possibly to the Win-16 environment. Porting to the Win-16
+environment provides the least disruption to the target audience.
+
+o C Run time libraries for Win-32 applications
+
+3.9 Hardware booting support
+
+The following platforms are being utilized for development and/or
+testing and as such hardware booting support and configuration will be
+provided.
+
+o Power PC/RISC (Jazz)
+
+o Compaq Deskpro-486 (EISA)
+
+For 386 environments, Intel 387 floating point emulation is provided for
+system without 387 coprocessors.
+
+3.10 Installation / Setup
+
+The beta SDK release will have minimal installation / setup support.
+This includes support for building a bootable system from a floppy disk
+kit and copying the appropriate SDK header files and utilities to the
+hard disk.
+
+3.11 Performance utilities
+
+The beta SDK will have basic performance utilities.
+
+o profiler - provides mechanism to obtain a time sampled PC histogram.
+The profiler is implemented like a debugger; no changes are required to
+the application to enable profiling. The profiler operates in its own
+address space and creates profiling objects on behalf of the process
+being profiled. When the process completes, the profiler closes the
+profile objects and analyzes the collected data. The beta SDK version of
+the profiler will not be GUI based. The profiler fucntionality is not
+currently documented.
+
+o show system information - shows the current resource usage, active
+processes, active threads, etc. within the system. The show system
+functionality is not currently documented.
+
+3.12 Development utilities
+
+  CMD.EXE - command interpreter (ported from OS/2) provides basic
+  commands (dir, ren, del, etc) and batch script capability.
+
+  format - format disks, supports FAT format for floppy, HPFS, FAT, and
+  NTFS for hard disks.
+
+  chkdsk - check disk, checks disk for consistent file structure and bad
+  blocks
+
+  chmode - allows protection on file to be changed
+
+  diskcopy - sector based floppy disk copy
+
+  diskcomp - sector based disk comparison
+
+  du - disk usage by directory
+
+  ech - echo string
+
+  fcom - compare files (both text and binary)
+
+  fcopy - general purpose file/directory copy
+
+  fdel - general purpose file/directory deletion
+
+  fview - extensible file viewer, views text files, objects, images,
+  etc.
+
+  ls - list directory contents
+
+  nmake - program maintenance utility
+
+  ppr - remote print
+
+  qgrep - search for strings in files
+
+  sort - sort file contents base on keys
+
+  timer - simple execution timer
+
+  touch - change file time stamps
+
+  walk - walk a directory tree applying command to files and directories
+
+  where - locate files in a directory tree
+
+  ync - single character batch file prompts (yes, no, continue)
+
+  editor (MEP) which utilizes WinHelp
+
+3.13 Internal Development Utilities (not shipped with SDK) 
+
+  cp - copy file to file or files to directory
+
+  delnode - delete directory tree
+
+  exp - remove deleted files
+
+  mv - rename files and directories
+
+  rm - make files deleted
+
+  slm - source control maintenance facility
+
+  t - terminal emulator
+
+  undel - undelete deleted files
+
+  upd - timestamp based file copy
+
+  updrn - timestamp base file copy for directories
+
+  xcopy - copy file and directory tree
+
+ 4. Retail Product for RISC/PC (includes an SDK)
+
+The retail product for RISC/PC includes the final version of the
+components provided in the beta SDK release plus installation/setup
+features, POSIX compliance and security at the C2 level.
+
+4.1 API Sets
+
+Same as beta SDK with addition of POSIX support.
+
+POSIX 1003.1 API - provides the POSIX compliant APIs. These APIs are
+defined by the IEEE 1003.1 POSIX specification. The APIs supported are
+the minimum set required for to obtain POSIX certification, i.e., none
+of the optional APIs will be supported.
+
+4.2 Subsystems
+
+Same as Beta SDK with the addition of POSIX.
+
+o POSIX - provides support for all processes executing the POSIX API
+set.
+
+4.3 Device Drivers
+
+Same as beta SDK.
+
+4.4 File Systems
+
+Same as beta SDK.
+
+4.5 Fault tolerance
+
+Same as beta SDK.
+
+4.6 Language support
+
+Same as beta SDK plus the addition of C run time libraries for POSIX
+applications.
+
+4.7 Hardware booting support
+
+Same as beta SDK.
+
+4.8 Installation / Setup
+
+Complete installation / setup support including configuration
+management. The documentation for installation and system management is
+currently under development.
+
+o Architecture dependent kernel routines
+
+o System configuration / configuration management
+
+o System management
+
+o Error log reporting mechanism. This is a character mode application
+that allows error log reports to be generated based on error type, time,
+and device type. For example, list all Fatal errors on device Harddisk0
+between Jan 1 1990 12:00 and Jan 1 1990 18:00.
+
+o System crash dump and analysis utility. This provides a mechanism to
+dump the contents of physical memory to a file on the disk in the case
+of a system crash. When the system is rebooted, the analysis utility
+allows the cause of the crash to be analyzed. In severe cases, crash
+dump contents may be copied to floppy or tape and sent to product
+support specialists for analysis.
+
+o File backup on SCSI tape. This utility provides the ability to backup
+and restore complete volumes or selected files onto tape.
+
+  Issue: does this need to be SYTRON compatible to provide the ability
+  to read files written on an OS/2 system? How about just supporting TAR
+  format??
+
+o Application installation - provides a mechanism to install application
+software on an NT system.
+
+o National Language Support (NLS) - provides a mechanism for tailoring
+an NT system to a specific language environment.
+
+o Shutdown - allow orderly shutdown of the system as a reasonable
+alternative to Ctrl-Alt-Del. The shutdown mechanism flushes file caches,
+terminates network connects, and does an orderly shutdown of the system.
+
+4.9 Security 
+
+NT OS provides security features to allow the base operating system to
+be certified at the C2 level (discretionary access control) for the
+first product release, and eventually at the B1 level. In order to gain
+certifications certain features and utilities must be present in the
+system to allow the detection and analysis of break-in attempts and
+suspected attempts. In addition, a mechanism must be provided to allow
+users to display and manipulate security information on objects, most
+notably files.
+
+The following components are provided to support security:
+
+User Interface:
+
+User Account Manager - This utility is based upon the LAN Manager 3.0
+User Account Manager utility. It includes minor extensions to support
+administration of Security Account Manager concepts that don't exist in
+LAN Manager.
+
+Local Security Manager - This utility allows the security parameters of
+each NT system to be administered. This is a new utility with no
+corresponding LAN Manager functionality. This utility will utilize the
+Local Security Manager DLL described below.
+
+Win32 Logon User Interface - This is the user interface presented at
+logon time. It collects the user name and password and prevents password
+stealing by unauthorized processes. This UI is projected by the Win32
+logon process described below.
+
+Win32 File Browser extensions - The Win32 File Browser will be extended
+to support security by:
+
+- Displaying security of files and directories upon request.
+
+- Allow modification of file and directory protection and auditing
+requirements (using the Object Security editor DLL described below).
+
+- Allow modification of file and directory owner values.
+
+The Win32 Shell will allow a user to establish security personas and to
+modify the user's active security persona. This will allow the user to
+perform actions such as changing default protection or enabling and
+disabling privileges.
+
+Some aspects of installation will deal with establishing the customer's
+mode of operation (secure or non-secure) and collecting security
+parameters, if running securely. A secure system may also have to
+convert a LAN Manager UAS database to a Security Account Manager
+database.
+
+Some aspects of configuration control will deal with the security
+attributes associated with components of the configured system. For
+example, protected subsystems, such as the NT Session Manager, may be
+assigned privileges to be run with.
+
+Runtime Library & Client Stubs:
+
+Runtime Library routines will be included for the manipulation of
+security data structures, such as access control lists.
+
+Client RPC stubs will be included for Security Account Manager services,
+making the security Account Manager a network-wide service. This allows
+administration of security accounts from remote nodes.
+
+Client RPC stubs will be included for Local Security Authority services,
+making the Local Security Authority a network-wide service. This allows
+administration of individual system security from remote nodes.
+
+Executable Images And DLLs:
+
+Security Account Manager protected subsystem image (sam.exe). This image
+is run as a native NT protected subsystem. It services user/group
+account administration requests, as well as user authentication
+requests. This image will only be run on Domain Controller nodes.
+
+Local Security Authority protected subsystem (lsa.exe). This image is
+run as a native NT protected subsystem. This image is responsible or
+maintaining and enforcing all security policy for an individual system,
+such as what audit messages to generate. This protected subsystem will
+be active on each NT system.
+
+Win32 Logon Process (w32logon.exe). This image is responsible for
+monitoring Win32 for logon requests, and processing them when received.
+It prevents Trojan programs from stealing user passwords. This is a
+customer modifiable or replaceable module and we will ship the source
+code for this module. This image will be active on each NT system.
+
+Local Security Manager DLL (lsm.dll). This DLL provides Win32 user
+Interface screens for administering the local system security. This is
+implemented as a DLL to allow this functionality to be activated from a
+number of related UI utilities (such as the security account
+administrator).
+
+Object Security Editor DLL (objsec.dll). This DLL provides object
+protection viewing and modification capabilities. It is implemented as a
+DLL to allow a standard view of object security to be used anyplace it
+is needed. For example, the file browser will use this DLL for file and
+directory protection modification and the Security Account Manager will
+use this DLL for user and group account protection modification.
+
+4.10 Performance utilities
+
+Same as beta SDK with a GUI interface to show system information
+utility.
+
+4.11 Development utilities
+
+Same as beta SDK with the addition of UI enhancements to some utilities
+and the user debugger.
+
+ 5. Retail Product for Servers (RISC, 486 and 486MP)
+
+The retail product for servers includes the retail product components
+provided in the above product in addition to a more robust networking
+environment.
+
+5.1 API Sets
+
+Same as RISC workstation product.
+
+5.2 Subsystems
+
+Same as RISC workstation product.
+
+5.3 File Systems
+
+Same as RISC workstation product.
+
+5.4 Device Drivers
+
+Same as retail product (both MIPS and 486).
+
+5.5 Fault tolerance
+
+o Disk Mirror - allows files mirroring of disk image on another disk(s)
+block for block. While this is implemented as a layered driver, it is
+listed under file systems.
+
+o UPS - uninterruptable power systems support
+
+o Dual controller support ??
+
+5.6 Language support
+
+Same as RISC workstation product with the addition of C++ support.
+
+5.7 Hardware booting support
+
+The following platforms are being utilized for development and/or
+testing and as such hardware booting support and configuration will be
+provided.
+
+o Power PC/RISC (Jazz)
+
+o Power PC/486 with EISA bus
+
+o Power PC/486 with MCA bus
+
+o Compaq Deskpro 486
+
+o IBM PS/2 Model 90
+
+o Power MP/486 - to be determined.
+
+5.8 Installation / Setup
+
+Same installation / setup features provided in the RISC workstation
+product plus the addition of:
+
+o Disk mirroring management
+
+o Logical volume management - allows multiple disks to be configured
+such that they appear as a single drive.
+
+5.9 Security 
+
+More network based security? remote admin?
+
+5.10 Performance utilities
+
+network performance things?
+
+5.11 Development utilities
+
+Same as RISC workstation product.
+
+ 6. Retail Product for 486 workstations
+
+The retail product for 486 workstations provides the support for running
+Windows 16-bit applications and DOS applications as well as support for
+32-bit OS/2 non PM base (i.e., server) applications.
+
+6.1 API Sets
+
+Same as server product.
+
+6.2 Subsystems
+
+Same as server product plus the addition of:
+
+o MVDM subsystem
+
+o Windows 16-bit subsystem
+
+o OS/2 subsystem
+
+6.3 File Systems
+
+Same as server product.
+
+6.4 Device Drivers
+
+Same as server product.
+
+6.5 Fault tolerance
+
+Same as server product.
+
+6.6 Language support
+
+Same as server product.
+
+6.7 Intel 486 support
+
+Same as server product.
+
+5.8 Hardware booting support
+
+Same as server product.
+
+6.8 Installation / Setup
+
+Same installation / setup features provided in the server product plus
+the addition of:
+
+o MVDM installation
+
+o Windows 16-bit installation
+
+o OS/2 Subsystem installation
+
+6.9 Security 
+
+Same as server product.
+
+6.10 Performance utilities
+
+Same as server product.
+
+6.11 Development utilities
+
+Same as server product.

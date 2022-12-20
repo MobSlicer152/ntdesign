@@ -1,0 +1,720 @@
+Portable Systems Group
+
+NT OS/2 Product Description and Implementation Plan
+
+Author: David N. Cutler
+
+Revision 0.1, October 24, 1990
+
+.Begin Table C.
+
+1. Executive Summary 1
+
+2. Overall Goals 2
+
+3. Major Milestones, Implementation Strategy, and Overall Schedule 3
+
+4. Self Hosted Development Environment 4
+
+4.1. ANSI Terminal Based 386/486 Self Hosted System 4
+
+4.2. ANSI Terminal Based MIPS Self Hosted System 6
+
+4.3. Windows Based Self Hosted 386/486 and MIPS System 7
+
+5. Beta Test SDK 8
+
+6. Product Descriptions 8
+
+6.1. Power PC Workstation Release 8
+
+6.1.1 Deliverables 8
+
+6.1.2 Base System 8
+
+6.1.3 Windows 8
+
+6.1.4 Network 8
+
+6.1.5 Schedule 8
+
+6.1.6 Dependencies 9
+
+6.1.7 Issues 9
+
+6.2. Multiprocessor Server Release 9
+
+6.2.1 Deliverables 9
+
+6.2.2 Base System 9
+
+6.2.3 Windows 9
+
+6.2.4 Network 9
+
+6.2.5 Schedule 9
+
+6.2.6 Dependencies 9
+
+6.2.7 Issues 9
+
+6.3. Full Workstation Release 9
+
+6.3.1 Deliverables 9
+
+6.3.2 Base System 9
+
+6.3.3 Windows 9
+
+6.3.4 Network 9
+
+6.3.5 Schedule 9
+
+6.3.6 Dependencies 10
+
+6.3.7 Issues 10
+
+7. Product/Major Milestone Descriptions and Schedules 10
+
+8. Project Goals 10
+
+9. Dependencies 10
+
+9.1. Languages Group 10
+
+9.2. LanMan Group 11
+
+9.3. Testing Group 11
+
+9.4. User Ed Group 11
+
+10. Hardware Plans 12
+
+.End Table C.
+
+1. Executive Summary
+
+NT OS/2 , here referred to simply as NT, is a new operating system
+product being developed by Microsoft which is portable and supports the
+Windows 32-bit base system APIs, graphical user interface, and window
+management software.
+
+This document describes implementation plans for the NT operating system
+and contains product descriptions, projected release dates, an overall
+schedule, a summary of the work items to be performed, and a list of
+external dependencies.
+
+Development on NT actually began approximately two years ago and has
+progressed to the point where significant system functionality is
+operational on both 386/486 and MIPS RISC platforms.
+
+In addition to the development of the NT operating system, Microsoft is
+also developing a reference implementation for RISC PCs based on the
+MIPS R4000 microprocessor chip. This hardware architecture will be the
+main target for the first NT product release.
+
+The development and product releases of NT will be phased such that new
+markets are addressed first, followed by high end server markets, and
+finally the general workstation market.
+
+NT is aimed at the high end of Microsoft's systems business and, when
+running on an 386/486 platform, will share a binary compatible 32-bit
+programming interface with the low end implementation of the Windows
+32-bit operating system environment based on DOS and an extension of
+Windows 3.0.
+
+On RISC systems, NT will provide source level compatiblity with the
+386/486 versions of the Windows 32-bit operating system environment, and
+binary compatibility with other RISC systems of the same architecture.
+
+Typically NT will service markets requiring larger memories and higher
+performance (e.g., greater than 4mb and RISC performance levels),
+whereas the low end system will service markets requiring smaller
+memories, lower performance, and x86 binary compatibility (.e.g, less
+than 4mb of memory and up to 486 performance).
+
+Currently four major product releases are planned, although it is likely
+that one of more of these releases will be combined.
+
+The first release of NT is planned as a workstation product that will
+provide a strong competitor to UN*X based workstations. It will provide
+the Windows 32-bit operating system environment, a POSIX compliant
+execution environment, high integrity, robustnesss, security, and be
+network enabled as both a client and a server. The primary target for
+this release is a MIPS based RISC PC, although a 386/486 system will
+also be developed in parallel and be ready for deployment.
+
+\A major issue that needs to get resolved is whether DOS and/or Windows
+16-bit emulation needs to be provided on the RISC platform. Another
+issue relates to whether the 1003.2 tools need to be delivered with the
+POSIX environment./
+
+The second release of NT is planned as a scalable performance server
+product and adds multiprocessor support for 486 systems, LanMan 3.0
+functionality, an extensive set of network device drivers, and the full
+services needed to replace OS/2 1.x as the primary Microsoft server
+platform. Its main marketing goal is to provide strong competitor with
+Novell for server based systems.
+
+The third release of NT adds full support for 386/486 workstations and
+includes DOS emulation, Windows 16-bit emulation, OS/2 32-bit Base APIs,
+and certified C2 security. It will provide a full PC workstation
+environment.
+
+The fourth release of NT adds support for multiprocessor RISC servers.
+This release will most lilely be combined with the second release if
+hardware is available for testing and evaluation.
+
+In addition to the planned product releases, an OAK, DDK, SDK, and
+source porting kit will be available at the appropriate times.
+
+2. Overall Goals
+
+The overall long term goals for the NT project are to:
+
+o Provide Microsoft with a high end Windows 32-bit operating system that
+is portable, secure, and provides the base technology to compete with
+UN*X on the desktop, Novell in the network, and provides the advanced
+features necessary to implement "information at your finger tips".
+
+o Provide Microsoft with a reference implementation of a RISC platform
+based on the MIPS R4000 microporcessor chip that can be used to
+facilitate the establishment of standards for the implementation of RISC
+PCs and servers.
+
+o Deliver on the above two goals by providing a series of product
+releases that build functionality, let Microsoft address new markets,
+and provide strong compatibility ties to existing and future low end
+products.
+
+The specific development goals for NT are:
+
+o Portability - NT will be written in C and will be portable to RISC,
+the 386/486, and other architectures. A typical port to a new
+architecture should take no longer than six calender months.
+
+o Security - NT will be designed to have pervasive security and will be
+capable of attaining the "B" levels of security as defined by the U.S.
+government. Initially it will be certified at the C2 level.
+
+o Compatibility - NT will provide a high degree of compatiblity with
+other Microsoft systems.
+
+- Window 32-bit Environment - Binary compatibility with the low end
+implementation of 32-bit Windows environment will be provided when
+running on a 386/486 system. On RISC platforms, source level
+compatibility with 386/486 systems will be provided and binary
+compatibiity with other RISC platforms of the same architecture.
+
+- OS/2 32-bit Base APIs - Binary compatibility will be provided with the
+OS/2 2.0 32-bit Base APIs when running on a 386/486 platform. On RISC
+platforms source level compatiblity will be provided.
+
+\OS/2 32-bit Base API binary compatibility is predicated on IBM
+accepting and implementing all of the NT OS/2 DCRs that were implemented
+in Cruiser. This includes the image format, structured exception
+handling, alignment of arguments, and changes to the semantics of
+muxwait.\
+
+- DOS and Windows 16-bit Environment - Binary compatibility with DOS and
+16-bit Windows will be provided when running on a 386/486 system. On
+RISC platforms, these capabilities will be provided via software
+emulation of the 8086 instruction set.
+
+\It is not clear how extensive these capabilites will be. The simplest
+and most straight forward approach is to only run "clean" APPs that do
+not make arcane use of hardware resources. If all APPS have to be
+executed without change, then this goal becomes more difficult to
+achieve. Another question is whether network services need to be
+available to 16-bit environments.\
+
+- File Systems - Binary compatible on-disk structures will be provided
+for the FAT, HPFS, and CD-ROM file systems on both 386/486 and RISC
+platforms.
+
+- Network - LanMan compatible protocols, redirector, server, and network
+services will be provided.
+
+o Multiprocessors - NT will support symmetric multiprocessing and
+provide scalable performance on 486 and RISC based platforms.
+
+o POSIX - NT will provide a POSIX compliant IEEE 1003.1 (FIPS 151-1)
+POSIX execution environment for deployment in the government
+marketplace.
+
+o Virtual Memory - NT will provide support for a 32-bit flat addressed
+virtual environment with demand paging, mapped files, and asynchronous
+I/O.
+
+The 486 and RISC PC platforms will be fully supported by NT and will
+provide a robust and high integrity system. The deficiencies in the 386
+memory management architecture, however, will not be fully masked and
+will result in a 386 based system that is less secure and does not
+exhibit the same level of integrity and robustness as the 486 and RISC
+systems. In actual practice this should not be a concern and only
+represents an exposure in a system under malicious attack.
+
+\386 platforms must contain an i386 B6 stepping or above to be
+supported. Earlier steppings will not be supported and an attempt to
+boot on such a platform will be rejected by the NT system with an
+appropriate error message.\
+
+3. Major Milestones, Implementation Strategy, and Overall Schedule
+
+Several major milestones are planned on the road to a the first release
+of an NT product. These milestones lead through a progression of
+functionality and will increase confidence that the implementation is
+proceeding according to plan.
+
+Currently NT boots and executes user programs on both 386/486 and MIPS
+R3000 based DECstation 5000s. However, the network software is not
+complete, the complete set of development tools are not in place, the
+implementation of the Windows 32-bit base system APIs, graphical user
+interface, and window management environment are just beginning, and the
+system is not capable of supporting its own development. In addition,
+the Jazz hardware is not yet available for software development.
+
+The first major milestone is the finalization of the implemenation plan,
+product descriptions, and development schedule. This is expected to
+occur before the end of the year with the first draft completed by
+November 30, 1990.
+
+The main implementation strategy for NT is to provide a self hosted
+development environment on NT as quickly as possible. This will provide
+more testing, force the focus to a stable system that supports its own
+development, and provide a viable system for ISV and hardware OEM
+development.
+
+Self hosting will first occur on the 386/486 and be followed shortly
+thereafter on the Jazz MIPS hardware. The initial self hosted
+development environment will support network connections to the source
+code server, character mode development tools, and will require an
+additional machine for mail and producing word documents.
+
+The target date for self hosting on 386/486 systems is March 26, 1991
+and the target date for the Jazz MIPS system is April 25, 1991.
+
+Self hosting with character mode tools will be followed by a windows
+environment that supports an ANSI terminal window. This will allow the
+windowing and graphical user interface software to be combined into the
+system that is running on each developer's desktop.
+
+The target date for a self hosted system on both the 386/486 and Jazz
+MIPS platforms using the windowing environment is ????.
+
+The next major milestone is a Beta Test SDK that contains a full Windows
+32-bit environment on both 386/486 and Jazz platforms. The target date
+for the Beta Test SDK is ????.
+
+It is envisioned that two major updates to the beta-test SDK will be
+required before the first real product release. These updates will occur
+at approximately 3 month intervals.
+
+The target for the first product release is ????.
+
+4. Self Hosted Development Environment
+
+The self hosted development system provides for the development of NT on
+NT. There are three self hosted system milestones described below.
+
+4.1. ANSI Terminal Based 386/486 Self Hosted System
+
+The 386/486 self hosted system will occur first and will contain
+following tools and components:
+
+1. A completely functional NT base system with virtual memory,
+multithreading, process management, image/DLL loader, file system
+support (FAT and HPFS), and disk driver (ST506).
+
+2. Support for the Windows 32-bit base system API minus the named pipe,
+sound, and registration APIs.
+
+3. ANSI terminal support for character mode APPs in the keyboard, mouse,
+and display drivers.
+
+4. A complete C runtime library that uses the Windows 32-bit base system
+APIs.
+
+5. A command interpreter (CMD.EXE) and the Z-Tools.
+
+6. The source language maintenance utility (SLM).
+
+7. A full screen editor (MEP).
+
+8. The make utility (NMAKE).
+
+9. A native profile utility.
+
+10. A linker that produces executable images and DLLs.
+
+11. An object module conversion utility to convert from the Microsoft
+x86 object format to the COFF format(CVTOMF).
+
+12. The NT system build utility (BUILD.EXE).
+
+13. A LanMan redirector that is capable of communicating with and
+accessing files and printing on a LanMan 2.0 server.
+
+14. A NetBeui transport.
+
+15. The CFRONT C++ preprocessor.
+
+16. An Etherlink II NDIS driver.
+
+17. A 386/486 C compiler with structured exception handling.
+
+18. A 386/486 assembler.
+
+19. A 386/486 user mode debugger.
+
+20. An OS/2 hosted 386/486 kernel debugger.
+
+The NT group will deliver all of these components except the last four
+items which will be delivered by the Microsoft Languages group.
+
+\A schedule commmitment is required from the languages group for support
+of an NT OS/2 hosted 386/486 C compiler, 386/486 assembler, and 386/486
+user mode debugger.\
+
+Four people from the NT group will be responsible for pulling together
+the actual system and verifying its operation over a 6-8 week period.
+These people are tentatively identified as Bryanwi, Stever, Garyki, and
+Davidtr. Kylesh from the testing group will be the offical build
+resource and will be responsible for maintaining the build and
+maintenance trees.
+
+People developing the MIPS self hosted system will not be able to switch
+their development environment to the 386/486 NT system since they will
+have to be able to continue to compile on the DECstation 5000 systems
+which are accessed using TCP/IP.
+
+The target data for the self hosted 386/486 system is March 26, 1991.
+
+\A complete set of Windows 32-bit base system API tests should be
+operatioinal to check out this system. What other tests should be
+available?\
+
+\A complete set of network aware file tests should be available.\
+
+\File system and file server stress tests should be available.\
+
+\Are there any doucmentation requirements?\
+
+Documentation will be required for installation and a description of the
+features that are, and are not, available in the various utilities.
+
+4.2. ANSI Terminal Based MIPS Self Hosted System
+
+The MIPS self hosted system implementation will proceed in parallel with
+the 386/486 self hosted system support but will not occur until after
+the 386/486 version. It will contain the following additional tools and
+components:
+
+1. A port of the NT base system from the DECstation 5000 to the R3000
+based Jazz system. This requires a new set of device drivers for the
+SCSI and floopy disks and an update to the original i860 bootstrap code.
+
+2. A port of the NT base system from the R3000 based Jazz system to the
+R4000 base Jazz system. This requires a rewrite of the trap handling
+code, an update to the memory management code, and an update to the
+interlocked operations.
+
+3. ANSI terminal support for character mode APPs in the keyboard, mouse,
+and display drivers.
+
+4. A port and verification of all the above development utilities and
+tools to the MIPS environment. This includes the 386/486 C compiler and
+386/486 assembler.
+
+5. The MIPS C compiler with structured exception handling.
+
+6. The MIPS assembler.
+
+7. A MIPS user mode debugger.
+
+8. An OS/2 hosted MIPS kernel debugger.
+
+9. A Sonic chip NDIS driver.
+
+10. A port and verification of the redirector and NetBeui transport.
+
+The NT group will deliver all of these components except the 386/486 C
+compiler, 386/486 assembler, the MIPS user mode debugger, and the OS/2
+hosted MIPS kernel debugger which are being delivered by the Microsoft
+Languages Group.
+
+\A schedule commmitment is required from the languages group for support
+of an NT OS/2 hosted 386/486 C compiler, 386/486 assembler, and a MIPS
+user mode debugger.\
+
+Four people from the NT group will be responsible for pulling together
+the actual system and verifying its operation over a 6-8 week period.
+These people are tentatively identified as Markl, Davegi, Tomm, and
+Larryo. Kylesh from the testing group will be the offical build resource
+and will be responsible for maintaining the build and maintenance trees.
+
+The target data for the self hosted MIPS system is April 25, 1991.
+
+Meeting the target date assumes that a MIPS compiler will be available
+on the DECstation 5000 by December 1, 1990 that fully supports
+structured exception handling and a Microsoft C compatible packed
+pragma.
+
+Meeting the target date also assumes that the R3000 based Jazz hardware
+will be available for use by the NT software group by December 1, 1990
+and that the R4000 based Jazz system will be available by February 1,
+1991.
+
+\We will have to decide how to split the source tree for multiple
+targets within one architecture. Currently this is done via conditional
+compilation, but the differences between the R3000 and R4000 based Jazz
+system will be too great to use this methodology.\
+
+\A ported set of Windows 32-bit base system API tests should be
+available for testing this system. What other tests should be
+available?\
+
+\A complete set of network aware file tests should be available.\
+
+\File system and file server stress tests should be available.\
+
+4.3. Windows Based Self Hosted 386/486 and MIPS System
+
+The windows based self hosted system adds Windows support for an ANSI
+terminal window and allows the phase over from the interim ANSI terminal
+capabilites to a fully windowed system. This system will be supported on
+both 386/486 and MIPS platforms and will form the development
+environment for the components and capabilities needed for the Beta Test
+SDK system.
+
+The Windows based self hosted system will contain the following
+additional capabilities and components:
+
+1. ANSI terminal support in a window.
+
+2. The GDI subset required for window support.
+
+3. The user window manager.
+
+4. The program manager in the shell.
+
+5. Kernel and DDI level device drivers for the Jazz and 386/486 display,
+keyboard, and mouse that have the interim ANSI terminal support removed.
+
+6. The resource compiler.
+
+\What other tools and capabilities are needed?\
+
+\What is the debugging environment for windows apps? Is it 3.1
+compatible? Does it require a separate terminal?\
+
+\The 32-bit thunks kit would help the development of Windows 32-bit APPs
+before the full windowing environment is available.\
+
+The target date for the self hosted windows system is May 1, 1991.
+
+5. Beta Test SDK
+
+The Beta Test SDK will be a formally packaged system that is distributed
+to a selected set of ISVs and hardware OEMs wishing to develop device
+drivers. It will be supported on a selected 486 platform and the Jazz
+MIPS platform.
+
+It will contain preliminary installation and configuration management
+software.
+
+Windows based version of user debugger.
+
+DDK and device driver writers guide.
+
+NDIS driver writers guide.
+
+6. Product Descriptions
+
+This following sections contain a detailed description of the various
+product releases and schedules.
+
+6.1. Power PC Workstation Release
+
+6.1.1 Deliverables
+
+This section contains a description of the deliverables.
+
+6.1.2 Base System
+
+6.1.3 Windows
+
+6.1.4 Network
+
+6.1.5 Schedule
+
+This section section contains the schedule for major milestones.
+
+6.1.6 Dependencies
+
+This section contains the dependencies on other groups.
+
+User-Ed, Testing, Languages, Lan, Windows-32.
+
+6.1.7 Issues
+
+This section contains any issues that need to be called out.
+
+6.2. Multiprocessor Server Release
+
+6.2.1 Deliverables
+
+This section contains a description of the deliverables.
+
+6.2.2 Base System
+
+6.2.3 Windows
+
+6.2.4 Network
+
+6.2.5 Schedule
+
+This section section contains the schedule for major milestones.
+
+6.2.6 Dependencies
+
+This section contains the dependencies on other groups.
+
+User-Ed, Testing, Languages, Lan, Windows-32.
+
+6.2.7 Issues
+
+This section contains any issues that need to be called out.
+
+6.3. Full Workstation Release
+
+6.3.1 Deliverables
+
+This section contains a description of the deliverables.
+
+6.3.2 Base System
+
+6.3.3 Windows
+
+6.3.4 Network
+
+6.3.5 Schedule
+
+This section section contains the schedule for major milestones.
+
+6.3.6 Dependencies
+
+This section contains the dependencies on other groups.
+
+User-Ed, Testing, Languages, Lan, Windows-32.
+
+6.3.7 Issues
+
+This section contains any issues that need to be called out.
+
+7. Product/Major Milestone Descriptions and Schedules
+
+The development strategy that is being followed is to
+
+The next major milestone in the development of NT OS/2 will be the
+ability of the operating system to host its own development. This is
+planned to be operational on both the x86 and the MIPS RISC PC in Q1'91.
+
+This milestone will be followed by a beta quality field test SDK that
+will be available on the MIPS RISC PC and Compaq 486 systems in Q3'91.
+
+The first retail product will be a MIPS RISC PC that supports the
+Windows 32-bit APIs, is network enabled, provides a robust and secure
+operating environment, and is capable of competing with UN*X systems. A
+secondary goal for this product is the support for Compaq 486 systems.
+The target date for this product is Q1'92.
+
+The second retail product is aimed at providing a robust and secure
+platform for scalable performance LanMan servers. This release will
+support multi-processor 486 systems (possibly also MIPS RISC
+multi-processor systems as well) and will support all the network
+services and NDIS drivers necessary to compete with Novell on 386 and
+486 systems. The target date for this product is H2'92.
+
+The third retail product is aimed at providing a full workstation
+capability for 368 and 486 systems that is certifiably secure, contains
+support for DOS and Windows 16-bit applications, and also supports the
+OS/2 32-bit base system APIs. The target date for this product is
+somtime in 93.
+
+What products have an OAK? DDK?
+
+8. Project Goals
+
+9. Dependencies
+
+The NT operating system products are dependent on several groups to
+provide necessary components for the various product releases.
+
+9.1. Languages Group
+
+The NT effort is dependent on the languages group to deliver the
+necessary programming tools for the 386, 486, and MIPS platforms to
+support self hosted development.
+
+Programming tools to be supplied by the languages group are split into
+two groups; those required for 386 and 486 development, and those
+required for MIPS development. All tools must be ported to the NT
+environment and run under the NT operating system.
+
+The following is a list of the 386 and 486 tools to be delivered by the
+languages group:
+
+76. C compiler with structured exception handling.
+
+77. x86 Assembler.
+
+78. Linker capable of producing NT format images.
+
+79. User debugger capable of supporting multi-thread debugging.
+
+80. Kernel debugger capable of supporting multi-processor debugging.
+
+The following is a list of the MIPS tools to be delivered by the
+languages group:
+
+81. User debugger capable of supporting multi-thread debugging.
+
+82. Kernel debugger capable of supporting multi-processor debugging.
+
+The languages group is also planning to deliver a C compiler for MIPS
+that supports structured exception handling. However, this compiler will
+not be available for use in time to support the self hosting of NT
+development. Therefore, the MIPS C compiler, which also supports
+structured exception handling, is being ported to the NT environment as
+a backup.
+
+A linker capable of linking MIPS object modules into an executable image
+will be provided by the NT Base System group.
+
+The MIPS assembler is being ported to o the NT OS/2 environment to
+support self hosting and product develoment in assembly language.
+
+C++?? C++ seh??
+
+9.2. LanMan Group
+
+Lan group for UI components, RPC stub compiler and runtime, TCP/IP
+transport and utiltiies.
+
+9.3. Testing Group
+
+Testing group for ??
+
+9.4. User Ed Group
+
+NT system services manual - who does?
+
+Driver writers course?
+
+NDIS driver writers course.
+
+Where will the documentation for the MIPS compiler and assembler come
+from? Who will do?
+
+10. Hardware Plans
